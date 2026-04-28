@@ -3064,8 +3064,8 @@ function syncMarketOptions() {
     sel.value    = state.market;
   }
   // Params panel: hide for WS (params go in JSON body, not query string)
-  document.getElementById("params-container").style.display =
-    state.apitype === "ws" ? "none" : "";
+  const _pc = document.getElementById("params-container");
+  if (_pc) _pc.style.display = state.apitype === "ws" ? "none" : "";
 }
 
 /* ── Render ────────────────────────────────────────────────────────── */
