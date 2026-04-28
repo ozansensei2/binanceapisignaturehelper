@@ -288,28 +288,7 @@
     /* ── Print / PDF ────────────────────────────────────────────────── */
     .print-only { display: none; }
 
-    @page { margin: 0; size: auto; }
-
-    @media print {
-      * { visibility: hidden; }
-      pre, pre * { visibility: visible; }
-      pre {
-        position: fixed;
-        top: 0; left: 0;
-        width: 100%;
-        margin: 0;
-        padding: 0;
-      }
-      pre code.hljs {
-        font-size: 9pt !important;
-        line-height: 1.5 !important;
-        padding: 16px !important;
-        background: white !important;
-        color: #111 !important;
-        white-space: pre-wrap !important;
-        word-break: break-all !important;
-      }
-    }
+    .pdf-btn.loading { opacity: 0.6; cursor: wait; pointer-events: none; }
 
     pre {
       margin: 0;
@@ -489,6 +468,8 @@
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 
 /* ── Endpoints ─────────────────────────────────────────────────────── */
@@ -1919,7 +1900,26 @@ document.getElementById("sel-env").addEventListener("change",    e => { state.en
 document.getElementById("sel-market").addEventListener("change", e => { state.market = e.target.value; render(); });
 document.getElementById("sel-lang").addEventListener("change",   e => { state.lang   = e.target.value; render(); });
 document.getElementById("add-param-btn").addEventListener("click", addParamRow);
-document.getElementById("pdf-btn").addEventListener("click", () => window.print());
+document.getElementById("pdf-btn").addEventListener("click", async () => {
+  const btn = document.getElementById("pdf-btn");
+  btn.classList.add("loading");
+  btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 3a5 5 0 100 10A5 5 0 008 3zm0-3a8 8 0 110 16A8 8 0 018 0z" opacity=".3"/><path d="M8 0a8 8 0 018 8h-2a6 6 0 00-6-6V0z"><animateTransform attributeName="transform" type="rotate" from="0 8 8" to="360 8 8" dur=".8s" repeatCount="indefinite"/></path></svg> Generating…';
+
+  try {
+    const pre    = document.querySelector("pre");
+    const canvas = await html2canvas(pre, { backgroundColor: "#161b22", scale: 2, logging: false });
+    const img    = canvas.toDataURL("image/png");
+    const { jsPDF } = window.jspdf;
+    const pw = canvas.width  / 2;
+    const ph = canvas.height / 2;
+    const pdf = new jsPDF({ orientation: pw > ph ? "l" : "p", unit: "px", format: [pw, ph], hotfixes: ["px_scaling"] });
+    pdf.addImage(img, "PNG", 0, 0, pw, ph);
+    pdf.save("binance-api-snippet.pdf");
+  } catch(e) { console.error(e); }
+
+  btn.classList.remove("loading");
+  btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M14 4.5V14a2 2 0 01-2 2H4a2 2 0 01-2-2V2a2 2 0 012-2h5.5L14 4.5zm-3 0A1.5 1.5 0 019.5 3V1H4a1 1 0 00-1 1v12a1 1 0 001 1h8a1 1 0 001-1V4.5h-2z"/><path d="M5.5 10.5a.5.5 0 01.5-.5h4a.5.5 0 010 1H6a.5.5 0 01-.5-.5zm0 2a.5.5 0 01.5-.5h4a.5.5 0 010 1H6a.5.5 0 01-.5-.5zM6 7.5a.5.5 0 000 1h2a.5.5 0 000-1H6z"/></svg> PDF';
+});
 
 document.getElementById("copy-btn").addEventListener("click", () => {
   const code = document.getElementById("code-block").textContent;
