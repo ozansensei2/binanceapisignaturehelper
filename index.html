@@ -504,9 +504,11 @@ const ENDPOINTS = {
   },
   uds: {
     mainnet: {
-      spot:  'wss://ws-api.binance.com:443/ws-api/v3',
-      usdm:  'wss://fstream.binance.com/private',
-      coinm: 'wss://dstream.binance.com'
+      spot:      'wss://ws-api.binance.com:443/ws-api/v3',
+      usdm:      'wss://fstream.binance.com/private',
+      coinm:     'wss://dstream.binance.com',
+      portfolio: 'wss://fstream.binance.com/pm',
+      options:   'wss://fstream.binance.com/private'
     },
     testnet: {
       spot: 'wss://demo-ws-api.binance.com'
@@ -518,7 +520,7 @@ const ENDPOINTS = {
 const MARKET_AVAILABLE = {
   rest: { mainnet: ['spot','usdm','coinm','portfolio','options'], testnet: ['spot','usdm','coinm'] },
   ws:   { mainnet: ['spot','usdm','coinm'],                       testnet: ['spot','usdm','coinm'] },
-  uds:  { mainnet: ['spot','usdm','coinm'],                        testnet: ['spot'] }
+  uds:  { mainnet: ['spot','usdm','coinm','portfolio','options'],   testnet: ['spot'] }
 };
 
 /* ── WS method names per market ────────────────────────────────────── */
@@ -530,8 +532,10 @@ const WS_METHODS = {
 
 /* ── UDS REST endpoints (for listenKey creation — usdm / coinm) ─────── */
 const UDS_REST_EP = {
-  usdm:  { mainnet: 'https://fapi.binance.com/fapi/v1/listenKey' },
-  coinm: { mainnet: 'https://dapi.binance.com/dapi/v1/listenKey' }
+  usdm:      { mainnet: 'https://fapi.binance.com/fapi/v1/listenKey' },
+  coinm:     { mainnet: 'https://dapi.binance.com/dapi/v1/listenKey' },
+  portfolio: { mainnet: 'https://papi.binance.com/papi/v1/listenKey' },
+  options:   { mainnet: 'https://eapi.binance.com/eapi/v1/listenKey' }
 };
 
 /* ── UI metadata ───────────────────────────────────────────────────── */
