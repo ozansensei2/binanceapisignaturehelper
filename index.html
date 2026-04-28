@@ -504,7 +504,9 @@ const ENDPOINTS = {
   },
   uds: {
     mainnet: {
-      spot: 'wss://ws-api.binance.com:443/ws-api/v3'
+      spot:  'wss://ws-api.binance.com:443/ws-api/v3',
+      usdm:  'wss://fstream.binance.com/private',
+      coinm: 'wss://dstream.binance.com'
     },
     testnet: {
       spot: 'wss://demo-ws-api.binance.com'
@@ -516,7 +518,7 @@ const ENDPOINTS = {
 const MARKET_AVAILABLE = {
   rest: { mainnet: ['spot','usdm','coinm','portfolio','options'], testnet: ['spot','usdm','coinm'] },
   ws:   { mainnet: ['spot','usdm','coinm'],                       testnet: ['spot','usdm','coinm'] },
-  uds:  { mainnet: ['spot'],                                      testnet: ['spot'] }
+  uds:  { mainnet: ['spot','usdm','coinm'],                        testnet: ['spot'] }
 };
 
 /* ── WS method names per market ────────────────────────────────────── */
@@ -524,6 +526,12 @@ const WS_METHODS = {
   spot:  'account.status',
   usdm:  'v2/account.balance',
   coinm: 'v1/account.balance'
+};
+
+/* ── UDS REST endpoints (for listenKey creation — usdm / coinm) ─────── */
+const UDS_REST_EP = {
+  usdm:  { mainnet: 'https://fapi.binance.com/fapi/v1/listenKey' },
+  coinm: { mainnet: 'https://dapi.binance.com/dapi/v1/listenKey' }
 };
 
 /* ── UI metadata ───────────────────────────────────────────────────── */
@@ -3519,6 +3527,445 @@ SUBSCRIBE='{"id":"1","method":"userDataStream.subscribe"}'
 # Send logon then subscribe, then listen indefinitely
 (echo "\$LOGON"; sleep 1; echo "\$SUBSCRIBE"; sleep 86400) | websocat -n "\$BASE_URL"`;
 
+/* ════════════════════════════════════════════════════════════════════
+   USD-M / COIN-M User Data Stream — listenKey approach
+   {{REST_EP}} → REST endpoint for listenKey   {{EP}} → WebSocket base URL
+   All auth types (HMAC/RSA/Ed25519) produce identical code —
+   listenKey creation only requires X-MBX-APIKEY header, no signature.
+═══════════════════════════════════════════════════════════════════ */
+const T_uds_lk = {};
+
+T_uds_lk.python = `import requests, json, threading, time
+from websocket import WebSocketApp
+
+API_KEY  = "YOUR_API_KEY"
+REST_URL = "{{REST_EP}}"
+WS_BASE  = "{{EP}}"
+
+# Step 1: Create listenKey (no signature needed — only X-MBX-APIKEY header)
+resp       = requests.post(REST_URL, headers={"X-MBX-APIKEY": API_KEY})
+listen_key = resp.json()["listenKey"]
+print(f"listenKey: {listen_key}")
+print(f"Connecting to: {WS_BASE}/ws/{listen_key}")
+
+def on_message(ws, message): print(json.loads(message))
+def on_error(ws, error):     print("Error:", error)
+def on_open(ws):             print("Listening for account events (Ctrl+C to stop)...")
+
+# Keep-alive: extend listenKey every 30 minutes
+def keep_alive():
+    while True:
+        time.sleep(1800)
+        requests.put(REST_URL, headers={"X-MBX-APIKEY": API_KEY})
+        print("listenKey extended")
+
+threading.Thread(target=keep_alive, daemon=True).start()
+
+ws = WebSocketApp(f"{WS_BASE}/ws/{listen_key}",
+                  on_message=on_message, on_error=on_error, on_open=on_open)
+ws.run_forever()
+# DELETE {REST_URL} with X-MBX-APIKEY header to close the stream`;
+
+T_uds_lk.javascript = `const https     = require("https");
+const WebSocket = require("ws");
+
+const API_KEY  = "YOUR_API_KEY";
+const REST_URL = new URL("{{REST_EP}}");
+const WS_BASE  = "{{EP}}";
+
+// Step 1: Create listenKey (no signature — only X-MBX-APIKEY header)
+const req = https.request({
+  hostname: REST_URL.hostname, path: REST_URL.pathname, method: "POST",
+  headers: { "X-MBX-APIKEY": API_KEY, "Content-Length": 0 }
+}, (res) => {
+  let data = "";
+  res.on("data", (c) => data += c);
+  res.on("end", () => {
+    const { listenKey } = JSON.parse(data);
+    console.log("listenKey:", listenKey);
+
+    // Step 2: Connect to User Data Stream
+    const ws = new WebSocket(WS_BASE + "/ws/" + listenKey);
+    ws.on("open",    () => console.log("Listening for account events (Ctrl+C to stop)..."));
+    ws.on("message", (d) => console.log(JSON.parse(d.toString())));
+    ws.on("error",   (e) => console.error(e));
+
+    // Keep-alive: extend listenKey every 30 minutes
+    setInterval(() => {
+      https.request({ hostname: REST_URL.hostname, path: REST_URL.pathname, method: "PUT",
+        headers: { "X-MBX-APIKEY": API_KEY, "Content-Length": 0 } }, () => {}).end();
+      console.log("listenKey extended");
+    }, 1800000);
+  });
+});
+req.end();`;
+
+T_uds_lk.java = `import java.net.URI;
+import java.net.http.*;
+
+public class BinanceUdsListenKey {
+    static final String API_KEY  = "YOUR_API_KEY";
+    static final String REST_URL = "{{REST_EP}}";
+    static final String WS_BASE  = "{{EP}}";
+
+    public static void main(String[] args) throws Exception {
+        HttpClient client = HttpClient.newHttpClient();
+
+        // Step 1: Create listenKey (no signature needed)
+        HttpResponse<String> res = client.send(
+            HttpRequest.newBuilder(URI.create(REST_URL))
+                .POST(HttpRequest.BodyPublishers.noBody())
+                .header("X-MBX-APIKEY", API_KEY).build(),
+            HttpResponse.BodyHandlers.ofString()
+        );
+        // Simple extraction — use a JSON library (Gson/Jackson) in production
+        String listenKey = res.body().replaceAll(".*\\"listenKey\\":\\"([^\\"]+)\\".*", "$1");
+        System.out.println("listenKey: " + listenKey);
+
+        // Step 2: Connect to User Data Stream
+        String wsUrl = WS_BASE + "/ws/" + listenKey;
+        System.out.println("Connecting: " + wsUrl);
+        client.newWebSocketBuilder()
+            .buildAsync(URI.create(wsUrl), new WebSocket.Listener() {
+                public void onOpen(WebSocket ws) {
+                    System.out.println("Listening for account events (Ctrl+C to stop)...");
+                    ws.request(1);
+                }
+                public java.util.concurrent.CompletionStage<?> onText(WebSocket ws, CharSequence d, boolean last) {
+                    System.out.println(d); ws.request(1); return null;
+                }
+            }).join();
+        Thread.currentThread().join();
+    }
+}`;
+
+T_uds_lk.go = `package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"os/signal"
+	"time"
+	"github.com/gorilla/websocket"
+)
+
+const (
+	apiKey  = "YOUR_API_KEY"
+	restURL = "{{REST_EP}}"
+	wsBase  = "{{EP}}"
+)
+
+func main() {
+	// Step 1: Create listenKey (no signature needed)
+	req, _ := http.NewRequest("POST", restURL, nil)
+	req.Header.Set("X-MBX-APIKEY", apiKey)
+	resp, _ := http.DefaultClient.Do(req)
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	var result struct{ ListenKey string \`json:"listenKey"\` }
+	json.Unmarshal(body, &result)
+	fmt.Println("listenKey:", result.ListenKey)
+
+	// Step 2: Connect to User Data Stream
+	conn, _, _ := websocket.DefaultDialer.Dial(wsBase+"/ws/"+result.ListenKey, nil)
+	defer conn.Close()
+	fmt.Println("Listening for account events (Ctrl+C to stop)...")
+
+	// Keep-alive: extend listenKey every 30 minutes
+	go func() {
+		for range time.Tick(30 * time.Minute) {
+			req2, _ := http.NewRequest("PUT", restURL, nil)
+			req2.Header.Set("X-MBX-APIKEY", apiKey)
+			http.DefaultClient.Do(req2)
+			fmt.Println("listenKey extended")
+		}
+	}()
+
+	interrupt := make(chan os.Signal, 1)
+	signal.Notify(interrupt, os.Interrupt)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for {
+			_, msg, err := conn.ReadMessage()
+			if err != nil { return }
+			fmt.Println(string(msg))
+		}
+	}()
+	select {
+	case <-interrupt:
+		conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+	case <-done:
+	}
+}`;
+
+T_uds_lk.csharp = `using System;
+using System.Net.Http;
+using System.Net.WebSockets;
+using System.Text;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+
+class BinanceUdsListenKey
+{
+    const string ApiKey  = "YOUR_API_KEY";
+    const string RestUrl = "{{REST_EP}}";
+    const string WsBase  = "{{EP}}";
+
+    static async Task Main()
+    {
+        using var http = new HttpClient();
+        http.DefaultRequestHeaders.Add("X-MBX-APIKEY", ApiKey);
+
+        // Step 1: Create listenKey (no signature needed)
+        var res      = await http.PostAsync(RestUrl, null);
+        var doc      = JsonDocument.Parse(await res.Content.ReadAsStringAsync());
+        string lk    = doc.RootElement.GetProperty("listenKey").GetString()!;
+        Console.WriteLine("listenKey: " + lk);
+
+        // Step 2: Connect to User Data Stream
+        using var ws = new ClientWebSocket();
+        await ws.ConnectAsync(new Uri(WsBase + "/ws/" + lk), CancellationToken.None);
+        Console.WriteLine("Listening for account events (Ctrl+C to stop)...");
+
+        // Keep-alive: extend listenKey every 30 minutes
+        _ = Task.Run(async () => {
+            while (true) {
+                await Task.Delay(TimeSpan.FromMinutes(30));
+                await http.SendAsync(new HttpRequestMessage(HttpMethod.Put, RestUrl));
+                Console.WriteLine("listenKey extended");
+            }
+        });
+
+        using var cts = new CancellationTokenSource();
+        Console.CancelKeyPress += (s, e) => { e.Cancel = true; cts.Cancel(); };
+        var buf = new byte[65536];
+        while (!cts.IsCancellationRequested) {
+            try {
+                var r = await ws.ReceiveAsync(buf, cts.Token);
+                if (r.MessageType == WebSocketMessageType.Close) break;
+                Console.WriteLine(Encoding.UTF8.GetString(buf, 0, r.Count));
+            } catch (OperationCanceledException) { break; }
+        }
+        await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None);
+    }
+}`;
+
+T_uds_lk.php = `<?php
+// composer require textalk/websocket
+require "vendor/autoload.php";
+use WebSocket\\Client;
+
+$apiKey  = "YOUR_API_KEY";
+$restUrl = "{{REST_EP}}";
+$wsBase  = "{{EP}}";
+
+// Step 1: Create listenKey (no signature needed — only X-MBX-APIKEY header)
+$ch = curl_init($restUrl);
+curl_setopt_array($ch, [
+    CURLOPT_POST           => true,
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_POSTFIELDSIZE  => 0,
+    CURLOPT_HTTPHEADER     => ["X-MBX-APIKEY: {$apiKey}"]
+]);
+$response  = json_decode(curl_exec($ch), true);
+curl_close($ch);
+$listenKey = $response["listenKey"];
+echo "listenKey: {$listenKey}\\n";
+
+// Step 2: Connect to User Data Stream
+$ws = new Client("{$wsBase}/ws/{$listenKey}");
+echo "Listening for account events (Ctrl+C to stop)...\\n";
+while (true) {
+    echo $ws->receive() . "\\n";
+}`;
+
+T_uds_lk.ruby = `# gem install websocket-client-simple
+require "net/http"
+require "uri"
+require "json"
+require "websocket-client-simple"
+
+API_KEY  = "YOUR_API_KEY"
+REST_URL = "{{REST_EP}}"
+WS_BASE  = "{{EP}}"
+
+# Step 1: Create listenKey (no signature needed)
+uri  = URI(REST_URL)
+http = Net::HTTP.new(uri.host, uri.port)
+http.use_ssl = true
+req  = Net::HTTP::Post.new(uri.path)
+req["X-MBX-APIKEY"] = API_KEY
+resp = http.request(req)
+listen_key = JSON.parse(resp.body)["listenKey"]
+puts "listenKey: #{listen_key}"
+
+# Step 2: Connect to User Data Stream
+ws = WebSocket::Client::Simple.connect("#{WS_BASE}/ws/#{listen_key}")
+ws.on(:open)    { puts "Listening for account events (Ctrl+C to stop)..." }
+ws.on(:message) { |e| puts e.data }
+ws.on(:error)   { |e| puts "Error: #{e.message}" }
+loop {}`;
+
+T_uds_lk.typescript = `import * as https from "https";
+import { URL }    from "url";
+import WebSocket  from "ws";
+
+const API_KEY: string = "YOUR_API_KEY";
+const REST_URL        = new URL("{{REST_EP}}");
+const WS_BASE: string = "{{EP}}";
+
+// Step 1: Create listenKey (no signature — only X-MBX-APIKEY header)
+const req = https.request({
+  hostname: REST_URL.hostname, path: REST_URL.pathname, method: "POST",
+  headers: { "X-MBX-APIKEY": API_KEY, "Content-Length": 0 }
+}, (res) => {
+  let data = "";
+  res.on("data", (c: Buffer) => data += c.toString());
+  res.on("end", () => {
+    const { listenKey } = JSON.parse(data) as { listenKey: string };
+    console.log("listenKey:", listenKey);
+
+    // Step 2: Connect to User Data Stream
+    const ws = new WebSocket(WS_BASE + "/ws/" + listenKey);
+    ws.on("open",    () => console.log("Listening for account events (Ctrl+C to stop)..."));
+    ws.on("message", (d: WebSocket.RawData) => console.log(JSON.parse(d.toString())));
+    ws.on("error",   (e: Error) => console.error(e));
+
+    // Keep-alive: extend listenKey every 30 minutes
+    setInterval(() => {
+      https.request({ hostname: REST_URL.hostname, path: REST_URL.pathname,
+        method: "PUT", headers: { "X-MBX-APIKEY": API_KEY, "Content-Length": 0 } }, () => {}).end();
+    }, 1800000);
+  });
+});
+req.end();`;
+
+T_uds_lk.rust = `// Cargo.toml:
+// reqwest = { version = "0.12", features = ["blocking", "json"] }
+// tungstenite = { version = "0.24", features = ["native-tls"] }
+// serde_json = "1"
+
+use tungstenite::connect;
+
+fn main() {
+    let api_key  = "YOUR_API_KEY";
+    let rest_url = "{{REST_EP}}";
+    let ws_base  = "{{EP}}";
+
+    // Step 1: Create listenKey (no signature needed)
+    let client = reqwest::blocking::Client::new();
+    let resp: serde_json::Value = client.post(rest_url)
+        .header("X-MBX-APIKEY", api_key)
+        .send().unwrap()
+        .json().unwrap();
+    let listen_key = resp["listenKey"].as_str().unwrap();
+    println!("listenKey: {}", listen_key);
+
+    // Step 2: Connect to User Data Stream
+    let ws_url = format!("{}/ws/{}", ws_base, listen_key);
+    println!("Connecting: {}", ws_url);
+    let (mut ws, _) = connect(ws_url.as_str()).unwrap();
+    println!("Listening for account events (Ctrl+C to stop)...");
+    loop {
+        match ws.read() {
+            Ok(msg) => println!("{}", msg),
+            Err(e)  => { eprintln!("Error: {}", e); break; }
+        }
+    }
+}`;
+
+T_uds_lk.cpp = `// Requires libcurl + IXWebSocket + nlohmann/json
+// Compile: g++ -std=c++17 main.cpp -lixwebsocket -lssl -lcrypto -lcurl -lpthread
+#include <ixwebsocket/IXWebSocket.h>
+#include <curl/curl.h>
+#include <iostream>
+#include <string>
+#include <thread>
+#include <chrono>
+
+size_t writeCb(char* p, size_t s, size_t n, std::string* d) { d->append(p, s*n); return s*n; }
+
+std::string postListenKey(const std::string& url, const std::string& apiKey) {
+    CURL* c = curl_easy_init(); std::string resp;
+    struct curl_slist* h = curl_slist_append(nullptr, ("X-MBX-APIKEY: " + apiKey).c_str());
+    curl_easy_setopt(c, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(c, CURLOPT_POST, 1L);
+    curl_easy_setopt(c, CURLOPT_POSTFIELDSIZE, 0L);
+    curl_easy_setopt(c, CURLOPT_HTTPHEADER, h);
+    curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, writeCb);
+    curl_easy_setopt(c, CURLOPT_WRITEDATA, &resp);
+    curl_easy_perform(c); curl_easy_cleanup(c); curl_slist_free_all(h);
+    // Simple JSON extraction — use a JSON library in production
+    auto p1 = resp.find("\\"listenKey\\":\\"") + 13;
+    auto p2 = resp.find("\\"", p1);
+    return resp.substr(p1, p2 - p1);
+}
+
+int main() {
+    const std::string apiKey  = "YOUR_API_KEY";
+    const std::string restUrl = "{{REST_EP}}";
+    const std::string wsBase  = "{{EP}}";
+
+    // Step 1: Create listenKey
+    std::string lk = postListenKey(restUrl, apiKey);
+    std::cout << "listenKey: " << lk << "\\n";
+
+    // Step 2: Connect to User Data Stream
+    ix::WebSocket ws;
+    ws.setUrl(wsBase + "/ws/" + lk);
+    ws.setOnMessageCallback([](const ix::WebSocketMessagePtr& m) {
+        if (m->type == ix::WebSocketMessageType::Open)
+            std::cout << "Listening for account events (Ctrl+C to stop)...\\n";
+        if (m->type == ix::WebSocketMessageType::Message)
+            std::cout << m->str << "\\n";
+    });
+    ws.start();
+    std::this_thread::sleep_for(std::chrono::hours(24));
+    return 0;
+}`;
+
+T_uds_lk.bash = `#!/bin/bash
+# Requires: curl, websocat, python3
+API_KEY="YOUR_API_KEY"
+REST_URL="{{REST_EP}}"
+WS_BASE="{{EP}}"
+
+# Step 1: Create listenKey (no signature needed — only X-MBX-APIKEY header)
+LISTEN_KEY=$(curl -s -X POST "$REST_URL" \
+  -H "X-MBX-APIKEY: $API_KEY" \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['listenKey'])")
+
+echo "listenKey: $LISTEN_KEY"
+echo "Connecting to: $WS_BASE/ws/$LISTEN_KEY"
+
+# Step 2: Connect to User Data Stream (listen indefinitely)
+websocat "$WS_BASE/ws/$LISTEN_KEY"
+
+# To extend listenKey validity (run before 60 min):
+# curl -X PUT "$REST_URL" -H "X-MBX-APIKEY: $API_KEY"
+# To close the stream:
+# curl -X DELETE "$REST_URL" -H "X-MBX-APIKEY: $API_KEY"`;
+
+/* ── Notes for listenKey-based UDS (usdm / coinm) ─────────────────── */
+const UDS_LK_NOTES = {
+  python:     'Install: <code>pip install requests websocket-client</code> &nbsp;|&nbsp; No signature needed — only <code>X-MBX-APIKEY</code> header. Extend listenKey via PUT every 30 min.',
+  javascript: 'Install: <code>npm install ws</code>. Node.js built-in <code>https</code> for REST. Extend listenKey via PUT every 30 min.',
+  java:       'Requires Java 11+ (built-in HttpClient). No extra dependencies. Extend listenKey via PUT every 30 min.',
+  go:         'Install: <code>go get github.com/gorilla/websocket</code>. Extend listenKey via PUT every 30 min.',
+  csharp:     'Requires .NET 6+. No extra packages. Extend listenKey via PUT every 30 min.',
+  php:        'Install: <code>composer require textalk/websocket</code>. PHP with cURL extension.',
+  ruby:       'Install: <code>gem install websocket-client-simple</code>. Ruby standard library for HTTP.',
+  typescript: 'Install: <code>npm install ws @types/ws</code>. Node.js 15+. Extend listenKey via PUT every 30 min.',
+  rust:       'Add to Cargo.toml: <code>reqwest = { version = "0.12", features = ["blocking","json"] }</code>, <code>tungstenite = { version = "0.24", features = ["native-tls"] }</code>, <code>serde_json = "1"</code>',
+  cpp:        'Requires libcurl + IXWebSocket + nlohmann/json. Compile: <code>g++ -std=c++17 main.cpp -lixwebsocket -lssl -lcrypto -lcurl -lpthread</code>',
+  bash:       'Requires <code>curl</code>, <code>websocat</code>, <code>python3</code>. Extend listenKey: <code>curl -X PUT URL -H "X-MBX-APIKEY: KEY"</code>'
+};
+
 /* ── Extra-param injection per language ────────────────────────────── */
 function injectExtraParams(code, lang, params) {
   if (!params || params.length === 0) return code;
@@ -3601,14 +4048,14 @@ function syncMarketOptions() {
     sel.value    = state.market;
   }
 
-  // UDS: force Ed25519, disable other auth options
-  const selAuth = document.getElementById("sel-auth");
-  const isUds   = state.apitype === "uds";
+  // Spot UDS requires Ed25519 only; usdm/coinm UDS allow all auth types
+  const selAuth   = document.getElementById("sel-auth");
+  const isUdsSpot = state.apitype === "uds" && state.market === "spot";
   for (const opt of selAuth.options) {
-    opt.disabled    = isUds && opt.value !== "ed25519";
-    opt.style.color = (isUds && opt.value !== "ed25519") ? "#484f58" : "";
+    opt.disabled    = isUdsSpot && opt.value !== "ed25519";
+    opt.style.color = (isUdsSpot && opt.value !== "ed25519") ? "#484f58" : "";
   }
-  if (isUds && state.auth !== "ed25519") {
+  if (isUdsSpot && state.auth !== "ed25519") {
     state.auth    = "ed25519";
     selAuth.value = "ed25519";
   }
@@ -3622,17 +4069,35 @@ function syncMarketOptions() {
 function render() {
   syncMarketOptions();
 
-  const isWs  = state.apitype === "ws";
-  const isUds = state.apitype === "uds";
-  const epMap = ENDPOINTS[state.apitype] ? ENDPOINTS[state.apitype][state.env] : null;
-  const ep    = epMap ? (epMap[state.market] || "") : "";
-  const method = isWs ? (WS_METHODS[state.market] || "") : "";
-  const templates = isUds ? T_uds : (isWs ? T_ws : T);
-  const notesMap  = isUds ? UDS_NOTES : (isWs ? WS_NOTES : NOTES);
+  const isWs       = state.apitype === "ws";
+  const isUds      = state.apitype === "uds";
+  const isUdsFutures = isUds && state.market !== "spot";
+  const epMap      = ENDPOINTS[state.apitype] ? ENDPOINTS[state.apitype][state.env] : null;
+  const ep         = epMap ? (epMap[state.market] || "") : "";
+  const method     = isWs ? (WS_METHODS[state.market] || "") : "";
+  const restEp     = isUdsFutures && UDS_REST_EP[state.market]
+                     ? (UDS_REST_EP[state.market][state.env] || "") : "";
 
-  const rawCode = (templates[state.auth][state.lang] || "// Not available for this combination")
+  let rawCode;
+  if (isUdsFutures) {
+    rawCode = (T_uds_lk[state.lang] || "// Not available for this combination");
+  } else if (isUds) {
+    rawCode = (T_uds[state.auth][state.lang] || "// Not available for this combination");
+  } else if (isWs) {
+    rawCode = (T_ws[state.auth][state.lang] || "// Not available for this combination");
+  } else {
+    rawCode = (T[state.auth][state.lang] || "// Not available for this combination");
+  }
+  rawCode = rawCode
     .replace(/\{\{EP\}\}/g, ep)
-    .replace(/\{\{METHOD\}\}/g, method);
+    .replace(/\{\{METHOD\}\}/g, method)
+    .replace(/\{\{REST_EP\}\}/g, restEp);
+
+  const notesMap = isUdsFutures ? null : (isUds ? UDS_NOTES : (isWs ? WS_NOTES : NOTES));
+  const noteStr  = isUdsFutures
+    ? (UDS_LK_NOTES[state.lang] || "")
+    : ((notesMap ? (notesMap[state.auth] || {}) : {})[state.lang] || "");
+
   const code = (isWs || isUds) ? rawCode : injectExtraParams(rawCode, state.lang, extraParams);
 
   const block = document.getElementById("code-block");
@@ -3644,7 +4109,7 @@ function render() {
   document.getElementById("lang-badge").textContent       = LANG_NAMES[state.lang];
   document.getElementById("auth-badge").textContent       = AUTH_NAMES[state.auth];
   document.getElementById("endpoint-display").textContent = ep || "N/A";
-  document.getElementById("note-box").innerHTML           = (notesMap[state.auth] || {})[state.lang] || "";
+  document.getElementById("note-box").innerHTML           = noteStr;
 
   const envBadge = document.getElementById("env-badge");
   envBadge.style.display = state.env === "testnet" ? "inline" : "none";
