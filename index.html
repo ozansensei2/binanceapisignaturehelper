@@ -345,26 +345,25 @@
   <div class="logo">B</div>
   <div>
     <h1>Binance API Code Generator</h1>
-    <p>Signed REST API request examples across languages and key types</p>
+    <p>Signed REST &amp; WebSocket API request examples across languages and key types</p>
   </div>
 </header>
 
 <main>
   <div class="selectors">
     <div class="select-group">
-      <label>Auth Type</label>
-      <select id="sel-auth">
-        <option value="hmac">HMAC-SHA256</option>
-        <option value="rsa">RSA</option>
-        <option value="ed25519">Ed25519</option>
-      </select>
-    </div>
-
-    <div class="select-group">
       <label>Environment</label>
       <select id="sel-env">
         <option value="mainnet">Mainnet</option>
         <option value="testnet">Testnet</option>
+      </select>
+    </div>
+
+    <div class="select-group">
+      <label>API Type</label>
+      <select id="sel-apitype">
+        <option value="rest">REST API</option>
+        <option value="ws">WebSocket API</option>
       </select>
     </div>
 
@@ -380,9 +379,11 @@
     </div>
 
     <div class="select-group">
-      <label>API Type</label>
-      <select id="sel-apitype">
-        <option value="rest">REST API</option>
+      <label>Auth Type</label>
+      <select id="sel-auth">
+        <option value="hmac">HMAC-SHA256</option>
+        <option value="rsa">RSA</option>
+        <option value="ed25519">Ed25519</option>
       </select>
     </div>
 
@@ -399,7 +400,7 @@
         <option value="typescript">TypeScript</option>
         <option value="rust">Rust</option>
         <option value="cpp">C++</option>
-        <option value="bash">Bash (curl)</option>
+        <option value="bash">Bash</option>
       </select>
     </div>
   </div>
@@ -474,21 +475,46 @@
 
 /* ── Endpoints ─────────────────────────────────────────────────────── */
 const ENDPOINTS = {
-  mainnet: {
-    spot:      'https://api.binance.com/api/v3/account',
-    usdm:      'https://fapi.binance.com/fapi/v3/balance',
-    coinm:     'https://dapi.binance.com/dapi/v1/balance',
-    portfolio: 'https://papi.binance.com/papi/v1/balance',
-    options:   'https://eapi.binance.com/eapi/v1/marginAccount'
+  rest: {
+    mainnet: {
+      spot:      'https://api.binance.com/api/v3/account',
+      usdm:      'https://fapi.binance.com/fapi/v3/balance',
+      coinm:     'https://dapi.binance.com/dapi/v1/balance',
+      portfolio: 'https://papi.binance.com/papi/v1/balance',
+      options:   'https://eapi.binance.com/eapi/v1/marginAccount'
+    },
+    testnet: {
+      spot:  'https://demo-api.binance.com/api/v3/account',
+      usdm:  'https://demo-fapi.binance.com/fapi/v3/balance',
+      coinm: 'https://demo-dapi.binance.com/dapi/v1/balance'
+    }
   },
-  testnet: {
-    spot:  'https://demo-api.binance.com/api/v3/account',
-    usdm:  'https://demo-fapi.binance.com/fapi/v3/balance',
-    coinm: 'https://demo-dapi.binance.com/dapi/v1/balance'
+  ws: {
+    mainnet: {
+      spot:  'wss://ws-api.binance.com:443/ws-api/v3',
+      usdm:  'wss://ws-fapi.binance.com/ws-fapi/v1',
+      coinm: 'wss://ws-dapi.binance.com/ws-dapi/v1'
+    },
+    testnet: {
+      spot:  'wss://demo-ws-api.binance.com',
+      usdm:  'wss://testnet.binancefuture.com/ws-fapi/v1',
+      coinm: 'wss://testnet.binancefuture.com/ws-dapi/v1'
+    }
   }
 };
 
-const TESTNET_ONLY = ['spot', 'usdm', 'coinm'];
+// Markets available per apitype+env combo
+const MARKET_AVAILABLE = {
+  rest: { mainnet: ['spot','usdm','coinm','portfolio','options'], testnet: ['spot','usdm','coinm'] },
+  ws:   { mainnet: ['spot','usdm','coinm'],                       testnet: ['spot','usdm','coinm'] }
+};
+
+/* ── WS method names per market ────────────────────────────────────── */
+const WS_METHODS = {
+  spot:  'account.status',
+  usdm:  'v2/account.balance',
+  coinm: 'v1/account.balance'
+};
 
 /* ── UI metadata ───────────────────────────────────────────────────── */
 const LANG_NAMES = { python:'Python', javascript:'Node.js', java:'Java', go:'Go', csharp:'C#', php:'PHP', ruby:'Ruby', typescript:'TypeScript', rust:'Rust', cpp:'C++', bash:'Bash' };
@@ -534,6 +560,49 @@ const NOTES = {
     rust:       'Add to Cargo.toml: <code>openssl = "0.10"</code>, <code>base64 = "0.22"</code>, <code>urlencoding = "2"</code>, <code>reqwest = { version = "0.12", features = ["blocking"] }</code>',
     cpp:        'Compile: <code>g++ -std=c++17 -o app main.cpp -lssl -lcrypto -lcurl</code> &nbsp;|&nbsp; Requires OpenSSL 1.1.1+ for Ed25519 support.',
     bash:       'Requires <code>openssl</code> 3.0+, <code>curl</code>, and <code>python3</code>. Generate key: <code>openssl genpkey -algorithm ed25519 -out private_key.pem</code>'
+  }
+};
+
+/* ── WebSocket Notes ───────────────────────────────────────────────── */
+const WS_NOTES = {
+  hmac: {
+    python:     'Install: <code>pip install websocket-client</code>',
+    javascript: 'Install: <code>npm install ws</code>',
+    java:       'Requires Java 11+ built-in WebSocket client. No extra dependencies.',
+    go:         'Install: <code>go get github.com/gorilla/websocket</code>',
+    csharp:     'Requires .NET 6+. <code>System.Net.WebSockets</code> is built-in.',
+    php:        'Install: <code>composer require textalk/websocket</code>',
+    ruby:       'Install: <code>gem install websocket-client-simple</code>',
+    typescript: 'Install: <code>npm install ws @types/ws</code>',
+    rust:       'Add to Cargo.toml: <code>tungstenite = { version = "0.24", features = ["native-tls"] }</code>, <code>hmac</code>, <code>sha2</code>, <code>hex</code>',
+    cpp:        'Install IXWebSocket: <code>https://github.com/machinezone/IXWebSocket</code> &nbsp;|&nbsp; Compile: <code>g++ -std=c++17 main.cpp -lixwebsocket -lssl -lcrypto -lpthread</code>',
+    bash:       'Install websocat: <code>https://github.com/vi/websocat</code> &nbsp;|&nbsp; Requires <code>openssl</code>'
+  },
+  rsa: {
+    python:     'Install: <code>pip install websocket-client cryptography</code> &nbsp;|&nbsp; Key format: PKCS#8 PEM',
+    javascript: 'Install: <code>npm install ws</code>. Node.js 15+. Key format: PKCS#8 PEM',
+    java:       'Requires Java 11+. Key format: DER PKCS#8.',
+    go:         'Install: <code>go get github.com/gorilla/websocket</code>. Key format: PKCS#8 PEM.',
+    csharp:     'Requires .NET 6+. Key format: PKCS#8 PEM.',
+    php:        'Install: <code>composer require textalk/websocket</code>. Key format: PEM.',
+    ruby:       'Install: <code>gem install websocket-client-simple</code>. Key format: PEM.',
+    typescript: 'Install: <code>npm install ws @types/ws</code>. Node.js 15+. Key format: PKCS#8 PEM.',
+    rust:       'Add to Cargo.toml: <code>tungstenite</code>, <code>openssl</code>, <code>base64</code>, <code>urlencoding</code>',
+    cpp:        'Install IXWebSocket + OpenSSL. Key format: PKCS#8 PEM.',
+    bash:       'Install websocat. Requires <code>openssl</code> 1.1.1+ and <code>python3</code>.'
+  },
+  ed25519: {
+    python:     'Install: <code>pip install websocket-client cryptography</code> &nbsp;|&nbsp; Uses <strong>Session Authentication</strong> (session.logon)',
+    javascript: 'Install: <code>npm install ws</code>. Uses <strong>Session Authentication</strong> (session.logon).',
+    java:       'Requires Java 15+ (Ed25519 native). Uses <strong>Session Authentication</strong>.',
+    go:         'Install: <code>go get github.com/gorilla/websocket</code>. Uses <strong>Session Authentication</strong>.',
+    csharp:     'Install: <code>dotnet add package BouncyCastle.Cryptography</code>. Uses <strong>Session Authentication</strong>.',
+    php:        'PHP 8.2+ with OpenSSL 3.0+. Install: <code>composer require textalk/websocket</code>. Uses <strong>Session Authentication</strong>.',
+    ruby:       'Ruby 3.1+ with OpenSSL 3.0+. Install: <code>gem install websocket-client-simple</code>. Uses <strong>Session Authentication</strong>.',
+    typescript: 'Install: <code>npm install ws @types/ws</code>. Node.js 15+. Uses <strong>Session Authentication</strong>.',
+    rust:       'Add to Cargo.toml: <code>tungstenite</code>, <code>openssl</code>, <code>base64</code>. Uses <strong>Session Authentication</strong>.',
+    cpp:        'Requires OpenSSL 1.1.1+ for Ed25519. Install IXWebSocket. Uses <strong>Session Authentication</strong>.',
+    bash:       'Requires <code>openssl</code> 3.0+, websocat, <code>python3</code>. Uses <strong>Session Authentication</strong>.'
   }
 };
 
@@ -1749,6 +1818,1170 @@ echo "\$RESPONSE"
 echo "=== Request Headers ==="
 echo "X-MBX-APIKEY: \$API_KEY"`;
 
+/* ════════════════════════════════════════════════════════════════════
+   WebSocket API Templates   {{EP}} → endpoint   {{METHOD}} → WS method name
+═══════════════════════════════════════════════════════════════════ */
+const T_ws = {};
+T_ws.hmac = {};
+T_ws.rsa  = {};
+T_ws.ed25519 = {};
+
+/* ── WS HMAC ──────────────────────────────────────────────────────── */
+T_ws.hmac.python = `import websocket
+import time, hashlib, hmac, json
+from urllib.parse import urlencode
+
+API_KEY    = "YOUR_API_KEY"
+API_SECRET = "YOUR_API_SECRET"
+BASE_URL   = "{{EP}}"
+
+timestamp    = round(time.time() * 1000)
+params       = {"apiKey": API_KEY, "timestamp": timestamp}
+query_string = urlencode(params)
+signature    = hmac.new(API_SECRET.encode("utf-8"), query_string.encode("utf-8"), hashlib.sha256).hexdigest()
+
+request = json.dumps({
+    "id":     "1",
+    "method": "{{METHOD}}",
+    "params": {"apiKey": API_KEY, "signature": signature, "timestamp": timestamp}
+})
+
+ws = websocket.WebSocket()
+ws.connect(BASE_URL)
+ws.send(request)
+print(request)
+print(ws.recv())
+ws.close()`;
+
+T_ws.hmac.javascript = `const crypto    = require("crypto");
+const WebSocket = require("ws");
+
+const API_KEY    = "YOUR_API_KEY";
+const API_SECRET = "YOUR_API_SECRET";
+const BASE_URL   = "{{EP}}";
+
+const timestamp = Date.now();
+const qs        = "apiKey=" + API_KEY + "&timestamp=" + timestamp;
+const signature = crypto.createHmac("sha256", API_SECRET).update(qs).digest("hex");
+
+const request = JSON.stringify({
+  id: "1", method: "{{METHOD}}",
+  params: { apiKey: API_KEY, signature, timestamp }
+});
+
+const ws = new WebSocket(BASE_URL);
+ws.on("open",    () => { console.log(request); ws.send(request); });
+ws.on("message", (data) => { console.log(JSON.parse(data.toString())); ws.close(); });
+ws.on("error",   (err)  => console.error(err));`;
+
+T_ws.hmac.java = `import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.net.URI;
+import java.net.http.*;
+import java.time.Instant;
+import java.util.concurrent.CountDownLatch;
+
+public class BinanceWsHmac {
+    static final String API_KEY    = "YOUR_API_KEY";
+    static final String API_SECRET = "YOUR_API_SECRET";
+    static final String BASE_URL   = "{{EP}}";
+    static final String METHOD     = "{{METHOD}}";
+
+    public static void main(String[] args) throws Exception {
+        long   ts  = Instant.now().toEpochMilli();
+        String qs  = "apiKey=" + API_KEY + "&timestamp=" + ts;
+        String sig = hmacSha256(API_SECRET, qs);
+
+        String req = String.format(
+            "{\\"id\\":\\"1\\",\\"method\\":\\"%s\\",\\"params\\":{\\"apiKey\\":\\"%s\\",\\"signature\\":\\"%s\\",\\"timestamp\\":%d}}",
+            METHOD, API_KEY, sig, ts);
+
+        CountDownLatch latch = new CountDownLatch(1);
+        HttpClient.newHttpClient().newWebSocketBuilder()
+            .buildAsync(URI.create(BASE_URL), new WebSocket.Listener() {
+                public void onOpen(WebSocket ws) { ws.sendText(req, true); ws.request(1); }
+                public java.util.concurrent.CompletionStage<?> onText(WebSocket ws, CharSequence d, boolean last) {
+                    System.out.println(d); latch.countDown(); ws.abort(); return null;
+                }
+            }).join();
+        latch.await();
+    }
+
+    static String hmacSha256(String secret, String data) throws Exception {
+        Mac mac = Mac.getInstance("HmacSHA256");
+        mac.init(new SecretKeySpec(secret.getBytes(), "HmacSHA256"));
+        byte[] raw = mac.doFinal(data.getBytes());
+        StringBuilder sb = new StringBuilder();
+        for (byte b : raw) sb.append(String.format("%02x", b));
+        return sb.toString();
+    }
+}`;
+
+T_ws.hmac.go = `package main
+
+import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"time"
+	"github.com/gorilla/websocket"
+)
+
+const (
+	apiKey    = "YOUR_API_KEY"
+	apiSecret = "YOUR_API_SECRET"
+	baseURL   = "{{EP}}"
+	wsMethod  = "{{METHOD}}"
+)
+
+func main() {
+	ts  := time.Now().UnixMilli()
+	qs  := fmt.Sprintf("apiKey=%s&timestamp=%d", apiKey, ts)
+	sig := signHmac(apiSecret, qs)
+
+	req, _ := json.Marshal(map[string]interface{}{
+		"id": "1", "method": wsMethod,
+		"params": map[string]interface{}{"apiKey": apiKey, "signature": sig, "timestamp": ts},
+	})
+
+	conn, _, _ := websocket.DefaultDialer.Dial(baseURL, nil)
+	defer conn.Close()
+	fmt.Println(string(req))
+	conn.WriteMessage(websocket.TextMessage, req)
+	_, msg, _ := conn.ReadMessage()
+	fmt.Println(string(msg))
+}
+
+func signHmac(secret, data string) string {
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(data))
+	return hex.EncodeToString(mac.Sum(nil))
+}`;
+
+T_ws.hmac.csharp = `using System;
+using System.Net.WebSockets;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+
+class BinanceWsHmac
+{
+    const string ApiKey    = "YOUR_API_KEY";
+    const string ApiSecret = "YOUR_API_SECRET";
+    const string BaseUrl   = "{{EP}}";
+    const string Method    = "{{METHOD}}";
+
+    static async Task Main()
+    {
+        long   ts  = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        string qs  = "apiKey=" + ApiKey + "&timestamp=" + ts;
+        string sig = ComputeHmac(ApiSecret, qs);
+
+        string payload = JsonSerializer.Serialize(new {
+            id = "1", method = Method,
+            @params = new { apiKey = ApiKey, signature = sig, timestamp = ts }
+        });
+
+        using var ws = new ClientWebSocket();
+        await ws.ConnectAsync(new Uri(BaseUrl), CancellationToken.None);
+        Console.WriteLine(payload);
+        await ws.SendAsync(Encoding.UTF8.GetBytes(payload), WebSocketMessageType.Text, true, CancellationToken.None);
+
+        var buf    = new byte[65536];
+        var result = await ws.ReceiveAsync(buf, CancellationToken.None);
+        Console.WriteLine(Encoding.UTF8.GetString(buf, 0, result.Count));
+        await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None);
+    }
+
+    static string ComputeHmac(string secret, string data)
+    {
+        using var mac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
+        return BitConverter.ToString(mac.ComputeHash(Encoding.UTF8.GetBytes(data))).Replace("-", "").ToLower();
+    }
+}`;
+
+T_ws.hmac.php = `<?php
+// composer require textalk/websocket
+require "vendor/autoload.php";
+use WebSocket\\Client;
+
+$apiKey    = "YOUR_API_KEY";
+$apiSecret = "YOUR_API_SECRET";
+$baseUrl   = "{{EP}}";
+$method    = "{{METHOD}}";
+
+$ts        = round(microtime(true) * 1000);
+$qs        = "apiKey={$apiKey}&timestamp={$ts}";
+$signature = hash_hmac("sha256", $qs, $apiSecret);
+
+$request = json_encode([
+    "id" => "1", "method" => $method,
+    "params" => ["apiKey" => $apiKey, "signature" => $signature, "timestamp" => $ts]
+]);
+
+$ws = new Client($baseUrl);
+echo $request . "\\n";
+$ws->send($request);
+echo $ws->receive() . "\\n";
+$ws->close();`;
+
+T_ws.hmac.ruby = `# gem install websocket-client-simple
+require "websocket-client-simple"
+require "openssl"
+require "json"
+
+API_KEY    = "YOUR_API_KEY"
+API_SECRET = "YOUR_API_SECRET"
+BASE_URL   = "{{EP}}"
+METHOD     = "{{METHOD}}"
+
+ts        = (Time.now.to_f * 1000).round
+qs        = "apiKey=#{API_KEY}&timestamp=#{ts}"
+signature = OpenSSL::HMAC.hexdigest("SHA256", API_SECRET, qs)
+
+request = JSON.generate({
+  id: "1", method: METHOD,
+  params: { apiKey: API_KEY, signature: signature, timestamp: ts }
+})
+
+ws = WebSocket::Client::Simple.connect(BASE_URL)
+ws.on(:open)    { puts request; ws.send(request) }
+ws.on(:message) { |e| puts e.data; ws.close }
+ws.on(:close)   { exit }
+loop {}`;
+
+T_ws.hmac.typescript = `import * as crypto from "crypto";
+import WebSocket    from "ws";
+
+const API_KEY:    string = "YOUR_API_KEY";
+const API_SECRET: string = "YOUR_API_SECRET";
+const BASE_URL:   string = "{{EP}}";
+const METHOD:     string = "{{METHOD}}";
+
+const ts:  number = Date.now();
+const qs:  string = "apiKey=" + API_KEY + "&timestamp=" + ts;
+const sig: string = crypto.createHmac("sha256", API_SECRET).update(qs).digest("hex");
+
+const request: string = JSON.stringify({
+  id: "1", method: METHOD,
+  params: { apiKey: API_KEY, signature: sig, timestamp: ts }
+});
+
+const ws = new WebSocket(BASE_URL);
+ws.on("open",    () => { console.log(request); ws.send(request); });
+ws.on("message", (data: WebSocket.RawData) => { console.log(JSON.parse(data.toString())); ws.close(); });
+ws.on("error",   (err: Error) => console.error(err));`;
+
+T_ws.hmac.rust = `// Cargo.toml:
+// tungstenite = { version = "0.24", features = ["native-tls"] }
+// hmac = "0.12"  |  sha2 = "0.10"  |  hex = "0.4"
+
+use hmac::{Hmac, Mac};
+use sha2::Sha256;
+use std::time::{SystemTime, UNIX_EPOCH};
+use tungstenite::connect;
+
+type HmacSha256 = Hmac<Sha256>;
+
+fn main() {
+    let api_key    = "YOUR_API_KEY";
+    let api_secret = "YOUR_API_SECRET";
+    let base_url   = "{{EP}}";
+    let method     = "{{METHOD}}";
+
+    let ts  = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
+    let qs  = format!("apiKey={}&timestamp={}", api_key, ts);
+    let mut mac = HmacSha256::new_from_slice(api_secret.as_bytes()).unwrap();
+    mac.update(qs.as_bytes());
+    let sig = hex::encode(mac.finalize().into_bytes());
+
+    let req = format!(
+        r#"{{"id":"1","method":"{}","params":{{"apiKey":"{}","signature":"{}","timestamp":{}}}}}"#,
+        method, api_key, sig, ts
+    );
+
+    let (mut ws, _) = connect(base_url).unwrap();
+    println!("{}", req);
+    ws.send(tungstenite::Message::Text(req)).unwrap();
+    println!("{}", ws.read().unwrap());
+    ws.close(None).unwrap();
+}`;
+
+T_ws.hmac.cpp = `// Install IXWebSocket: https://github.com/machinezone/IXWebSocket
+// Compile: g++ -std=c++17 main.cpp -lixwebsocket -lssl -lcrypto -lpthread
+#include <ixwebsocket/IXWebSocket.h>
+#include <openssl/hmac.h>
+#include <iostream>
+#include <sstream>
+#include <iomanip>
+#include <chrono>
+#include <thread>
+
+std::string hmacSha256(const std::string& key, const std::string& msg) {
+    unsigned char md[EVP_MAX_MD_SIZE]; unsigned int len = 0;
+    HMAC(EVP_sha256(), key.data(), key.size(),
+         reinterpret_cast<const unsigned char*>(msg.data()), msg.size(), md, &len);
+    std::ostringstream ss;
+    for (unsigned i = 0; i < len; ++i)
+        ss << std::hex << std::setw(2) << std::setfill('0') << (int)md[i];
+    return ss.str();
+}
+
+int main() {
+    const std::string apiKey    = "YOUR_API_KEY";
+    const std::string apiSecret = "YOUR_API_SECRET";
+    const std::string baseUrl   = "{{EP}}";
+    const std::string method    = "{{METHOD}}";
+
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                  std::chrono::system_clock::now().time_since_epoch()).count();
+    std::string qs  = "apiKey=" + apiKey + "&timestamp=" + std::to_string(ms);
+    std::string sig = hmacSha256(apiSecret, qs);
+
+    std::string req = R"({"id":"1","method":")" + method + R"(","params":{"apiKey":")" +
+                      apiKey + R"(","signature":")" + sig + R"(","timestamp":)" + std::to_string(ms) + "}}";
+
+    ix::WebSocket ws;
+    ws.setUrl(baseUrl);
+    ws.setOnMessageCallback([&](const ix::WebSocketMessagePtr& m) {
+        if (m->type == ix::WebSocketMessageType::Open)    { std::cout << req << "\\n"; ws.send(req); }
+        if (m->type == ix::WebSocketMessageType::Message) { std::cout << m->str << "\\n"; ws.close(); }
+    });
+    ws.start();
+    std::this_thread::sleep_for(std::chrono::seconds(5));
+    return 0;
+}`;
+
+T_ws.hmac.bash = `#!/bin/bash
+# Requires: websocat (https://github.com/vi/websocat) + openssl
+API_KEY="YOUR_API_KEY"
+API_SECRET="YOUR_API_SECRET"
+BASE_URL="{{EP}}"
+METHOD="{{METHOD}}"
+
+TIMESTAMP=$(date +%s%3N)
+QS="apiKey=\${API_KEY}&timestamp=\${TIMESTAMP}"
+SIGNATURE=$(echo -n "\$QS" | openssl dgst -sha256 -hmac "\$API_SECRET" | awk '{print \$2}')
+
+REQUEST='{"id":"1","method":"'\${METHOD}'","params":{"apiKey":"'\${API_KEY}'","signature":"'\${SIGNATURE}'","timestamp":'\${TIMESTAMP}'}}'
+
+echo "Request: \$REQUEST"
+echo "\$REQUEST" | websocat "\$BASE_URL"`;
+
+/* ── WS RSA ───────────────────────────────────────────────────────── */
+T_ws.rsa.python = `import websocket
+import time, json, base64
+from urllib.parse import urlencode
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import padding
+
+API_KEY  = "YOUR_API_KEY"
+BASE_URL = "{{EP}}"
+
+with open("private_key.pem", "rb") as f:
+    private_key = serialization.load_pem_private_key(f.read(), password=None)
+
+timestamp    = round(time.time() * 1000)
+params       = {"apiKey": API_KEY, "timestamp": timestamp}
+query_string = urlencode(params)
+
+raw_sig   = private_key.sign(query_string.encode(), padding.PKCS1v15(), hashes.SHA256())
+signature = base64.b64encode(raw_sig).decode()
+
+request = json.dumps({
+    "id":     "1",
+    "method": "{{METHOD}}",
+    "params": {"apiKey": API_KEY, "signature": signature, "timestamp": timestamp}
+})
+
+ws = websocket.WebSocket()
+ws.connect(BASE_URL)
+ws.send(request)
+print(request)
+print(ws.recv())
+ws.close()`;
+
+T_ws.rsa.javascript = `const crypto    = require("crypto");
+const fs        = require("fs");
+const WebSocket = require("ws");
+
+const API_KEY    = "YOUR_API_KEY";
+const BASE_URL   = "{{EP}}";
+const privateKey = fs.readFileSync("private_key.pem", "utf8");
+
+const timestamp = Date.now();
+const qs        = "apiKey=" + API_KEY + "&timestamp=" + timestamp;
+const signature = crypto.sign("sha256", Buffer.from(qs), {
+  key: privateKey, padding: crypto.constants.RSA_PKCS1_PADDING
+}).toString("base64");
+
+const request = JSON.stringify({
+  id: "1", method: "{{METHOD}}",
+  params: { apiKey: API_KEY, signature, timestamp }
+});
+
+const ws = new WebSocket(BASE_URL);
+ws.on("open",    () => { console.log(request); ws.send(request); });
+ws.on("message", (data) => { console.log(JSON.parse(data.toString())); ws.close(); });
+ws.on("error",   (err)  => console.error(err));`;
+
+T_ws.rsa.java = `import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.security.*;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.time.Instant;
+import java.util.Base64;
+import java.util.concurrent.CountDownLatch;
+
+public class BinanceWsRsa {
+    static final String API_KEY  = "YOUR_API_KEY";
+    static final String BASE_URL = "{{EP}}";
+    static final String METHOD   = "{{METHOD}}";
+
+    public static void main(String[] args) throws Exception {
+        byte[]     keyBytes   = Files.readAllBytes(Paths.get("private_key.der"));
+        PrivateKey privateKey = KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(keyBytes));
+
+        long   ts  = Instant.now().toEpochMilli();
+        String qs  = "apiKey=" + API_KEY + "&timestamp=" + ts;
+        String sig = sign(privateKey, qs);
+
+        String req = String.format(
+            "{\\"id\\":\\"1\\",\\"method\\":\\"%s\\",\\"params\\":{\\"apiKey\\":\\"%s\\",\\"signature\\":\\"%s\\",\\"timestamp\\":%d}}",
+            METHOD, API_KEY, sig, ts);
+
+        CountDownLatch latch = new CountDownLatch(1);
+        HttpClient.newHttpClient().newWebSocketBuilder()
+            .buildAsync(URI.create(BASE_URL), new WebSocket.Listener() {
+                public void onOpen(WebSocket ws) { ws.sendText(req, true); ws.request(1); }
+                public java.util.concurrent.CompletionStage<?> onText(WebSocket ws, CharSequence d, boolean last) {
+                    System.out.println(d); latch.countDown(); ws.abort(); return null;
+                }
+            }).join();
+        latch.await();
+    }
+
+    static String sign(PrivateKey key, String data) throws Exception {
+        Signature sig = Signature.getInstance("SHA256withRSA");
+        sig.initSign(key);
+        sig.update(data.getBytes(StandardCharsets.UTF_8));
+        return Base64.getEncoder().encodeToString(sig.sign());
+    }
+}`;
+
+T_ws.rsa.go = `package main
+
+import (
+	"crypto"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/json"
+	"encoding/pem"
+	"fmt"
+	"os"
+	"time"
+	"github.com/gorilla/websocket"
+)
+
+const (
+	apiKey   = "YOUR_API_KEY"
+	baseURL  = "{{EP}}"
+	wsMethod = "{{METHOD}}"
+)
+
+func main() {
+	keyData, _  := os.ReadFile("private_key.pem")
+	block, _    := pem.Decode(keyData)
+	keyIface, _ := x509.ParsePKCS8PrivateKey(block.Bytes)
+	rsaKey      := keyIface.(*rsa.PrivateKey)
+
+	ts  := time.Now().UnixMilli()
+	qs  := fmt.Sprintf("apiKey=%s&timestamp=%d", apiKey, ts)
+	hash := sha256.Sum256([]byte(qs))
+	sigBytes, _ := rsa.SignPKCS1v15(rand.Reader, rsaKey, crypto.SHA256, hash[:])
+	sig := base64.StdEncoding.EncodeToString(sigBytes)
+
+	req, _ := json.Marshal(map[string]interface{}{
+		"id": "1", "method": wsMethod,
+		"params": map[string]interface{}{"apiKey": apiKey, "signature": sig, "timestamp": ts},
+	})
+
+	conn, _, _ := websocket.DefaultDialer.Dial(baseURL, nil)
+	defer conn.Close()
+	fmt.Println(string(req))
+	conn.WriteMessage(websocket.TextMessage, req)
+	_, msg, _ := conn.ReadMessage()
+	fmt.Println(string(msg))
+}`;
+
+T_ws.rsa.csharp = `using System;
+using System.Net.WebSockets;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+
+class BinanceWsRsa
+{
+    const string ApiKey  = "YOUR_API_KEY";
+    const string BaseUrl = "{{EP}}";
+    const string Method  = "{{METHOD}}";
+
+    static async Task Main()
+    {
+        string pem = System.IO.File.ReadAllText("private_key.pem");
+        using var rsa = RSA.Create();
+        rsa.ImportFromPem(pem);
+
+        long   ts  = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        string qs  = "apiKey=" + ApiKey + "&timestamp=" + ts;
+        string sig = Convert.ToBase64String(rsa.SignData(Encoding.UTF8.GetBytes(qs), HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1));
+
+        string payload = JsonSerializer.Serialize(new {
+            id = "1", method = Method,
+            @params = new { apiKey = ApiKey, signature = sig, timestamp = ts }
+        });
+
+        using var ws = new ClientWebSocket();
+        await ws.ConnectAsync(new Uri(BaseUrl), CancellationToken.None);
+        Console.WriteLine(payload);
+        await ws.SendAsync(Encoding.UTF8.GetBytes(payload), WebSocketMessageType.Text, true, CancellationToken.None);
+
+        var buf    = new byte[65536];
+        var result = await ws.ReceiveAsync(buf, CancellationToken.None);
+        Console.WriteLine(Encoding.UTF8.GetString(buf, 0, result.Count));
+        await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None);
+    }
+}`;
+
+T_ws.rsa.php = `<?php
+// composer require textalk/websocket
+require "vendor/autoload.php";
+use WebSocket\\Client;
+
+$apiKey   = "YOUR_API_KEY";
+$baseUrl  = "{{EP}}";
+$method   = "{{METHOD}}";
+
+$privateKey = openssl_pkey_get_private(file_get_contents("private_key.pem"));
+$ts         = round(microtime(true) * 1000);
+$qs         = "apiKey={$apiKey}&timestamp={$ts}";
+
+openssl_sign($qs, $sig, $privateKey, OPENSSL_ALGO_SHA256);
+$signature = base64_encode($sig);
+
+$request = json_encode([
+    "id" => "1", "method" => $method,
+    "params" => ["apiKey" => $apiKey, "signature" => $signature, "timestamp" => $ts]
+]);
+
+$ws = new Client($baseUrl);
+echo $request . "\\n";
+$ws->send($request);
+echo $ws->receive() . "\\n";
+$ws->close();`;
+
+T_ws.rsa.ruby = `# gem install websocket-client-simple
+require "websocket-client-simple"
+require "openssl"
+require "base64"
+require "json"
+
+API_KEY   = "YOUR_API_KEY"
+BASE_URL  = "{{EP}}"
+METHOD    = "{{METHOD}}"
+
+private_key = OpenSSL::PKey::RSA.new(File.read("private_key.pem"))
+ts          = (Time.now.to_f * 1000).round
+qs          = "apiKey=#{API_KEY}&timestamp=#{ts}"
+signature   = Base64.strict_encode64(private_key.sign(OpenSSL::Digest::SHA256.new, qs))
+
+request = JSON.generate({
+  id: "1", method: METHOD,
+  params: { apiKey: API_KEY, signature: signature, timestamp: ts }
+})
+
+ws = WebSocket::Client::Simple.connect(BASE_URL)
+ws.on(:open)    { puts request; ws.send(request) }
+ws.on(:message) { |e| puts e.data; ws.close }
+ws.on(:close)   { exit }
+loop {}`;
+
+T_ws.rsa.typescript = `import * as crypto from "crypto";
+import * as fs     from "fs";
+import WebSocket   from "ws";
+
+const API_KEY:    string = "YOUR_API_KEY";
+const BASE_URL:   string = "{{EP}}";
+const METHOD:     string = "{{METHOD}}";
+const privateKey: string = fs.readFileSync("private_key.pem", "utf8");
+
+const ts:  number = Date.now();
+const qs:  string = "apiKey=" + API_KEY + "&timestamp=" + ts;
+const sig: string = crypto.sign("sha256", Buffer.from(qs), {
+  key: privateKey, padding: crypto.constants.RSA_PKCS1_PADDING
+}).toString("base64");
+
+const request: string = JSON.stringify({
+  id: "1", method: METHOD,
+  params: { apiKey: API_KEY, signature: sig, timestamp: ts }
+});
+
+const ws = new WebSocket(BASE_URL);
+ws.on("open",    () => { console.log(request); ws.send(request); });
+ws.on("message", (data: WebSocket.RawData) => { console.log(JSON.parse(data.toString())); ws.close(); });
+ws.on("error",   (err: Error) => console.error(err));`;
+
+T_ws.rsa.rust = `// Cargo.toml:
+// tungstenite = { version = "0.24", features = ["native-tls"] }
+// openssl = "0.10"  |  base64 = "0.22"
+
+use base64::{engine::general_purpose, Engine as _};
+use openssl::{hash::MessageDigest, pkey::PKey, sign::Signer};
+use std::time::{SystemTime, UNIX_EPOCH};
+use tungstenite::connect;
+
+fn main() {
+    let api_key  = "YOUR_API_KEY";
+    let base_url = "{{EP}}";
+    let method   = "{{METHOD}}";
+
+    let pem  = std::fs::read("private_key.pem").unwrap();
+    let pkey = PKey::private_key_from_pem(&pem).unwrap();
+
+    let ts  = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
+    let qs  = format!("apiKey={}&timestamp={}", api_key, ts);
+    let mut signer = Signer::new(MessageDigest::sha256(), &pkey).unwrap();
+    signer.update(qs.as_bytes()).unwrap();
+    let sig = general_purpose::STANDARD.encode(signer.sign_to_vec().unwrap());
+
+    let req = format!(
+        r#"{{"id":"1","method":"{}","params":{{"apiKey":"{}","signature":"{}","timestamp":{}}}}}"#,
+        method, api_key, sig, ts
+    );
+
+    let (mut ws, _) = connect(base_url).unwrap();
+    println!("{}", req);
+    ws.send(tungstenite::Message::Text(req)).unwrap();
+    println!("{}", ws.read().unwrap());
+    ws.close(None).unwrap();
+}`;
+
+T_ws.rsa.cpp = `// Install IXWebSocket + OpenSSL
+// Compile: g++ -std=c++17 main.cpp -lixwebsocket -lssl -lcrypto -lpthread
+#include <ixwebsocket/IXWebSocket.h>
+#include <openssl/evp.h>
+#include <openssl/pem.h>
+#include <openssl/bio.h>
+#include <iostream>
+#include <vector>
+#include <chrono>
+#include <thread>
+
+std::string signRsaBase64(const std::string& data) {
+    FILE* fp = fopen("private_key.pem", "r");
+    EVP_PKEY* pkey = PEM_read_PrivateKey(fp, nullptr, nullptr, nullptr);
+    fclose(fp);
+    EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+    EVP_DigestSignInit(ctx, nullptr, EVP_sha256(), nullptr, pkey);
+    EVP_DigestSignUpdate(ctx, data.data(), data.size());
+    size_t sigLen = 0; EVP_DigestSignFinal(ctx, nullptr, &sigLen);
+    std::vector<unsigned char> sig(sigLen);
+    EVP_DigestSignFinal(ctx, sig.data(), &sigLen);
+    EVP_MD_CTX_free(ctx); EVP_PKEY_free(pkey);
+    BIO* b64 = BIO_push(BIO_new(BIO_f_base64()), BIO_new(BIO_s_mem()));
+    BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
+    BIO_write(b64, sig.data(), (int)sigLen); BIO_flush(b64);
+    BUF_MEM* bptr; BIO_get_mem_ptr(b64, &bptr);
+    std::string result(bptr->data, bptr->length);
+    BIO_free_all(b64);
+    return result;
+}
+
+int main() {
+    const std::string apiKey  = "YOUR_API_KEY";
+    const std::string baseUrl = "{{EP}}";
+    const std::string method  = "{{METHOD}}";
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                  std::chrono::system_clock::now().time_since_epoch()).count();
+    std::string qs  = "apiKey=" + apiKey + "&timestamp=" + std::to_string(ms);
+    std::string sig = signRsaBase64(qs);
+    std::string req = R"({"id":"1","method":")" + method + R"(","params":{"apiKey":")" +
+                      apiKey + R"(","signature":")" + sig + R"(","timestamp":)" + std::to_string(ms) + "}}";
+    ix::WebSocket ws;
+    ws.setUrl(baseUrl);
+    ws.setOnMessageCallback([&](const ix::WebSocketMessagePtr& m) {
+        if (m->type == ix::WebSocketMessageType::Open)    { std::cout << req << "\\n"; ws.send(req); }
+        if (m->type == ix::WebSocketMessageType::Message) { std::cout << m->str << "\\n"; ws.close(); }
+    });
+    ws.start();
+    std::this_thread::sleep_for(std::chrono::seconds(5));
+    return 0;
+}`;
+
+T_ws.rsa.bash = `#!/bin/bash
+# Requires: websocat, openssl, python3
+API_KEY="YOUR_API_KEY"
+BASE_URL="{{EP}}"
+METHOD="{{METHOD}}"
+PRIVATE_KEY="private_key.pem"
+
+TIMESTAMP=$(date +%s%3N)
+QS="apiKey=\${API_KEY}&timestamp=\${TIMESTAMP}"
+RAW_SIG=$(echo -n "\$QS" | openssl dgst -sha256 -sign "\$PRIVATE_KEY" | openssl base64 -A)
+SIGNATURE=$(python3 -c "import sys; print(sys.argv[1])" "\$RAW_SIG")
+
+REQUEST='{"id":"1","method":"'\${METHOD}'","params":{"apiKey":"'\${API_KEY}'","signature":"'\${SIGNATURE}'","timestamp":'\${TIMESTAMP}'}}'
+
+echo "Request: \$REQUEST"
+echo "\$REQUEST" | websocat "\$BASE_URL"`;
+
+/* ── WS Ed25519 — Session Authentication ─────────────────────────── */
+T_ws.ed25519.python = `import base64, time, json
+from cryptography.hazmat.primitives.serialization import load_pem_private_key
+from websocket import create_connection
+
+API_KEY          = "YOUR_API_KEY"
+PRIVATE_KEY_PATH = "private_key.pem"
+BASE_URL         = "{{EP}}"
+
+with open(PRIVATE_KEY_PATH, "rb") as f:
+    private_key = load_pem_private_key(data=f.read(), password=None)
+
+timestamp = int(time.time() * 1000)
+params    = {"apiKey": API_KEY, "timestamp": timestamp}
+payload   = "&".join([f"{k}={v}" for k, v in sorted(params.items())])
+signature = base64.b64encode(private_key.sign(payload.encode("ASCII"))).decode("ASCII")
+params["signature"] = signature
+
+# Step 1: Authenticate the WebSocket session
+ws = create_connection(BASE_URL)
+ws.send(json.dumps({"id": "logon", "method": "session.logon", "params": params}))
+print("Auth response:", ws.recv())
+
+# Step 2: Send request — no credentials needed (session is authenticated)
+ws.send(json.dumps({"id": "1", "method": "{{METHOD}}", "params": {}}))
+print("Response:", ws.recv())
+ws.close()`;
+
+T_ws.ed25519.javascript = `const crypto    = require("crypto");
+const fs        = require("fs");
+const WebSocket = require("ws");
+
+const API_KEY    = "YOUR_API_KEY";
+const BASE_URL   = "{{EP}}";
+const METHOD     = "{{METHOD}}";
+const privateKey = fs.readFileSync("private_key.pem", "utf8");
+
+const timestamp = Date.now();
+const params    = { apiKey: API_KEY, timestamp };
+const payload   = Object.entries(params).sort().map(([k, v]) => k + "=" + v).join("&");
+const signature = crypto.sign(null, Buffer.from(payload), privateKey).toString("base64");
+
+let loggedIn = false;
+const ws = new WebSocket(BASE_URL);
+
+ws.on("open", () => {
+  // Step 1: Session logon
+  ws.send(JSON.stringify({ id: "logon", method: "session.logon", params: { ...params, signature } }));
+});
+
+ws.on("message", (data) => {
+  const msg = JSON.parse(data.toString());
+  if (msg.id === "logon") {
+    console.log("Auth:", msg);
+    // Step 2: Request without credentials
+    ws.send(JSON.stringify({ id: "1", method: METHOD, params: {} }));
+  } else {
+    console.log("Response:", msg);
+    ws.close();
+  }
+});
+
+ws.on("error", (err) => console.error(err));`;
+
+T_ws.ed25519.java = `import java.net.URI;
+import java.net.http.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.security.*;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.time.Instant;
+import java.util.Base64;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+// Requires Java 15+ for Ed25519
+public class BinanceWsEd25519 {
+    static final String API_KEY  = "YOUR_API_KEY";
+    static final String BASE_URL = "{{EP}}";
+    static final String METHOD   = "{{METHOD}}";
+
+    public static void main(String[] args) throws Exception {
+        byte[]     keyBytes   = Files.readAllBytes(Paths.get("private_key.der"));
+        PrivateKey privateKey = KeyFactory.getInstance("Ed25519").generatePrivate(new PKCS8EncodedKeySpec(keyBytes));
+
+        long   ts      = Instant.now().toEpochMilli();
+        String payload = "apiKey=" + API_KEY + "&timestamp=" + ts;
+        Signature sig  = Signature.getInstance("Ed25519");
+        sig.initSign(privateKey);
+        sig.update(payload.getBytes(StandardCharsets.UTF_8));
+        String signature = Base64.getEncoder().encodeToString(sig.sign());
+
+        String logon = String.format(
+            "{\\"id\\":\\"logon\\",\\"method\\":\\"session.logon\\",\\"params\\":{\\"apiKey\\":\\"%s\\",\\"signature\\":\\"%s\\",\\"timestamp\\":%d}}",
+            API_KEY, signature, ts);
+        String req = String.format("{\\"id\\":\\"1\\",\\"method\\":\\"%s\\",\\"params\\":{}}", METHOD);
+
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicBoolean  auth  = new AtomicBoolean(false);
+        HttpClient.newHttpClient().newWebSocketBuilder()
+            .buildAsync(URI.create(BASE_URL), new WebSocket.Listener() {
+                public void onOpen(WebSocket ws) { ws.sendText(logon, true); ws.request(1); }
+                public java.util.concurrent.CompletionStage<?> onText(WebSocket ws, CharSequence d, boolean last) {
+                    System.out.println(d);
+                    if (!auth.getAndSet(true)) ws.sendText(req, true);
+                    else { latch.countDown(); ws.abort(); }
+                    ws.request(1); return null;
+                }
+            }).join();
+        latch.await();
+    }
+}`;
+
+T_ws.ed25519.go = `package main
+
+import (
+	"crypto/ed25519"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/json"
+	"encoding/pem"
+	"fmt"
+	"os"
+	"sort"
+	"strings"
+	"time"
+	"github.com/gorilla/websocket"
+)
+
+const (
+	apiKey   = "YOUR_API_KEY"
+	baseURL  = "{{EP}}"
+	wsMethod = "{{METHOD}}"
+)
+
+func main() {
+	keyData, _  := os.ReadFile("private_key.pem")
+	block, _    := pem.Decode(keyData)
+	keyIface, _ := x509.ParsePKCS8PrivateKey(block.Bytes)
+	privKey     := keyIface.(ed25519.PrivateKey)
+
+	ts := time.Now().UnixMilli()
+	p  := map[string]interface{}{"apiKey": apiKey, "timestamp": ts}
+	keys := []string{"apiKey", "timestamp"}
+	sort.Strings(keys)
+	parts := make([]string, len(keys))
+	for i, k := range keys { parts[i] = fmt.Sprintf("%s=%v", k, p[k]) }
+	payload  := strings.Join(parts, "&")
+	sigBytes := ed25519.Sign(privKey, []byte(payload))
+	sig      := base64.StdEncoding.EncodeToString(sigBytes)
+
+	conn, _, _ := websocket.DefaultDialer.Dial(baseURL, nil)
+	defer conn.Close()
+
+	// Step 1: session.logon
+	logon, _ := json.Marshal(map[string]interface{}{"id": "logon", "method": "session.logon",
+		"params": map[string]interface{}{"apiKey": apiKey, "signature": sig, "timestamp": ts}})
+	conn.WriteMessage(websocket.TextMessage, logon)
+	_, authResp, _ := conn.ReadMessage()
+	fmt.Println("Auth:", string(authResp))
+
+	// Step 2: actual request
+	req, _ := json.Marshal(map[string]interface{}{"id": "1", "method": wsMethod, "params": map[string]interface{}{}})
+	conn.WriteMessage(websocket.TextMessage, req)
+	_, msg, _ := conn.ReadMessage()
+	fmt.Println("Response:", string(msg))
+}`;
+
+T_ws.ed25519.csharp = `// Install: dotnet add package BouncyCastle.Cryptography
+using Org.BouncyCastle.Crypto.Parameters;
+using Org.BouncyCastle.Crypto.Signers;
+using Org.BouncyCastle.OpenSsl;
+using System;
+using System.Net.WebSockets;
+using System.Text;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+
+class BinanceWsEd25519
+{
+    const string ApiKey  = "YOUR_API_KEY";
+    const string BaseUrl = "{{EP}}";
+    const string Method  = "{{METHOD}}";
+
+    static async Task Main()
+    {
+        using var reader  = new System.IO.StreamReader("private_key.pem");
+        var keyParam      = (Ed25519PrivateKeyParameters)new PemReader(reader).ReadObject();
+        long ts           = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        string payload    = "apiKey=" + ApiKey + "&timestamp=" + ts;
+        var signer        = new Ed25519Signer();
+        signer.Init(true, keyParam);
+        byte[] msg        = Encoding.ASCII.GetBytes(payload);
+        signer.BlockUpdate(msg, 0, msg.Length);
+        string sig        = Convert.ToBase64String(signer.GenerateSignature());
+
+        string logon = JsonSerializer.Serialize(new {
+            id = "logon", method = "session.logon",
+            @params = new { apiKey = ApiKey, signature = sig, timestamp = ts }
+        });
+        string req = JsonSerializer.Serialize(new { id = "1", method = Method, @params = new { } });
+
+        using var ws = new ClientWebSocket();
+        await ws.ConnectAsync(new Uri(BaseUrl), CancellationToken.None);
+        await ws.SendAsync(Encoding.UTF8.GetBytes(logon), WebSocketMessageType.Text, true, CancellationToken.None);
+        var buf = new byte[65536];
+        var r   = await ws.ReceiveAsync(buf, CancellationToken.None);
+        Console.WriteLine("Auth: " + Encoding.UTF8.GetString(buf, 0, r.Count));
+        await ws.SendAsync(Encoding.UTF8.GetBytes(req), WebSocketMessageType.Text, true, CancellationToken.None);
+        r = await ws.ReceiveAsync(buf, CancellationToken.None);
+        Console.WriteLine("Response: " + Encoding.UTF8.GetString(buf, 0, r.Count));
+        await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None);
+    }
+}`;
+
+T_ws.ed25519.php = `<?php
+// PHP 8.2+ with OpenSSL 3.0+
+// composer require textalk/websocket
+require "vendor/autoload.php";
+use WebSocket\\Client;
+
+$apiKey   = "YOUR_API_KEY";
+$baseUrl  = "{{EP}}";
+$method   = "{{METHOD}}";
+
+$privateKey = openssl_pkey_get_private(file_get_contents("private_key.pem"));
+$ts         = round(microtime(true) * 1000);
+$payload    = "apiKey={$apiKey}&timestamp={$ts}";
+
+openssl_sign($payload, $sig, $privateKey, OPENSSL_ALGO_ED25519);
+$signature = base64_encode($sig);
+
+// Step 1: Session logon
+$logon = json_encode([
+    "id" => "logon", "method" => "session.logon",
+    "params" => ["apiKey" => $apiKey, "signature" => $signature, "timestamp" => $ts]
+]);
+$ws = new Client($baseUrl);
+$ws->send($logon);
+echo "Auth: " . $ws->receive() . "\\n";
+
+// Step 2: Request without credentials
+$ws->send(json_encode(["id" => "1", "method" => $method, "params" => new stdClass()]));
+echo "Response: " . $ws->receive() . "\\n";
+$ws->close();`;
+
+T_ws.ed25519.ruby = `# Ruby 3.1+ with OpenSSL 3.0+
+# gem install websocket-client-simple
+require "websocket-client-simple"
+require "openssl"
+require "base64"
+require "json"
+
+API_KEY   = "YOUR_API_KEY"
+BASE_URL  = "{{EP}}"
+METHOD    = "{{METHOD}}"
+
+private_key = OpenSSL::PKey.read(File.read("private_key.pem"))
+ts          = (Time.now.to_f * 1000).round
+payload     = "apiKey=#{API_KEY}&timestamp=#{ts}"
+signature   = Base64.strict_encode64(private_key.sign(nil, payload))
+
+logon = JSON.generate({
+  id: "logon", method: "session.logon",
+  params: { apiKey: API_KEY, signature: signature, timestamp: ts }
+})
+
+loggedIn = false
+ws = WebSocket::Client::Simple.connect(BASE_URL)
+ws.on(:open) { ws.send(logon) }
+ws.on(:message) do |e|
+  puts e.data
+  if !loggedIn
+    loggedIn = true
+    ws.send(JSON.generate({ id: "1", method: METHOD, params: {} }))
+  else
+    ws.close
+  end
+end
+ws.on(:close) { exit }
+loop {}`;
+
+T_ws.ed25519.typescript = `import * as crypto from "crypto";
+import * as fs     from "fs";
+import WebSocket   from "ws";
+
+const API_KEY:    string = "YOUR_API_KEY";
+const BASE_URL:   string = "{{EP}}";
+const METHOD:     string = "{{METHOD}}";
+const privateKey: string = fs.readFileSync("private_key.pem", "utf8");
+
+const timestamp: number = Date.now();
+const params = { apiKey: API_KEY, timestamp };
+const payload: string   = Object.entries(params).sort().map(([k, v]) => k + "=" + v).join("&");
+const signature: string = crypto.sign(null, Buffer.from(payload), privateKey).toString("base64");
+
+let loggedIn = false;
+const ws = new WebSocket(BASE_URL);
+
+ws.on("open", () => {
+  ws.send(JSON.stringify({ id: "logon", method: "session.logon", params: { ...params, signature } }));
+});
+
+ws.on("message", (data: WebSocket.RawData) => {
+  const msg = JSON.parse(data.toString());
+  if (!loggedIn) {
+    loggedIn = true;
+    console.log("Auth:", msg);
+    ws.send(JSON.stringify({ id: "1", method: METHOD, params: {} }));
+  } else {
+    console.log("Response:", msg);
+    ws.close();
+  }
+});
+
+ws.on("error", (err: Error) => console.error(err));`;
+
+T_ws.ed25519.rust = `// Cargo.toml:
+// tungstenite = { version = "0.24", features = ["native-tls"] }
+// openssl = "0.10"  |  base64 = "0.22"
+
+use base64::{engine::general_purpose, Engine as _};
+use openssl::{pkey::PKey, sign::Signer};
+use std::time::{SystemTime, UNIX_EPOCH};
+use tungstenite::{connect, Message};
+
+fn main() {
+    let api_key  = "YOUR_API_KEY";
+    let base_url = "{{EP}}";
+    let method   = "{{METHOD}}";
+
+    let pem  = std::fs::read("private_key.pem").unwrap();
+    let pkey = PKey::private_key_from_pem(&pem).unwrap();
+
+    let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
+    let payload = format!("apiKey={}&timestamp={}", api_key, ts);
+    let mut signer = Signer::new_without_digest(&pkey).unwrap();
+    signer.update(payload.as_bytes()).unwrap();
+    let sig = general_purpose::STANDARD.encode(signer.sign_to_vec().unwrap());
+
+    let logon = format!(
+        r#"{{"id":"logon","method":"session.logon","params":{{"apiKey":"{}","signature":"{}","timestamp":{}}}}}"#,
+        api_key, sig, ts
+    );
+    let req = format!(r#"{{"id":"1","method":"{}","params":{{}}}}"#, method);
+
+    let (mut ws, _) = connect(base_url).unwrap();
+    ws.send(Message::Text(logon)).unwrap();
+    println!("Auth: {}", ws.read().unwrap());
+    ws.send(Message::Text(req)).unwrap();
+    println!("Response: {}", ws.read().unwrap());
+    ws.close(None).unwrap();
+}`;
+
+T_ws.ed25519.cpp = `// Requires OpenSSL 1.1.1+ for Ed25519. Install IXWebSocket.
+// Compile: g++ -std=c++17 main.cpp -lixwebsocket -lssl -lcrypto -lpthread
+#include <ixwebsocket/IXWebSocket.h>
+#include <openssl/evp.h>
+#include <openssl/pem.h>
+#include <openssl/bio.h>
+#include <iostream>
+#include <vector>
+#include <chrono>
+#include <thread>
+#include <atomic>
+
+std::string signEd25519Base64(const std::string& data) {
+    FILE* fp = fopen("private_key.pem", "r");
+    EVP_PKEY* pkey = PEM_read_PrivateKey(fp, nullptr, nullptr, nullptr);
+    fclose(fp);
+    EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+    EVP_DigestSignInit(ctx, nullptr, nullptr, nullptr, pkey);
+    size_t sigLen = 0;
+    EVP_DigestSign(ctx, nullptr, &sigLen, (unsigned char*)data.data(), data.size());
+    std::vector<unsigned char> sig(sigLen);
+    EVP_DigestSign(ctx, sig.data(), &sigLen, (unsigned char*)data.data(), data.size());
+    EVP_MD_CTX_free(ctx); EVP_PKEY_free(pkey);
+    BIO* b64 = BIO_push(BIO_new(BIO_f_base64()), BIO_new(BIO_s_mem()));
+    BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
+    BIO_write(b64, sig.data(), (int)sigLen); BIO_flush(b64);
+    BUF_MEM* bptr; BIO_get_mem_ptr(b64, &bptr);
+    std::string result(bptr->data, bptr->length);
+    BIO_free_all(b64);
+    return result;
+}
+
+int main() {
+    const std::string apiKey  = "YOUR_API_KEY";
+    const std::string baseUrl = "{{EP}}";
+    const std::string method  = "{{METHOD}}";
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                  std::chrono::system_clock::now().time_since_epoch()).count();
+    std::string payload = "apiKey=" + apiKey + "&timestamp=" + std::to_string(ms);
+    std::string sig     = signEd25519Base64(payload);
+    std::string logon   = R"({"id":"logon","method":"session.logon","params":{"apiKey":")" +
+                          apiKey + R"(","signature":")" + sig + R"(","timestamp":)" + std::to_string(ms) + "}}";
+    std::string req     = R"({"id":"1","method":")" + method + R"(","params":{}})";
+
+    std::atomic<bool> loggedIn{false};
+    ix::WebSocket ws;
+    ws.setUrl(baseUrl);
+    ws.setOnMessageCallback([&](const ix::WebSocketMessagePtr& m) {
+        if (m->type == ix::WebSocketMessageType::Open) { ws.send(logon); }
+        if (m->type == ix::WebSocketMessageType::Message) {
+            std::cout << m->str << "\\n";
+            if (!loggedIn.exchange(true)) ws.send(req);
+            else ws.close();
+        }
+    });
+    ws.start();
+    std::this_thread::sleep_for(std::chrono::seconds(5));
+    return 0;
+}`;
+
+T_ws.ed25519.bash = `#!/bin/bash
+# Requires: websocat, openssl 3.0+, python3, jq
+API_KEY="YOUR_API_KEY"
+BASE_URL="{{EP}}"
+METHOD="{{METHOD}}"
+PRIVATE_KEY="private_key.pem"
+
+TIMESTAMP=$(date +%s%3N)
+# Sort params alphabetically: apiKey < timestamp
+PAYLOAD="apiKey=\${API_KEY}&timestamp=\${TIMESTAMP}"
+RAW_SIG=$(echo -n "\$PAYLOAD" | openssl pkeyutl -sign -inkey "\$PRIVATE_KEY" | openssl base64 -A)
+
+LOGON='{"id":"logon","method":"session.logon","params":{"apiKey":"'\${API_KEY}'","signature":"'\${RAW_SIG}'","timestamp":'\${TIMESTAMP}'}}'
+REQUEST='{"id":"1","method":"'\${METHOD}'","params":{}}'
+
+# session.logon then send actual request
+(echo "\$LOGON"; sleep 1; echo "\$REQUEST"; sleep 1) | websocat "\$BASE_URL"`;
+
 /* ── Extra-param injection per language ────────────────────────────── */
 function injectExtraParams(code, lang, params) {
   if (!params || params.length === 0) return code;
@@ -1814,32 +3047,42 @@ function injectExtraParams(code, lang, params) {
 }
 
 /* ── State ─────────────────────────────────────────────────────────── */
-let state   = { auth: "hmac", env: "mainnet", market: "spot", lang: "python" };
-let extraParams = [];   // [{ key, val }]
+let state   = { auth: "hmac", env: "mainnet", apitype: "rest", market: "spot", lang: "python" };
+let extraParams = [];
 let paramIdSeed = 0;
 
-/* ── Sync market options based on env ─────────────────────────────── */
+/* ── Sync market options based on apitype + env ────────────────────── */
 function syncMarketOptions() {
-  const sel = document.getElementById("sel-market");
-  const isTestnet = state.env === "testnet";
+  const sel       = document.getElementById("sel-market");
+  const available = MARKET_AVAILABLE[state.apitype][state.env] || [];
   for (const opt of sel.options) {
-    const available = TESTNET_ONLY.includes(opt.value);
-    opt.disabled = isTestnet && !available;
-    opt.style.color = (isTestnet && !available) ? "#484f58" : "";
+    opt.disabled   = !available.includes(opt.value);
+    opt.style.color = !available.includes(opt.value) ? "#484f58" : "";
   }
-  // If current market is not available on testnet, switch to spot
-  if (isTestnet && !TESTNET_ONLY.includes(state.market)) {
-    state.market = "spot";
-    sel.value = "spot";
+  if (!available.includes(state.market)) {
+    state.market = available[0] || "spot";
+    sel.value    = state.market;
   }
+  // Params panel: hide for WS (params go in JSON body, not query string)
+  document.getElementById("params-container").style.display =
+    state.apitype === "ws" ? "none" : "";
 }
 
 /* ── Render ────────────────────────────────────────────────────────── */
 function render() {
   syncMarketOptions();
-  const ep      = ENDPOINTS[state.env][state.market];
-  const rawCode = T[state.auth][state.lang].replace(/\{\{EP\}\}/g, ep);
-  const code    = injectExtraParams(rawCode, state.lang, extraParams);
+
+  const isWs     = state.apitype === "ws";
+  const epMap    = ENDPOINTS[state.apitype][state.env];
+  const ep       = epMap ? (epMap[state.market] || "") : "";
+  const method   = isWs ? (WS_METHODS[state.market] || "") : "";
+  const templates = isWs ? T_ws : T;
+  const notesMap  = isWs ? WS_NOTES : NOTES;
+
+  const rawCode = (templates[state.auth][state.lang] || "// Not available for this combination")
+    .replace(/\{\{EP\}\}/g, ep)
+    .replace(/\{\{METHOD\}\}/g, method);
+  const code = isWs ? rawCode : injectExtraParams(rawCode, state.lang, extraParams);
 
   const block = document.getElementById("code-block");
   block.className = "language-" + LANG_HL[state.lang];
@@ -1849,18 +3092,16 @@ function render() {
 
   document.getElementById("lang-badge").textContent       = LANG_NAMES[state.lang];
   document.getElementById("auth-badge").textContent       = AUTH_NAMES[state.auth];
-  document.getElementById("endpoint-display").textContent = ep;
-  document.getElementById("note-box").innerHTML           = NOTES[state.auth][state.lang];
+  document.getElementById("endpoint-display").textContent = ep || "N/A";
+  document.getElementById("note-box").innerHTML           = (notesMap[state.auth] || {})[state.lang] || "";
 
-  // Testnet badge
   const envBadge = document.getElementById("env-badge");
   envBadge.style.display = state.env === "testnet" ? "inline" : "none";
 
-  // Print header
   const marketLabels = { spot:'Spot', usdm:'USD-M Futures', coinm:'COIN-M Futures', portfolio:'Portfolio Margin', options:'Options' };
   document.getElementById("print-meta").textContent =
     LANG_NAMES[state.lang] + "  |  " + AUTH_NAMES[state.auth] + "  |  " +
-    marketLabels[state.market] + "  |  " + (state.env === "testnet" ? "TESTNET" : "Mainnet");
+    (isWs ? "WebSocket API" : "REST API") + "  |  " + marketLabels[state.market];
   document.getElementById("print-ep").textContent = ep;
 }
 
@@ -1895,10 +3136,11 @@ function removeParam(id) {
 }
 
 /* ── Event listeners ───────────────────────────────────────────────── */
-document.getElementById("sel-auth").addEventListener("change",   e => { state.auth   = e.target.value; render(); });
-document.getElementById("sel-env").addEventListener("change",    e => { state.env    = e.target.value; render(); });
-document.getElementById("sel-market").addEventListener("change", e => { state.market = e.target.value; render(); });
-document.getElementById("sel-lang").addEventListener("change",   e => { state.lang   = e.target.value; render(); });
+document.getElementById("sel-env").addEventListener("change",     e => { state.env     = e.target.value; render(); });
+document.getElementById("sel-apitype").addEventListener("change", e => { state.apitype = e.target.value; render(); });
+document.getElementById("sel-market").addEventListener("change",  e => { state.market  = e.target.value; render(); });
+document.getElementById("sel-auth").addEventListener("change",    e => { state.auth    = e.target.value; render(); });
+document.getElementById("sel-lang").addEventListener("change",    e => { state.lang    = e.target.value; render(); });
 document.getElementById("add-param-btn").addEventListener("click", addParamRow);
 document.getElementById("pdf-btn").addEventListener("click", async () => {
   const btn = document.getElementById("pdf-btn");
