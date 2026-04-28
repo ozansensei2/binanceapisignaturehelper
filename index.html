@@ -288,6 +288,8 @@
     /* ── Print / PDF ────────────────────────────────────────────────── */
     .print-only { display: none; }
 
+    @page { margin: 0; size: auto; }
+
     @media print {
       * { visibility: hidden; }
       pre, pre * { visibility: visible; }
