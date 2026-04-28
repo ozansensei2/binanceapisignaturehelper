@@ -169,7 +169,9 @@
       border-radius: 4px;
     }
 
-    .copy-btn {
+    .btn-group { display: flex; gap: 8px; }
+
+    .copy-btn, .pdf-btn {
       background: #21262d;
       color: #c9d1d9;
       border: 1px solid #30363d;
@@ -183,8 +185,129 @@
       gap: 6px;
     }
 
-    .copy-btn:hover { background: #30363d; border-color: #8b949e; }
+    .copy-btn:hover, .pdf-btn:hover { background: #30363d; border-color: #8b949e; }
     .copy-btn.copied { background: #1f4f2e; border-color: #2ea043; color: #3fb950; }
+    .pdf-btn:hover { color: #e6edf3; }
+
+    /* ── Parameters section ─────────────────────────────────────────── */
+    .params-container {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      margin-bottom: 16px;
+      overflow: hidden;
+    }
+
+    .params-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 14px;
+      border-bottom: 1px solid #30363d;
+      background: #1c2128;
+    }
+
+    .params-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: #8b949e;
+    }
+
+    .add-param-btn {
+      background: none;
+      border: 1px solid #30363d;
+      color: #8b949e;
+      border-radius: 5px;
+      padding: 3px 10px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .add-param-btn:hover { border-color: #58a6ff; color: #58a6ff; background: rgba(88,166,255,0.07); }
+
+    .params-rows { padding: 6px 8px; display: flex; flex-direction: column; gap: 4px; }
+
+    .param-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .param-input {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 5px;
+      padding: 5px 10px;
+      font-size: 13px;
+      color: #e6edf3;
+      font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+      outline: none;
+      transition: border-color 0.15s;
+      width: 100%;
+    }
+    .param-input:focus { border-color: #58a6ff; }
+    .param-input::placeholder { color: #484f58; }
+
+    .param-fixed-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 6px;
+      align-items: center;
+    }
+    .param-fixed-key, .param-fixed-val {
+      font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+      font-size: 13px;
+      padding: 5px 10px;
+      color: #484f58;
+      border: 1px solid transparent;
+    }
+    .param-fixed-key { color: #6e7681; }
+    .param-fixed-val { color: #484f58; font-style: italic; }
+
+    .param-remove-btn {
+      background: none;
+      border: none;
+      color: #484f58;
+      font-size: 16px;
+      cursor: pointer;
+      padding: 2px 6px;
+      border-radius: 4px;
+      line-height: 1;
+      transition: all 0.12s;
+      width: 28px;
+      text-align: center;
+    }
+    .param-remove-btn:hover { background: rgba(248,81,73,0.15); color: #f85149; }
+
+    /* ── Print / PDF ────────────────────────────────────────────────── */
+    .print-only { display: none; }
+
+    @media print {
+      body { background: white; color: black; }
+      header, .selectors, .endpoint-bar, .params-container,
+      .note-box, .btn-group, .code-header .btn-group { display: none !important; }
+      .print-only { display: block !important; margin-bottom: 16px; font-family: sans-serif; }
+      .print-only h2 { font-size: 16pt; margin-bottom: 6px; color: #000; }
+      .print-meta { font-size: 10pt; color: #555; margin-bottom: 4px; }
+      .print-ep   { font-size: 9pt; font-family: monospace; color: #1a1a8c; word-break: break-all; margin-bottom: 12px; }
+      .code-container { border: 1px solid #ccc !important; border-radius: 0 !important; }
+      .code-header { background: #f5f5f5 !important; border-bottom: 1px solid #ccc !important; padding: 6px 12px !important; }
+      .lang-badge, .auth-badge { color: #333 !important; background: #eee !important; border-color: #ccc !important; }
+      pre code.hljs { font-size: 9pt !important; line-height: 1.5 !important; padding: 14px !important;
+                      background: white !important; color: #111 !important; }
+      .hljs-keyword  { color: #a626a4 !important; }
+      .hljs-string   { color: #50a14f !important; }
+      .hljs-comment  { color: #a0a1a7 !important; }
+      .hljs-number   { color: #986801 !important; }
+      .hljs-built_in { color: #c18401 !important; }
+      main { margin: 0 !important; padding: 0 !important; max-width: 100% !important; }
+    }
 
     pre {
       margin: 0;
@@ -306,6 +429,30 @@
     <span id="env-badge" style="display:none; font-size:11px; font-weight:700; color:#f0b90b; background:rgba(240,185,11,0.13); border:1px solid rgba(240,185,11,0.35); padding:2px 8px; border-radius:4px; margin-left:auto; white-space:nowrap; letter-spacing:0.05em;">TESTNET</span>
   </div>
 
+  <div class="params-container">
+    <div class="params-header">
+      <span class="params-title">Parameters</span>
+      <button class="add-param-btn" id="add-param-btn">
+        <svg width="11" height="11" viewBox="0 0 12 12" fill="currentColor"><path d="M6.5 1a.5.5 0 00-1 0v4H1a.5.5 0 000 1h4.5v4a.5.5 0 001 0V6.5H11a.5.5 0 000-1H6.5V1z"/></svg>
+        Add Parameter
+      </button>
+    </div>
+    <div class="params-rows" id="params-rows">
+      <div class="param-fixed-row">
+        <span class="param-fixed-key">timestamp</span>
+        <span class="param-fixed-val">(auto)</span>
+        <span style="width:28px;"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Print-only header (hidden on screen) -->
+  <div class="print-only">
+    <h2>Binance API — Signed Request Example</h2>
+    <div class="print-meta" id="print-meta"></div>
+    <div class="print-ep" id="print-ep"></div>
+  </div>
+
   <div class="code-container">
     <div class="code-header">
       <div class="header-left">
@@ -313,6 +460,7 @@
         <span class="lang-badge" id="lang-badge">Python</span>
         <span class="auth-badge" id="auth-badge">HMAC-SHA256</span>
       </div>
+      <div class="btn-group">
       <button class="copy-btn" id="copy-btn">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
           <path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z"/>
@@ -320,7 +468,14 @@
         </svg>
         Copy
       </button>
-    </div>
+      <button class="pdf-btn" id="pdf-btn">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M14 4.5V14a2 2 0 01-2 2H4a2 2 0 01-2-2V2a2 2 0 012-2h5.5L14 4.5zm-3 0A1.5 1.5 0 019.5 3V1H4a1 1 0 00-1 1v12a1 1 0 001 1h8a1 1 0 001-1V4.5h-2z"/>
+          <path d="M5.5 10.5a.5.5 0 01.5-.5h4a.5.5 0 010 1H6a.5.5 0 01-.5-.5zm0 2a.5.5 0 01.5-.5h4a.5.5 0 010 1H6a.5.5 0 01-.5-.5zM6 7.5a.5.5 0 000 1h2a.5.5 0 000-1H6z"/>
+        </svg>
+        PDF
+      </button>
+      </div>
     <pre><code id="code-block" class="language-python"></code></pre>
   </div>
 
@@ -1610,8 +1765,74 @@ echo "\$RESPONSE"
 echo "=== Request Headers ==="
 echo "X-MBX-APIKEY: \$API_KEY"`;
 
+/* ── Extra-param injection per language ────────────────────────────── */
+function injectExtraParams(code, lang, params) {
+  if (!params || params.length === 0) return code;
+  const ampQs = '&' + params.map(p => p.key + '=' + p.val).join('&');
+
+  switch (lang) {
+    case 'python': {
+      const extra = params.map(p => '"' + p.key + '": "' + p.val + '"').join(', ');
+      return code.replace(
+        'params       = {"timestamp": timestamp}',
+        'params       = {"timestamp": timestamp, ' + extra + '}'
+      );
+    }
+    case 'javascript':
+    case 'typescript':
+      return code.replace(
+        /const queryString\s*=\s*"timestamp=" \+ timestamp;/,
+        () => 'const queryString = "timestamp=" + timestamp + "' + ampQs + '";'
+      );
+    case 'java':
+      return code.replace(
+        'String queryString = "timestamp=" + timestamp;',
+        () => 'String queryString = "timestamp=" + timestamp + "' + ampQs + '";'
+      );
+    case 'go':
+      return code.replace(
+        /queryString\s*:=\s*fmt\.Sprintf\("timestamp=%d", timestamp\)/,
+        () => 'queryString := fmt.Sprintf("timestamp=%d' + ampQs + '", timestamp)'
+      );
+    case 'csharp':
+      return code.replace(
+        'string queryString = "timestamp=" + timestamp;',
+        () => 'string queryString = "timestamp=" + timestamp + "' + ampQs + '";'
+      );
+    case 'php':
+      return code.replace(
+        /\$queryString\s*=\s*"timestamp=\{\$timestamp\}";/,
+        () => '$queryString = "timestamp={$timestamp}' + ampQs + '";'
+      );
+    case 'ruby':
+      return code.replace(
+        'query_string = "timestamp=#{timestamp}"',
+        () => 'query_string = "timestamp=#{timestamp}' + ampQs + '"'
+      );
+    case 'rust':
+      return code.replace(
+        /let qs\s+=\s+format!\("timestamp=\{\}", ts\);/,
+        () => 'let qs = format!("timestamp={}' + ampQs + '", ts);'
+      );
+    case 'cpp':
+      return code.replace(
+        /std::string qs\s+=\s+"timestamp=" \+ std::to_string\(ms\);/,
+        () => 'std::string qs = "timestamp=" + std::to_string(ms) + "' + ampQs + '";'
+      );
+    case 'bash':
+      return code.replace(
+        /QUERY_STRING="timestamp=\\\$\{TIMESTAMP\}"/,
+        () => 'QUERY_STRING="timestamp=${TIMESTAMP}' + ampQs + '"'
+      );
+    default:
+      return code;
+  }
+}
+
 /* ── State ─────────────────────────────────────────────────────────── */
-let state = { auth: "hmac", env: "mainnet", market: "spot", lang: "python" };
+let state   = { auth: "hmac", env: "mainnet", market: "spot", lang: "python" };
+let extraParams = [];   // [{ key, val }]
+let paramIdSeed = 0;
 
 /* ── Sync market options based on env ─────────────────────────────── */
 function syncMarketOptions() {
@@ -1632,8 +1853,9 @@ function syncMarketOptions() {
 /* ── Render ────────────────────────────────────────────────────────── */
 function render() {
   syncMarketOptions();
-  const ep   = ENDPOINTS[state.env][state.market];
-  const code = T[state.auth][state.lang].replace(/\{\{EP\}\}/g, ep);
+  const ep      = ENDPOINTS[state.env][state.market];
+  const rawCode = T[state.auth][state.lang].replace(/\{\{EP\}\}/g, ep);
+  const code    = injectExtraParams(rawCode, state.lang, extraParams);
 
   const block = document.getElementById("code-block");
   block.className = "language-" + LANG_HL[state.lang];
@@ -1646,14 +1868,46 @@ function render() {
   document.getElementById("endpoint-display").textContent = ep;
   document.getElementById("note-box").innerHTML           = NOTES[state.auth][state.lang];
 
-  // Testnet warning badge on endpoint bar
-  const bar = document.getElementById("env-badge");
-  if (state.env === "testnet") {
-    bar.textContent = "TESTNET";
-    bar.style.display = "inline";
-  } else {
-    bar.style.display = "none";
-  }
+  // Testnet badge
+  const envBadge = document.getElementById("env-badge");
+  envBadge.style.display = state.env === "testnet" ? "inline" : "none";
+
+  // Print header
+  const marketLabels = { spot:'Spot', usdm:'USD-M Futures', coinm:'COIN-M Futures', portfolio:'Portfolio Margin', options:'Options' };
+  document.getElementById("print-meta").textContent =
+    LANG_NAMES[state.lang] + "  |  " + AUTH_NAMES[state.auth] + "  |  " +
+    marketLabels[state.market] + "  |  " + (state.env === "testnet" ? "TESTNET" : "Mainnet");
+  document.getElementById("print-ep").textContent = ep;
+}
+
+/* ── Parameter management ──────────────────────────────────────────── */
+function collectParams() {
+  extraParams = [];
+  document.querySelectorAll('#params-rows .param-row').forEach(row => {
+    const k = row.querySelector('.param-key-input').value.trim();
+    const v = row.querySelector('.param-val-input').value.trim();
+    if (k) extraParams.push({ key: k, val: v });
+  });
+  render();
+}
+
+function addParamRow() {
+  const id  = ++paramIdSeed;
+  const row = document.createElement('div');
+  row.className   = 'param-row';
+  row.dataset.pid = id;
+  row.innerHTML   =
+    '<input class="param-input param-key-input" placeholder="key"   oninput="collectParams()">' +
+    '<input class="param-input param-val-input" placeholder="value" oninput="collectParams()">' +
+    '<button class="param-remove-btn" onclick="removeParam(' + id + ')">×</button>';
+  document.getElementById('params-rows').appendChild(row);
+  row.querySelector('.param-key-input').focus();
+}
+
+function removeParam(id) {
+  const row = document.querySelector('[data-pid="' + id + '"]');
+  if (row) row.remove();
+  collectParams();
 }
 
 /* ── Event listeners ───────────────────────────────────────────────── */
@@ -1661,6 +1915,8 @@ document.getElementById("sel-auth").addEventListener("change",   e => { state.au
 document.getElementById("sel-env").addEventListener("change",    e => { state.env    = e.target.value; render(); });
 document.getElementById("sel-market").addEventListener("change", e => { state.market = e.target.value; render(); });
 document.getElementById("sel-lang").addEventListener("change",   e => { state.lang   = e.target.value; render(); });
+document.getElementById("add-param-btn").addEventListener("click", addParamRow);
+document.getElementById("pdf-btn").addEventListener("click", () => window.print());
 
 document.getElementById("copy-btn").addEventListener("click", () => {
   const code = document.getElementById("code-block").textContent;
