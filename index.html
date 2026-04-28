@@ -58,7 +58,7 @@
 
     .selectors {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(5, 1fr);
       gap: 14px;
       margin-bottom: 20px;
     }
@@ -220,6 +220,10 @@
       color: #79c0ff;
     }
 
+    @media (max-width: 860px) {
+      .selectors { grid-template-columns: repeat(3, 1fr); }
+    }
+
     @media (max-width: 640px) {
       .selectors { grid-template-columns: 1fr 1fr; }
       header { padding: 14px 16px; }
@@ -249,6 +253,14 @@
         <option value="hmac">HMAC-SHA256</option>
         <option value="rsa">RSA</option>
         <option value="ed25519">Ed25519</option>
+      </select>
+    </div>
+
+    <div class="select-group">
+      <label>Environment</label>
+      <select id="sel-env">
+        <option value="mainnet">Mainnet</option>
+        <option value="testnet">Testnet</option>
       </select>
     </div>
 
@@ -291,6 +303,7 @@
   <div class="endpoint-bar">
     <span class="endpoint-label">Endpoint</span>
     <span class="endpoint-url" id="endpoint-display">https://api.binance.com/api/v3/account</span>
+    <span id="env-badge" style="display:none; font-size:11px; font-weight:700; color:#f0b90b; background:rgba(240,185,11,0.13); border:1px solid rgba(240,185,11,0.35); padding:2px 8px; border-radius:4px; margin-left:auto; white-space:nowrap; letter-spacing:0.05em;">TESTNET</span>
   </div>
 
   <div class="code-container">
@@ -322,12 +335,21 @@
 
 /* ── Endpoints ─────────────────────────────────────────────────────── */
 const ENDPOINTS = {
-  spot:      'https://api.binance.com/api/v3/account',
-  usdm:      'https://fapi.binance.com/fapi/v3/balance',
-  coinm:     'https://dapi.binance.com/dapi/v1/balance',
-  portfolio: 'https://papi.binance.com/papi/v1/balance',
-  options:   'https://eapi.binance.com/eapi/v1/marginAccount'
+  mainnet: {
+    spot:      'https://api.binance.com/api/v3/account',
+    usdm:      'https://fapi.binance.com/fapi/v3/balance',
+    coinm:     'https://dapi.binance.com/dapi/v1/balance',
+    portfolio: 'https://papi.binance.com/papi/v1/balance',
+    options:   'https://eapi.binance.com/eapi/v1/marginAccount'
+  },
+  testnet: {
+    spot:  'https://demo-api.binance.com/api/v3/account',
+    usdm:  'https://demo-fapi.binance.com/fapi/v3/balance',
+    coinm: 'https://demo-dapi.binance.com/dapi/v1/balance'
+  }
 };
+
+const TESTNET_ONLY = ['spot', 'usdm', 'coinm'];
 
 /* ── UI metadata ───────────────────────────────────────────────────── */
 const LANG_NAMES = { python:'Python', javascript:'Node.js', java:'Java', go:'Go', csharp:'C#', php:'PHP', ruby:'Ruby', typescript:'TypeScript', rust:'Rust', cpp:'C++', bash:'Bash' };
@@ -1589,11 +1611,28 @@ echo "=== Request Headers ==="
 echo "X-MBX-APIKEY: \$API_KEY"`;
 
 /* ── State ─────────────────────────────────────────────────────────── */
-let state = { auth: "hmac", market: "spot", lang: "python" };
+let state = { auth: "hmac", env: "mainnet", market: "spot", lang: "python" };
+
+/* ── Sync market options based on env ─────────────────────────────── */
+function syncMarketOptions() {
+  const sel = document.getElementById("sel-market");
+  const isTestnet = state.env === "testnet";
+  for (const opt of sel.options) {
+    const available = TESTNET_ONLY.includes(opt.value);
+    opt.disabled = isTestnet && !available;
+    opt.style.color = (isTestnet && !available) ? "#484f58" : "";
+  }
+  // If current market is not available on testnet, switch to spot
+  if (isTestnet && !TESTNET_ONLY.includes(state.market)) {
+    state.market = "spot";
+    sel.value = "spot";
+  }
+}
 
 /* ── Render ────────────────────────────────────────────────────────── */
 function render() {
-  const ep   = ENDPOINTS[state.market];
+  syncMarketOptions();
+  const ep   = ENDPOINTS[state.env][state.market];
   const code = T[state.auth][state.lang].replace(/\{\{EP\}\}/g, ep);
 
   const block = document.getElementById("code-block");
@@ -1602,14 +1641,24 @@ function render() {
   delete block.dataset.highlighted;
   hljs.highlightElement(block);
 
-  document.getElementById("lang-badge").textContent  = LANG_NAMES[state.lang];
-  document.getElementById("auth-badge").textContent  = AUTH_NAMES[state.auth];
+  document.getElementById("lang-badge").textContent       = LANG_NAMES[state.lang];
+  document.getElementById("auth-badge").textContent       = AUTH_NAMES[state.auth];
   document.getElementById("endpoint-display").textContent = ep;
-  document.getElementById("note-box").innerHTML = NOTES[state.auth][state.lang];
+  document.getElementById("note-box").innerHTML           = NOTES[state.auth][state.lang];
+
+  // Testnet warning badge on endpoint bar
+  const bar = document.getElementById("env-badge");
+  if (state.env === "testnet") {
+    bar.textContent = "TESTNET";
+    bar.style.display = "inline";
+  } else {
+    bar.style.display = "none";
+  }
 }
 
 /* ── Event listeners ───────────────────────────────────────────────── */
 document.getElementById("sel-auth").addEventListener("change",   e => { state.auth   = e.target.value; render(); });
+document.getElementById("sel-env").addEventListener("change",    e => { state.env    = e.target.value; render(); });
 document.getElementById("sel-market").addEventListener("change", e => { state.market = e.target.value; render(); });
 document.getElementById("sel-lang").addEventListener("change",   e => { state.lang   = e.target.value; render(); });
 
