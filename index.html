@@ -4066,7 +4066,7 @@ function syncMarketOptions() {
 
   // Params panel: hide for WS / UDS
   const _pc = document.getElementById("params-container");
-  if (_pc) _pc.style.display = (state.apitype === "ws" || isUds) ? "none" : "";
+  if (_pc) _pc.style.display = (state.apitype === "ws" || state.apitype === "uds") ? "none" : "";
 }
 
 /* ── Render ────────────────────────────────────────────────────────── */
