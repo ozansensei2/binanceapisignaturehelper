@@ -3593,16 +3593,29 @@ function syncMarketOptions() {
   const sel       = document.getElementById("sel-market");
   const available = MARKET_AVAILABLE[state.apitype][state.env] || [];
   for (const opt of sel.options) {
-    opt.disabled   = !available.includes(opt.value);
+    opt.disabled    = !available.includes(opt.value);
     opt.style.color = !available.includes(opt.value) ? "#484f58" : "";
   }
   if (!available.includes(state.market)) {
     state.market = available[0] || "spot";
     sel.value    = state.market;
   }
-  // Params panel: hide for WS (params go in JSON body, not query string)
+
+  // UDS: force Ed25519, disable other auth options
+  const selAuth = document.getElementById("sel-auth");
+  const isUds   = state.apitype === "uds";
+  for (const opt of selAuth.options) {
+    opt.disabled    = isUds && opt.value !== "ed25519";
+    opt.style.color = (isUds && opt.value !== "ed25519") ? "#484f58" : "";
+  }
+  if (isUds && state.auth !== "ed25519") {
+    state.auth    = "ed25519";
+    selAuth.value = "ed25519";
+  }
+
+  // Params panel: hide for WS / UDS
   const _pc = document.getElementById("params-container");
-  if (_pc) _pc.style.display = (state.apitype === "ws" || state.apitype === "uds") ? "none" : "";
+  if (_pc) _pc.style.display = (state.apitype === "ws" || isUds) ? "none" : "";
 }
 
 /* ── Render ────────────────────────────────────────────────────────── */
