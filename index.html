@@ -392,7 +392,9 @@ url     = ENDPOINT + "?" + query_string + "&signature=" + signature
 headers = {"X-MBX-APIKEY": API_KEY}
 
 response = requests.get(url, headers=headers)
-print(response.text)`;
+print(response.url)
+print(response.text)
+print(response.request.headers)`;
 
 T.hmac.javascript = `const crypto = require("crypto");
 const https  = require("https");
@@ -421,7 +423,11 @@ const options = {
 const req = https.request(options, (res) => {
   let data = "";
   res.on("data", (chunk) => (data += chunk));
-  res.on("end", () => console.log(JSON.parse(data)));
+  res.on("end", () => {
+    console.log(url.href);
+    console.log(data);
+    console.log(options.headers);
+  });
 });
 req.end();`;
 
@@ -452,7 +458,9 @@ public class BinanceHmacExample {
             .build();
 
         HttpResponse<String> resp = client.send(request, HttpResponse.BodyHandlers.ofString());
+        System.out.println(request.uri());
         System.out.println(resp.body());
+        System.out.println(request.headers());
     }
 
     static String hmacSHA256(String secret, String data) throws Exception {
@@ -495,7 +503,9 @@ func main() {
 	resp, _ := http.DefaultClient.Do(req)
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
+	fmt.Println(req.URL.String())
 	fmt.Println(string(body))
+	fmt.Println(req.Header)
 }
 
 func signHmac(secret, data string) string {
@@ -525,7 +535,10 @@ class BinanceHmacExample
 
         using var client = new HttpClient();
         client.DefaultRequestHeaders.Add("X-MBX-APIKEY", ApiKey);
-        Console.WriteLine(await client.GetStringAsync(url));
+        var resp = await client.GetAsync(url);
+        Console.WriteLine(url);
+        Console.WriteLine(await resp.Content.ReadAsStringAsync());
+        Console.WriteLine(resp.RequestMessage?.Headers);
     }
 
     static string ComputeHmac(string secret, string data)
@@ -550,9 +563,12 @@ $ch = curl_init($url);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_HTTPHEADER, ["X-MBX-APIKEY: {$apiKey}"]);
 $response = curl_exec($ch);
+$info     = curl_getinfo($ch);
 curl_close($ch);
 
-echo $response;`;
+echo $info["url"] . "\n";
+echo $response . "\n";
+echo "X-MBX-APIKEY: {$apiKey}\n";`;
 
 T.hmac.ruby = `require "net/http"
 require "openssl"
@@ -572,7 +588,10 @@ http.use_ssl = true
 request      = Net::HTTP::Get.new(url)
 request["X-MBX-APIKEY"] = API_KEY
 
-puts http.request(request).body`;
+response = http.request(request)
+puts url.to_s
+puts response.body
+puts request.each_header.map { |k, v| "#{k}: #{v}" }.join("\n")`;
 
 /* ════════════════════════════════════════════════════════════════════
    RSA
@@ -604,7 +623,9 @@ url     = ENDPOINT + "?" + query_string + "&signature=" + signature
 headers = {"X-MBX-APIKEY": API_KEY}
 
 response = requests.get(url, headers=headers)
-print(response.text)`;
+print(response.url)
+print(response.text)
+print(response.request.headers)`;
 
 T.rsa.javascript = `const crypto  = require("crypto");
 const fs      = require("fs");
@@ -636,7 +657,11 @@ const options = {
 const req = https.request(options, (res) => {
   let data = "";
   res.on("data", (chunk) => (data += chunk));
-  res.on("end", () => console.log(data));
+  res.on("end", () => {
+    console.log(url.href);
+    console.log(data);
+    console.log(options.headers);
+  });
 });
 req.end();`;
 
@@ -674,7 +699,9 @@ public class BinanceRsaExample {
             .GET().build();
 
         HttpResponse<String> resp = client.send(request, HttpResponse.BodyHandlers.ofString());
+        System.out.println(request.uri());
         System.out.println(resp.body());
+        System.out.println(request.headers());
     }
 
     static String sign(PrivateKey key, String data) throws Exception {
@@ -728,7 +755,9 @@ func main() {
 	resp, _ := http.DefaultClient.Do(req)
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
+	fmt.Println(req.URL.String())
 	fmt.Println(string(body))
+	fmt.Println(req.Header)
 }`;
 
 T.rsa.csharp = `using System;
@@ -761,7 +790,10 @@ class BinanceRsaExample
 
         using var client = new HttpClient();
         client.DefaultRequestHeaders.Add("X-MBX-APIKEY", ApiKey);
-        Console.WriteLine(await client.GetStringAsync(url));
+        var resp = await client.GetAsync(url);
+        Console.WriteLine(url);
+        Console.WriteLine(await resp.Content.ReadAsStringAsync());
+        Console.WriteLine(resp.RequestMessage?.Headers);
     }
 }`;
 
@@ -781,9 +813,12 @@ $ch = curl_init($url);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_HTTPHEADER, ["X-MBX-APIKEY: {$apiKey}"]);
 $response = curl_exec($ch);
+$info     = curl_getinfo($ch);
 curl_close($ch);
 
-echo $response;`;
+echo $info["url"] . "\n";
+echo $response . "\n";
+echo "X-MBX-APIKEY: {$apiKey}\n";`;
 
 T.rsa.ruby = `require "net/http"
 require "openssl"
@@ -806,7 +841,10 @@ http.use_ssl = true
 request      = Net::HTTP::Get.new(url)
 request["X-MBX-APIKEY"] = API_KEY
 
-puts http.request(request).body`;
+response = http.request(request)
+puts url.to_s
+puts response.body
+puts request.each_header.map { |k, v| "#{k}: #{v}" }.join("\n")`;
 
 /* ════════════════════════════════════════════════════════════════════
    Ed25519
@@ -837,7 +875,9 @@ url     = ENDPOINT + "?" + query_string + "&signature=" + signature
 headers = {"X-MBX-APIKEY": API_KEY}
 
 response = requests.get(url, headers=headers)
-print(response.text)`;
+print(response.url)
+print(response.text)
+print(response.request.headers)`;
 
 T.ed25519.javascript = `const crypto  = require("crypto");
 const fs      = require("fs");
@@ -867,7 +907,11 @@ const options = {
 const req = https.request(options, (res) => {
   let data = "";
   res.on("data", (chunk) => (data += chunk));
-  res.on("end", () => console.log(data));
+  res.on("end", () => {
+    console.log(url.href);
+    console.log(data);
+    console.log(options.headers);
+  });
 });
 req.end();`;
 
@@ -906,7 +950,9 @@ public class BinanceEd25519Example {
             .GET().build();
 
         HttpResponse<String> resp = client.send(request, HttpResponse.BodyHandlers.ofString());
+        System.out.println(request.uri());
         System.out.println(resp.body());
+        System.out.println(request.headers());
     }
 
     static String sign(PrivateKey key, String data) throws Exception {
@@ -956,7 +1002,9 @@ func main() {
 	resp, _ := http.DefaultClient.Do(req)
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
+	fmt.Println(req.URL.String())
 	fmt.Println(string(body))
+	fmt.Println(req.Header)
 }`;
 
 T.ed25519.csharp = `// Install: dotnet add package BouncyCastle.Cryptography
@@ -992,7 +1040,10 @@ class BinanceEd25519Example
 
         using var client = new HttpClient();
         client.DefaultRequestHeaders.Add("X-MBX-APIKEY", ApiKey);
-        Console.WriteLine(await client.GetStringAsync(url));
+        var resp = await client.GetAsync(url);
+        Console.WriteLine(url);
+        Console.WriteLine(await resp.Content.ReadAsStringAsync());
+        Console.WriteLine(resp.RequestMessage?.Headers);
     }
 
     static Ed25519PrivateKeyParameters LoadKey(string path)
@@ -1020,9 +1071,12 @@ $ch = curl_init($url);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_HTTPHEADER, ["X-MBX-APIKEY: {$apiKey}"]);
 $response = curl_exec($ch);
+$info     = curl_getinfo($ch);
 curl_close($ch);
 
-echo $response;`;
+echo $info["url"] . "\n";
+echo $response . "\n";
+echo "X-MBX-APIKEY: {$apiKey}\n";`;
 
 T.ed25519.ruby = `require "net/http"
 require "openssl"
@@ -1047,7 +1101,10 @@ http.use_ssl = true
 request      = Net::HTTP::Get.new(url)
 request["X-MBX-APIKEY"] = API_KEY
 
-puts http.request(request).body`;
+response = http.request(request)
+puts url.to_s
+puts response.body
+puts request.each_header.map { |k, v| "#{k}: #{v}" }.join("\n")`;
 
 /* ── State ─────────────────────────────────────────────────────────── */
 let state = { auth: "hmac", market: "spot", lang: "python" };
