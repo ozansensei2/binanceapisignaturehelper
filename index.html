@@ -280,6 +280,10 @@
         <option value="csharp">C#</option>
         <option value="php">PHP</option>
         <option value="ruby">Ruby</option>
+        <option value="typescript">TypeScript</option>
+        <option value="rust">Rust</option>
+        <option value="cpp">C++</option>
+        <option value="bash">Bash (curl)</option>
       </select>
     </div>
   </div>
@@ -326,8 +330,8 @@ const ENDPOINTS = {
 };
 
 /* ── UI metadata ───────────────────────────────────────────────────── */
-const LANG_NAMES = { python:'Python', javascript:'Node.js', java:'Java', go:'Go', csharp:'C#', php:'PHP', ruby:'Ruby' };
-const LANG_HL    = { python:'python', javascript:'javascript', java:'java', go:'go', csharp:'csharp', php:'php', ruby:'ruby' };
+const LANG_NAMES = { python:'Python', javascript:'Node.js', java:'Java', go:'Go', csharp:'C#', php:'PHP', ruby:'Ruby', typescript:'TypeScript', rust:'Rust', cpp:'C++', bash:'Bash' };
+const LANG_HL    = { python:'python', javascript:'javascript', java:'java', go:'go', csharp:'csharp', php:'php', ruby:'ruby', typescript:'typescript', rust:'rust', cpp:'cpp', bash:'bash' };
 const AUTH_NAMES = { hmac:'HMAC-SHA256', rsa:'RSA', ed25519:'Ed25519' };
 
 const NOTES = {
@@ -338,16 +342,24 @@ const NOTES = {
     go:         'No external dependencies. Run with <code>go run main.go</code>',
     csharp:     'Requires .NET 6+. No external packages.',
     php:        'Requires PHP 7.4+ with cURL extension enabled.',
-    ruby:       'Ruby standard library only — no gems needed.'
+    ruby:       'Ruby standard library only — no gems needed.',
+    typescript: 'Run with <code>npx ts-node script.ts</code> &nbsp;|&nbsp; Install: <code>npm i -D typescript ts-node @types/node</code>',
+    rust:       'Add to Cargo.toml: <code>hmac = "0.12"</code>, <code>sha2 = "0.10"</code>, <code>hex = "0.4"</code>, <code>reqwest = { version = "0.12", features = ["blocking"] }</code>',
+    cpp:        'Compile: <code>g++ -std=c++17 -o app main.cpp -lssl -lcrypto -lcurl</code> &nbsp;|&nbsp; Requires OpenSSL and libcurl dev headers.',
+    bash:       'Requires <code>openssl</code> and <code>curl</code> — pre-installed on most Unix/macOS systems.'
   },
   rsa: {
     python:     'Install: <code>pip install requests cryptography</code> &nbsp;|&nbsp; Key format: PKCS#8 PEM',
     javascript: 'Key format: PKCS#8 PEM. Node.js 15+ required.',
-    java:       'Key format: DER-encoded PKCS#8. Convert PEM → DER: <code>openssl pkcs8 -topk8 -nocrypt -in key.pem -outform DER -out private_key.der</code>',
+    java:       'Key format: DER-encoded PKCS#8. Convert: <code>openssl pkcs8 -topk8 -nocrypt -in key.pem -outform DER -out private_key.der</code>',
     go:         'Key format: PKCS#8 PEM. No external dependencies.',
     csharp:     'Requires .NET 6+. <code>RSA.ImportFromPem()</code> available since .NET 5.',
     php:        'Requires PHP 7.4+ with OpenSSL extension.',
-    ruby:       'Requires Ruby 2.4+. Key format: PEM.'
+    ruby:       'Requires Ruby 2.4+. Key format: PEM.',
+    typescript: 'Run with <code>npx ts-node script.ts</code> &nbsp;|&nbsp; Install: <code>npm i -D typescript ts-node @types/node</code>',
+    rust:       'Add to Cargo.toml: <code>openssl = "0.10"</code>, <code>base64 = "0.22"</code>, <code>urlencoding = "2"</code>, <code>reqwest = { version = "0.12", features = ["blocking"] }</code>',
+    cpp:        'Compile: <code>g++ -std=c++17 -o app main.cpp -lssl -lcrypto -lcurl</code> &nbsp;|&nbsp; Key format: PKCS#8 PEM.',
+    bash:       'Requires <code>openssl</code>, <code>curl</code>, and <code>python3</code> (for URL encoding). Key format: PKCS#8 PEM.'
   },
   ed25519: {
     python:     'Install: <code>pip install requests cryptography</code> &nbsp;|&nbsp; Key format: Ed25519 PEM',
@@ -356,7 +368,11 @@ const NOTES = {
     go:         'No external dependencies. Key format: PKCS#8 PEM.',
     csharp:     'Install: <code>dotnet add package BouncyCastle.Cryptography</code> &nbsp;|&nbsp; Key format: Ed25519 PEM',
     php:        'PHP 8.2+ with OpenSSL 3.0+ required for Ed25519.',
-    ruby:       'Ruby 3.1+ with OpenSSL 3.0+ required for Ed25519.'
+    ruby:       'Ruby 3.1+ with OpenSSL 3.0+ required for Ed25519.',
+    typescript: 'Node.js 15+ required. Run with <code>npx ts-node script.ts</code> &nbsp;|&nbsp; Install: <code>npm i -D typescript ts-node @types/node</code>',
+    rust:       'Add to Cargo.toml: <code>openssl = "0.10"</code>, <code>base64 = "0.22"</code>, <code>urlencoding = "2"</code>, <code>reqwest = { version = "0.12", features = ["blocking"] }</code>',
+    cpp:        'Compile: <code>g++ -std=c++17 -o app main.cpp -lssl -lcrypto -lcurl</code> &nbsp;|&nbsp; Requires OpenSSL 1.1.1+ for Ed25519 support.',
+    bash:       'Requires <code>openssl</code> 3.0+, <code>curl</code>, and <code>python3</code>. Generate key: <code>openssl genpkey -algorithm ed25519 -out private_key.pem</code>'
   }
 };
 
@@ -592,6 +608,148 @@ response = http.request(request)
 puts url.to_s
 puts response.body
 puts request.each_header.map { |k, v| "#{k}: #{v}" }.join("\n")`;
+
+T.hmac.typescript = `import * as crypto from "crypto";
+import * as https  from "https";
+import { URL }     from "url";
+
+const API_KEY:    string = "YOUR_API_KEY";
+const API_SECRET: string = "YOUR_API_SECRET";
+const ENDPOINT:   string = "{{EP}}";
+
+const timestamp:   number = Date.now();
+const queryString: string = "timestamp=" + timestamp;
+const signature:   string = crypto
+  .createHmac("sha256", API_SECRET)
+  .update(queryString)
+  .digest("hex");
+
+const url = new URL(ENDPOINT + "?" + queryString + "&signature=" + signature);
+const options = {
+  hostname: url.hostname,
+  path:     url.pathname + url.search,
+  method:   "GET" as const,
+  headers:  { "X-MBX-APIKEY": API_KEY }
+};
+
+const req = https.request(options, (res) => {
+  let data = "";
+  res.on("data", (chunk: string) => (data += chunk));
+  res.on("end", () => {
+    console.log(url.href);
+    console.log(data);
+    console.log(options.headers);
+  });
+});
+req.end();`;
+
+T.hmac.rust = `// Cargo.toml:
+// [dependencies]
+// hmac    = "0.12"
+// sha2    = "0.10"
+// hex     = "0.4"
+// reqwest = { version = "0.12", features = ["blocking"] }
+
+use hmac::{Hmac, Mac};
+use sha2::Sha256;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+type HmacSha256 = Hmac<Sha256>;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let api_key    = "YOUR_API_KEY";
+    let api_secret = "YOUR_API_SECRET";
+    let endpoint   = "{{EP}}";
+
+    let ts  = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis();
+    let qs  = format!("timestamp={}", ts);
+
+    let mut mac = HmacSha256::new_from_slice(api_secret.as_bytes())?;
+    mac.update(qs.as_bytes());
+    let signature = hex::encode(mac.finalize().into_bytes());
+
+    let url = format!("{}?{}&signature={}", endpoint, qs, signature);
+
+    let client = reqwest::blocking::Client::new();
+    let resp   = client.get(&url).header("X-MBX-APIKEY", api_key).send()?;
+
+    println!("{}", url);
+    println!("{}", resp.text()?);
+    println!("X-MBX-APIKEY: {}", api_key);
+    Ok(())
+}`;
+
+T.hmac.cpp = `// Compile: g++ -std=c++17 -o app main.cpp -lssl -lcrypto -lcurl
+#include <iostream>
+#include <string>
+#include <sstream>
+#include <iomanip>
+#include <chrono>
+#include <openssl/hmac.h>
+#include <curl/curl.h>
+
+std::string hmacSha256(const std::string& key, const std::string& msg) {
+    unsigned char md[EVP_MAX_MD_SIZE];
+    unsigned int  len = 0;
+    HMAC(EVP_sha256(), key.data(), (int)key.size(),
+         reinterpret_cast<const unsigned char*>(msg.data()), msg.size(), md, &len);
+    std::ostringstream ss;
+    for (unsigned i = 0; i < len; ++i)
+        ss << std::hex << std::setw(2) << std::setfill('0') << (int)md[i];
+    return ss.str();
+}
+
+static size_t onData(void* buf, size_t sz, size_t n, std::string* out) {
+    out->append(static_cast<char*>(buf), sz * n); return sz * n;
+}
+
+int main() {
+    const std::string apiKey    = "YOUR_API_KEY";
+    const std::string apiSecret = "YOUR_API_SECRET";
+    const std::string endpoint  = "{{EP}}";
+
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                  std::chrono::system_clock::now().time_since_epoch()).count();
+    std::string qs  = "timestamp=" + std::to_string(ms);
+    std::string sig = hmacSha256(apiSecret, qs);
+    std::string url = endpoint + "?" + qs + "&signature=" + sig;
+
+    CURL*       curl = curl_easy_init();
+    std::string body;
+    curl_slist* hdrs = curl_slist_append(nullptr, ("X-MBX-APIKEY: " + apiKey).c_str());
+    curl_easy_setopt(curl, CURLOPT_URL,           url.c_str());
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER,    hdrs);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, onData);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA,     &body);
+    curl_easy_perform(curl);
+
+    char* effective = nullptr;
+    curl_easy_getinfo(curl, CURLINFO_EFFECTIVE_URL, &effective);
+    std::cout << effective << "\\n" << body << "\\nX-MBX-APIKEY: " << apiKey << "\\n";
+
+    curl_slist_free_all(hdrs);
+    curl_easy_cleanup(curl);
+    return 0;
+}`;
+
+T.hmac.bash = `#!/bin/bash
+API_KEY="YOUR_API_KEY"
+API_SECRET="YOUR_API_SECRET"
+ENDPOINT="{{EP}}"
+
+TIMESTAMP=$(date +%s%3N)
+QUERY_STRING="timestamp=\${TIMESTAMP}"
+SIGNATURE=$(echo -n "\$QUERY_STRING" | openssl dgst -sha256 -hmac "\$API_SECRET" | awk '{print \$2}')
+URL="\${ENDPOINT}?\${QUERY_STRING}&signature=\${SIGNATURE}"
+
+RESPONSE=$(curl -s -X GET "\$URL" -H "X-MBX-APIKEY: \$API_KEY")
+
+echo "=== URL ==="
+echo "\$URL"
+echo "=== Response ==="
+echo "\$RESPONSE"
+echo "=== Request Headers ==="
+echo "X-MBX-APIKEY: \$API_KEY"`;
 
 /* ════════════════════════════════════════════════════════════════════
    RSA
@@ -845,6 +1003,166 @@ response = http.request(request)
 puts url.to_s
 puts response.body
 puts request.each_header.map { |k, v| "#{k}: #{v}" }.join("\n")`;
+
+T.rsa.typescript = `import * as crypto from "crypto";
+import * as fs     from "fs";
+import * as https  from "https";
+import { URL }     from "url";
+
+const API_KEY:    string = "YOUR_API_KEY";
+const ENDPOINT:   string = "{{EP}}";
+const privateKey: string = fs.readFileSync("private_key.pem", "utf8");
+
+const timestamp:   number = Date.now();
+const queryString: string = "timestamp=" + timestamp;
+const signature:   string = encodeURIComponent(
+  crypto.sign("sha256", Buffer.from(queryString), {
+    key:     privateKey,
+    padding: crypto.constants.RSA_PKCS1_PADDING
+  }).toString("base64")
+);
+
+const url = new URL(ENDPOINT + "?" + queryString + "&signature=" + signature);
+const options = {
+  hostname: url.hostname,
+  path:     url.pathname + url.search,
+  method:   "GET" as const,
+  headers:  { "X-MBX-APIKEY": API_KEY }
+};
+
+const req = https.request(options, (res) => {
+  let data = "";
+  res.on("data", (chunk: string) => (data += chunk));
+  res.on("end", () => {
+    console.log(url.href);
+    console.log(data);
+    console.log(options.headers);
+  });
+});
+req.end();`;
+
+T.rsa.rust = `// Cargo.toml:
+// [dependencies]
+// openssl    = "0.10"
+// base64     = "0.22"
+// urlencoding = "2"
+// reqwest    = { version = "0.12", features = ["blocking"] }
+
+use base64::{engine::general_purpose, Engine as _};
+use openssl::{hash::MessageDigest, pkey::PKey, sign::Signer};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let api_key  = "YOUR_API_KEY";
+    let endpoint = "{{EP}}";
+
+    let pem  = std::fs::read("private_key.pem")?;
+    let pkey = PKey::private_key_from_pem(&pem)?;
+
+    let ts = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis();
+    let qs = format!("timestamp={}", ts);
+
+    let mut signer = Signer::new(MessageDigest::sha256(), &pkey)?;
+    signer.update(qs.as_bytes())?;
+    let sig_bytes = signer.sign_to_vec()?;
+    let signature = urlencoding::encode(&general_purpose::STANDARD.encode(&sig_bytes)).into_owned();
+
+    let url = format!("{}?{}&signature={}", endpoint, qs, signature);
+
+    let client = reqwest::blocking::Client::new();
+    let resp   = client.get(&url).header("X-MBX-APIKEY", api_key).send()?;
+
+    println!("{}", url);
+    println!("{}", resp.text()?);
+    println!("X-MBX-APIKEY: {}", api_key);
+    Ok(())
+}`;
+
+T.rsa.cpp = `// Compile: g++ -std=c++17 -o app main.cpp -lssl -lcrypto -lcurl
+#include <iostream>
+#include <string>
+#include <vector>
+#include <chrono>
+#include <openssl/evp.h>
+#include <openssl/pem.h>
+#include <openssl/bio.h>
+#include <curl/curl.h>
+
+static size_t onData(void* buf, size_t sz, size_t n, std::string* out) {
+    out->append(static_cast<char*>(buf), sz * n); return sz * n;
+}
+
+int main() {
+    const std::string apiKey   = "YOUR_API_KEY";
+    const std::string endpoint = "{{EP}}";
+
+    FILE*     fp   = fopen("private_key.pem", "r");
+    EVP_PKEY* pkey = PEM_read_PrivateKey(fp, nullptr, nullptr, nullptr);
+    fclose(fp);
+
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                  std::chrono::system_clock::now().time_since_epoch()).count();
+    std::string qs = "timestamp=" + std::to_string(ms);
+
+    EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+    EVP_DigestSignInit(ctx, nullptr, EVP_sha256(), nullptr, pkey);
+    EVP_DigestSignUpdate(ctx, qs.data(), qs.size());
+    size_t sigLen = 0;
+    EVP_DigestSignFinal(ctx, nullptr, &sigLen);
+    std::vector<unsigned char> sig(sigLen);
+    EVP_DigestSignFinal(ctx, sig.data(), &sigLen);
+    EVP_MD_CTX_free(ctx);
+    EVP_PKEY_free(pkey);
+
+    BIO* b64 = BIO_push(BIO_new(BIO_f_base64()), BIO_new(BIO_s_mem()));
+    BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
+    BIO_write(b64, sig.data(), (int)sigLen);
+    BIO_flush(b64);
+    BUF_MEM* bptr; BIO_get_mem_ptr(b64, &bptr);
+    std::string b64str(bptr->data, bptr->length);
+    BIO_free_all(b64);
+
+    CURL* curl = curl_easy_init();
+    char* enc  = curl_easy_escape(curl, b64str.c_str(), (int)b64str.size());
+    std::string url = endpoint + "?" + qs + "&signature=" + std::string(enc);
+    curl_free(enc);
+
+    std::string body;
+    curl_slist* hdrs = curl_slist_append(nullptr, ("X-MBX-APIKEY: " + apiKey).c_str());
+    curl_easy_setopt(curl, CURLOPT_URL,           url.c_str());
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER,    hdrs);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, onData);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA,     &body);
+    curl_easy_perform(curl);
+
+    char* effective = nullptr;
+    curl_easy_getinfo(curl, CURLINFO_EFFECTIVE_URL, &effective);
+    std::cout << effective << "\\n" << body << "\\nX-MBX-APIKEY: " << apiKey << "\\n";
+
+    curl_slist_free_all(hdrs);
+    curl_easy_cleanup(curl);
+    return 0;
+}`;
+
+T.rsa.bash = `#!/bin/bash
+API_KEY="YOUR_API_KEY"
+ENDPOINT="{{EP}}"
+PRIVATE_KEY="private_key.pem"
+
+TIMESTAMP=$(date +%s%3N)
+QUERY_STRING="timestamp=\${TIMESTAMP}"
+RAW_SIG=$(echo -n "\$QUERY_STRING" | openssl dgst -sha256 -sign "\$PRIVATE_KEY" | openssl base64 -A)
+SIGNATURE=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "\$RAW_SIG")
+URL="\${ENDPOINT}?\${QUERY_STRING}&signature=\${SIGNATURE}"
+
+RESPONSE=$(curl -s -X GET "\$URL" -H "X-MBX-APIKEY: \$API_KEY")
+
+echo "=== URL ==="
+echo "\$URL"
+echo "=== Response ==="
+echo "\$RESPONSE"
+echo "=== Request Headers ==="
+echo "X-MBX-APIKEY: \$API_KEY"`;
 
 /* ════════════════════════════════════════════════════════════════════
    Ed25519
@@ -1105,6 +1423,170 @@ response = http.request(request)
 puts url.to_s
 puts response.body
 puts request.each_header.map { |k, v| "#{k}: #{v}" }.join("\n")`;
+
+T.ed25519.typescript = `import * as crypto from "crypto";
+import * as fs     from "fs";
+import * as https  from "https";
+import { URL }     from "url";
+
+const API_KEY:    string = "YOUR_API_KEY";
+const ENDPOINT:   string = "{{EP}}";
+const privateKey: string = fs.readFileSync("private_key.pem", "utf8");
+
+const timestamp:   number = Date.now();
+const queryString: string = "timestamp=" + timestamp;
+
+// null algorithm → Ed25519 native signing (Node.js 15+)
+const signature: string = encodeURIComponent(
+  crypto.sign(null, Buffer.from(queryString), privateKey).toString("base64")
+);
+
+const url = new URL(ENDPOINT + "?" + queryString + "&signature=" + signature);
+const options = {
+  hostname: url.hostname,
+  path:     url.pathname + url.search,
+  method:   "GET" as const,
+  headers:  { "X-MBX-APIKEY": API_KEY }
+};
+
+const req = https.request(options, (res) => {
+  let data = "";
+  res.on("data", (chunk: string) => (data += chunk));
+  res.on("end", () => {
+    console.log(url.href);
+    console.log(data);
+    console.log(options.headers);
+  });
+});
+req.end();`;
+
+T.ed25519.rust = `// Cargo.toml:
+// [dependencies]
+// openssl    = "0.10"
+// base64     = "0.22"
+// urlencoding = "2"
+// reqwest    = { version = "0.12", features = ["blocking"] }
+
+use base64::{engine::general_purpose, Engine as _};
+use openssl::{pkey::PKey, sign::Signer};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let api_key  = "YOUR_API_KEY";
+    let endpoint = "{{EP}}";
+
+    let pem  = std::fs::read("private_key.pem")?;
+    let pkey = PKey::private_key_from_pem(&pem)?;
+
+    let ts = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis();
+    let qs = format!("timestamp={}", ts);
+
+    // Ed25519 uses no digest — new_without_digest
+    let mut signer = Signer::new_without_digest(&pkey)?;
+    signer.update(qs.as_bytes())?;
+    let sig_bytes = signer.sign_to_vec()?;
+    let signature = urlencoding::encode(&general_purpose::STANDARD.encode(&sig_bytes)).into_owned();
+
+    let url = format!("{}?{}&signature={}", endpoint, qs, signature);
+
+    let client = reqwest::blocking::Client::new();
+    let resp   = client.get(&url).header("X-MBX-APIKEY", api_key).send()?;
+
+    println!("{}", url);
+    println!("{}", resp.text()?);
+    println!("X-MBX-APIKEY: {}", api_key);
+    Ok(())
+}`;
+
+T.ed25519.cpp = `// Compile: g++ -std=c++17 -o app main.cpp -lssl -lcrypto -lcurl
+// Requires OpenSSL 1.1.1+
+#include <iostream>
+#include <string>
+#include <vector>
+#include <chrono>
+#include <openssl/evp.h>
+#include <openssl/pem.h>
+#include <openssl/bio.h>
+#include <curl/curl.h>
+
+static size_t onData(void* buf, size_t sz, size_t n, std::string* out) {
+    out->append(static_cast<char*>(buf), sz * n); return sz * n;
+}
+
+int main() {
+    const std::string apiKey   = "YOUR_API_KEY";
+    const std::string endpoint = "{{EP}}";
+
+    FILE*     fp   = fopen("private_key.pem", "r");
+    EVP_PKEY* pkey = PEM_read_PrivateKey(fp, nullptr, nullptr, nullptr);
+    fclose(fp);
+
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                  std::chrono::system_clock::now().time_since_epoch()).count();
+    std::string qs = "timestamp=" + std::to_string(ms);
+
+    // Ed25519: one-shot sign, no digest
+    EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+    EVP_DigestSignInit(ctx, nullptr, nullptr, nullptr, pkey);
+    size_t sigLen = 0;
+    EVP_DigestSign(ctx, nullptr, &sigLen,
+                   reinterpret_cast<const unsigned char*>(qs.data()), qs.size());
+    std::vector<unsigned char> sig(sigLen);
+    EVP_DigestSign(ctx, sig.data(), &sigLen,
+                   reinterpret_cast<const unsigned char*>(qs.data()), qs.size());
+    EVP_MD_CTX_free(ctx);
+    EVP_PKEY_free(pkey);
+
+    BIO* b64 = BIO_push(BIO_new(BIO_f_base64()), BIO_new(BIO_s_mem()));
+    BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
+    BIO_write(b64, sig.data(), (int)sigLen);
+    BIO_flush(b64);
+    BUF_MEM* bptr; BIO_get_mem_ptr(b64, &bptr);
+    std::string b64str(bptr->data, bptr->length);
+    BIO_free_all(b64);
+
+    CURL* curl = curl_easy_init();
+    char* enc  = curl_easy_escape(curl, b64str.c_str(), (int)b64str.size());
+    std::string url = endpoint + "?" + qs + "&signature=" + std::string(enc);
+    curl_free(enc);
+
+    std::string body;
+    curl_slist* hdrs = curl_slist_append(nullptr, ("X-MBX-APIKEY: " + apiKey).c_str());
+    curl_easy_setopt(curl, CURLOPT_URL,           url.c_str());
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER,    hdrs);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, onData);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA,     &body);
+    curl_easy_perform(curl);
+
+    char* effective = nullptr;
+    curl_easy_getinfo(curl, CURLINFO_EFFECTIVE_URL, &effective);
+    std::cout << effective << "\\n" << body << "\\nX-MBX-APIKEY: " << apiKey << "\\n";
+
+    curl_slist_free_all(hdrs);
+    curl_easy_cleanup(curl);
+    return 0;
+}`;
+
+T.ed25519.bash = `#!/bin/bash
+# Requires OpenSSL 3.0+ for Ed25519
+API_KEY="YOUR_API_KEY"
+ENDPOINT="{{EP}}"
+PRIVATE_KEY="private_key.pem"
+
+TIMESTAMP=$(date +%s%3N)
+QUERY_STRING="timestamp=\${TIMESTAMP}"
+RAW_SIG=$(echo -n "\$QUERY_STRING" | openssl pkeyutl -sign -inkey "\$PRIVATE_KEY" | openssl base64 -A)
+SIGNATURE=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "\$RAW_SIG")
+URL="\${ENDPOINT}?\${QUERY_STRING}&signature=\${SIGNATURE}"
+
+RESPONSE=$(curl -s -X GET "\$URL" -H "X-MBX-APIKEY: \$API_KEY")
+
+echo "=== URL ==="
+echo "\$URL"
+echo "=== Response ==="
+echo "\$RESPONSE"
+echo "=== Request Headers ==="
+echo "X-MBX-APIKEY: \$API_KEY"`;
 
 /* ── State ─────────────────────────────────────────────────────────── */
 let state = { auth: "hmac", market: "spot", lang: "python" };
