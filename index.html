@@ -364,6 +364,7 @@
       <select id="sel-apitype">
         <option value="rest">REST API</option>
         <option value="ws">WebSocket API</option>
+        <option value="uds">User Data Stream</option>
       </select>
     </div>
 
@@ -500,13 +501,22 @@ const ENDPOINTS = {
       usdm:  'wss://testnet.binancefuture.com/ws-fapi/v1',
       coinm: 'wss://testnet.binancefuture.com/ws-dapi/v1'
     }
+  },
+  uds: {
+    mainnet: {
+      spot: 'wss://ws-api.binance.com:443/ws-api/v3'
+    },
+    testnet: {
+      spot: 'wss://demo-ws-api.binance.com'
+    }
   }
 };
 
 // Markets available per apitype+env combo
 const MARKET_AVAILABLE = {
   rest: { mainnet: ['spot','usdm','coinm','portfolio','options'], testnet: ['spot','usdm','coinm'] },
-  ws:   { mainnet: ['spot','usdm','coinm'],                       testnet: ['spot','usdm','coinm'] }
+  ws:   { mainnet: ['spot','usdm','coinm'],                       testnet: ['spot','usdm','coinm'] },
+  uds:  { mainnet: ['spot'],                                      testnet: ['spot'] }
 };
 
 /* ── WS method names per market ────────────────────────────────────── */
@@ -560,6 +570,25 @@ const NOTES = {
     rust:       'Add to Cargo.toml: <code>openssl = "0.10"</code>, <code>base64 = "0.22"</code>, <code>urlencoding = "2"</code>, <code>reqwest = { version = "0.12", features = ["blocking"] }</code>',
     cpp:        'Compile: <code>g++ -std=c++17 -o app main.cpp -lssl -lcrypto -lcurl</code> &nbsp;|&nbsp; Requires OpenSSL 1.1.1+ for Ed25519 support.',
     bash:       'Requires <code>openssl</code> 3.0+, <code>curl</code>, and <code>python3</code>. Generate key: <code>openssl genpkey -algorithm ed25519 -out private_key.pem</code>'
+  }
+};
+
+/* ── User Data Stream Notes ────────────────────────────────────────── */
+const UDS_NOTES = {
+  hmac:    Object.fromEntries(['python','javascript','java','go','csharp','php','ruby','typescript','rust','cpp','bash'].map(l => [l, '<strong>User Data Stream requires Ed25519 Session Authentication.</strong> HMAC is not supported — please select Ed25519.'])),
+  rsa:     Object.fromEntries(['python','javascript','java','go','csharp','php','ruby','typescript','rust','cpp','bash'].map(l => [l, '<strong>User Data Stream requires Ed25519 Session Authentication.</strong> RSA is not supported — please select Ed25519.'])),
+  ed25519: {
+    python:     'Install: <code>pip install websocket-client cryptography</code> &nbsp;|&nbsp; Requires Ed25519 private key. Uses <strong>Session Auth</strong> → <code>userDataStream.subscribe</code>',
+    javascript: 'Install: <code>npm install ws</code>. Node.js 15+. Uses <strong>Session Auth</strong> → <code>userDataStream.subscribe</code>',
+    java:       'Requires Java 15+ for Ed25519. Key format: DER PKCS#8. Uses <strong>Session Auth</strong>.',
+    go:         'Install: <code>go get github.com/gorilla/websocket</code>. Uses <strong>Session Auth</strong> → <code>userDataStream.subscribe</code>',
+    csharp:     'Install: <code>dotnet add package BouncyCastle.Cryptography</code>. Uses <strong>Session Auth</strong>.',
+    php:        'PHP 8.2+ with OpenSSL 3.0+. Install: <code>composer require textalk/websocket</code>.',
+    ruby:       'Ruby 3.1+ with OpenSSL 3.0+. Install: <code>gem install websocket-client-simple</code>.',
+    typescript: 'Install: <code>npm install ws @types/ws</code>. Node.js 15+. Uses <strong>Session Auth</strong>.',
+    rust:       'Add to Cargo.toml: <code>tungstenite = { version = "0.24", features = ["native-tls"] }</code>, <code>openssl = "0.10"</code>, <code>base64 = "0.22"</code>',
+    cpp:        'Requires OpenSSL 1.1.1+ for Ed25519. Install IXWebSocket. Compile: <code>g++ -std=c++17 main.cpp -lixwebsocket -lssl -lcrypto -lpthread</code>',
+    bash:       'Requires <code>openssl</code> 3.0+, <code>websocat</code>. Install websocat: <a href="https://github.com/vi/websocat" target="_blank">github.com/vi/websocat</a>'
   }
 };
 
@@ -2982,6 +3011,514 @@ REQUEST='{"id":"1","method":"'\${METHOD}'","params":{}}'
 # session.logon then send actual request
 (echo "\$LOGON"; sleep 1; echo "\$REQUEST"; sleep 1) | websocat "\$BASE_URL"`;
 
+/* ════════════════════════════════════════════════════════════════════
+   User Data Stream Templates  (Ed25519 + Session Auth required)
+   {{EP}} → endpoint
+═══════════════════════════════════════════════════════════════════ */
+const T_uds = {};
+const _UDS_NA = (lang) => {
+  const c = { javascript:'// ', typescript:'// ', java:'// ', go:'// ', csharp:'// ', rust:'// ', cpp:'// ', bash:'# ' };
+  const p = c[lang] || '# ';
+  return p + 'User Data Stream only supports Ed25519 Session Authentication.\n' +
+         p + 'Please select "Ed25519" as the Auth Type.';
+};
+T_uds.hmac = {};
+T_uds.rsa  = {};
+['python','javascript','java','go','csharp','php','ruby','typescript','rust','cpp','bash'].forEach(l => {
+  T_uds.hmac[l] = _UDS_NA(l);
+  T_uds.rsa[l]  = _UDS_NA(l);
+});
+T_uds.ed25519 = {};
+
+T_uds.ed25519.python = `import base64, time, json
+from cryptography.hazmat.primitives.serialization import load_pem_private_key
+from websocket import create_connection
+
+API_KEY          = "YOUR_API_KEY"
+PRIVATE_KEY_PATH = "private_key.pem"
+BASE_URL         = "{{EP}}"
+
+with open(PRIVATE_KEY_PATH, "rb") as f:
+    private_key = load_pem_private_key(data=f.read(), password=None)
+
+timestamp = int(time.time() * 1000)
+params    = {"apiKey": API_KEY, "timestamp": timestamp}
+payload   = "&".join([f"{k}={v}" for k, v in sorted(params.items())])
+signature = base64.b64encode(private_key.sign(payload.encode("ASCII"))).decode("ASCII")
+params["signature"] = signature
+
+ws = create_connection(BASE_URL)
+
+# Step 1: Authenticate the WebSocket session
+ws.send(json.dumps({"id": "logon", "method": "session.logon", "params": params}))
+print("Auth:", ws.recv())
+
+# Step 2: Subscribe to User Data Stream
+ws.send(json.dumps({"id": "1", "method": "userDataStream.subscribe"}))
+print("Subscribed:", ws.recv())
+
+# Step 3: Listen for account events (balances, orders, positions...)
+print("Listening for account events (Ctrl+C to stop)...")
+try:
+    while True:
+        print(json.loads(ws.recv()))
+except KeyboardInterrupt:
+    ws.close()`;
+
+T_uds.ed25519.javascript = `const crypto    = require("crypto");
+const fs        = require("fs");
+const WebSocket = require("ws");
+
+const API_KEY    = "YOUR_API_KEY";
+const BASE_URL   = "{{EP}}";
+const privateKey = fs.readFileSync("private_key.pem", "utf8");
+
+const timestamp = Date.now();
+const params    = { apiKey: API_KEY, timestamp };
+const payload   = Object.entries(params).sort().map(([k, v]) => k + "=" + v).join("&");
+const signature = crypto.sign(null, Buffer.from(payload), privateKey).toString("base64");
+
+let step = 0;
+const ws = new WebSocket(BASE_URL);
+
+ws.on("open", () => {
+  // Step 1: Authenticate
+  ws.send(JSON.stringify({ id: "logon", method: "session.logon", params: { ...params, signature } }));
+});
+
+ws.on("message", (data) => {
+  const msg = JSON.parse(data.toString());
+  if (step === 0) {
+    console.log("Auth:", msg); step = 1;
+    // Step 2: Subscribe
+    ws.send(JSON.stringify({ id: "1", method: "userDataStream.subscribe" }));
+  } else if (step === 1) {
+    console.log("Subscribed:", msg); step = 2;
+    console.log("Listening for account events (Ctrl+C to stop)...");
+  } else {
+    // Step 3: Account events
+    console.log("Event:", msg);
+  }
+});
+
+ws.on("error", (err) => console.error(err));`;
+
+T_uds.ed25519.java = `import java.net.URI;
+import java.net.http.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.security.*;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.time.Instant;
+import java.util.Base64;
+import java.util.concurrent.atomic.AtomicInteger;
+
+// Requires Java 15+ for Ed25519
+public class BinanceUdsEd25519 {
+    static final String API_KEY  = "YOUR_API_KEY";
+    static final String BASE_URL = "{{EP}}";
+
+    public static void main(String[] args) throws Exception {
+        byte[]     keyBytes   = Files.readAllBytes(Paths.get("private_key.der"));
+        PrivateKey privateKey = KeyFactory.getInstance("Ed25519").generatePrivate(new PKCS8EncodedKeySpec(keyBytes));
+
+        long   ts      = Instant.now().toEpochMilli();
+        String payload = "apiKey=" + API_KEY + "&timestamp=" + ts;
+        Signature sig  = Signature.getInstance("Ed25519");
+        sig.initSign(privateKey);
+        sig.update(payload.getBytes(StandardCharsets.UTF_8));
+        String signature = Base64.getEncoder().encodeToString(sig.sign());
+
+        String logon = String.format(
+            "{\\"id\\":\\"logon\\",\\"method\\":\\"session.logon\\",\\"params\\":{\\"apiKey\\":\\"%s\\",\\"signature\\":\\"%s\\",\\"timestamp\\":%d}}",
+            API_KEY, signature, ts);
+        String sub  = "{\\"id\\":\\"1\\",\\"method\\":\\"userDataStream.subscribe\\"}";
+
+        AtomicInteger step = new AtomicInteger(0);
+        HttpClient.newHttpClient().newWebSocketBuilder()
+            .buildAsync(URI.create(BASE_URL), new WebSocket.Listener() {
+                public void onOpen(WebSocket ws) { ws.sendText(logon, true); ws.request(1); }
+                public java.util.concurrent.CompletionStage<?> onText(WebSocket ws, CharSequence d, boolean last) {
+                    int s = step.getAndIncrement();
+                    if (s == 0) {
+                        System.out.println("Auth: " + d);
+                        ws.sendText(sub, true);
+                    } else if (s == 1) {
+                        System.out.println("Subscribed: " + d);
+                        System.out.println("Listening for account events (Ctrl+C to stop)...");
+                    } else {
+                        System.out.println("Event: " + d);
+                    }
+                    ws.request(1); return null;
+                }
+            }).join();
+        Thread.currentThread().join(); // keep alive
+    }
+}`;
+
+T_uds.ed25519.go = `package main
+
+import (
+	"crypto/ed25519"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/json"
+	"encoding/pem"
+	"fmt"
+	"os"
+	"os/signal"
+	"sort"
+	"strings"
+	"time"
+	"github.com/gorilla/websocket"
+)
+
+const (
+	apiKey  = "YOUR_API_KEY"
+	baseURL = "{{EP}}"
+)
+
+func main() {
+	keyData, _  := os.ReadFile("private_key.pem")
+	block, _    := pem.Decode(keyData)
+	keyIface, _ := x509.ParsePKCS8PrivateKey(block.Bytes)
+	privKey     := keyIface.(ed25519.PrivateKey)
+
+	ts := time.Now().UnixMilli()
+	p  := map[string]interface{}{"apiKey": apiKey, "timestamp": ts}
+	keys := []string{"apiKey", "timestamp"}; sort.Strings(keys)
+	parts := make([]string, len(keys))
+	for i, k := range keys { parts[i] = fmt.Sprintf("%s=%v", k, p[k]) }
+	sig := base64.StdEncoding.EncodeToString(ed25519.Sign(privKey, []byte(strings.Join(parts, "&"))))
+
+	conn, _, _ := websocket.DefaultDialer.Dial(baseURL, nil)
+	defer conn.Close()
+
+	// Step 1: Authenticate
+	logon, _ := json.Marshal(map[string]interface{}{"id": "logon", "method": "session.logon",
+		"params": map[string]interface{}{"apiKey": apiKey, "signature": sig, "timestamp": ts}})
+	conn.WriteMessage(websocket.TextMessage, logon)
+	_, r, _ := conn.ReadMessage(); fmt.Println("Auth:", string(r))
+
+	// Step 2: Subscribe
+	sub, _ := json.Marshal(map[string]interface{}{"id": "1", "method": "userDataStream.subscribe"})
+	conn.WriteMessage(websocket.TextMessage, sub)
+	_, r, _ = conn.ReadMessage(); fmt.Println("Subscribed:", string(r))
+
+	// Step 3: Listen for events
+	fmt.Println("Listening for account events (Ctrl+C to stop)...")
+	interrupt := make(chan os.Signal, 1); signal.Notify(interrupt, os.Interrupt)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for {
+			_, msg, err := conn.ReadMessage()
+			if err != nil { return }
+			fmt.Println(string(msg))
+		}
+	}()
+	select {
+	case <-interrupt:
+		conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+	case <-done:
+	}
+}`;
+
+T_uds.ed25519.csharp = `// Install: dotnet add package BouncyCastle.Cryptography
+using Org.BouncyCastle.Crypto.Parameters;
+using Org.BouncyCastle.Crypto.Signers;
+using Org.BouncyCastle.OpenSsl;
+using System;
+using System.Net.WebSockets;
+using System.Text;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+
+class BinanceUdsEd25519
+{
+    const string ApiKey  = "YOUR_API_KEY";
+    const string BaseUrl = "{{EP}}";
+
+    static async Task Main()
+    {
+        using var reader = new System.IO.StreamReader("private_key.pem");
+        var keyParam     = (Ed25519PrivateKeyParameters)new PemReader(reader).ReadObject();
+        long ts          = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        string payload   = "apiKey=" + ApiKey + "&timestamp=" + ts;
+        var signer       = new Ed25519Signer();
+        signer.Init(true, keyParam);
+        byte[] msg       = Encoding.ASCII.GetBytes(payload);
+        signer.BlockUpdate(msg, 0, msg.Length);
+        string sig       = Convert.ToBase64String(signer.GenerateSignature());
+
+        string logon = JsonSerializer.Serialize(new {
+            id = "logon", method = "session.logon",
+            @params = new { apiKey = ApiKey, signature = sig, timestamp = ts }
+        });
+        string sub = JsonSerializer.Serialize(new { id = "1", method = "userDataStream.subscribe" });
+
+        using var ws = new ClientWebSocket();
+        await ws.ConnectAsync(new Uri(BaseUrl), CancellationToken.None);
+
+        var buf = new byte[65536]; WebSocketReceiveResult r;
+
+        // Step 1: Authenticate
+        await ws.SendAsync(Encoding.UTF8.GetBytes(logon), WebSocketMessageType.Text, true, CancellationToken.None);
+        r = await ws.ReceiveAsync(buf, CancellationToken.None);
+        Console.WriteLine("Auth: " + Encoding.UTF8.GetString(buf, 0, r.Count));
+
+        // Step 2: Subscribe
+        await ws.SendAsync(Encoding.UTF8.GetBytes(sub), WebSocketMessageType.Text, true, CancellationToken.None);
+        r = await ws.ReceiveAsync(buf, CancellationToken.None);
+        Console.WriteLine("Subscribed: " + Encoding.UTF8.GetString(buf, 0, r.Count));
+
+        // Step 3: Listen for events
+        Console.WriteLine("Listening for account events (Ctrl+C to stop)...");
+        using var cts = new CancellationTokenSource();
+        Console.CancelKeyPress += (s, e) => { e.Cancel = true; cts.Cancel(); };
+        while (!cts.IsCancellationRequested) {
+            try { r = await ws.ReceiveAsync(buf, cts.Token); }
+            catch (OperationCanceledException) { break; }
+            if (r.MessageType == WebSocketMessageType.Close) break;
+            Console.WriteLine(Encoding.UTF8.GetString(buf, 0, r.Count));
+        }
+        await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None);
+    }
+}`;
+
+T_uds.ed25519.php = `<?php
+// PHP 8.2+ with OpenSSL 3.0+
+// composer require textalk/websocket
+require "vendor/autoload.php";
+use WebSocket\\Client;
+
+$apiKey   = "YOUR_API_KEY";
+$baseUrl  = "{{EP}}";
+
+$privateKey = openssl_pkey_get_private(file_get_contents("private_key.pem"));
+$ts         = round(microtime(true) * 1000);
+$payload    = "apiKey={$apiKey}&timestamp={$ts}";
+
+openssl_sign($payload, $sig, $privateKey, OPENSSL_ALGO_ED25519);
+$signature = base64_encode($sig);
+
+$ws = new Client($baseUrl);
+
+// Step 1: Authenticate
+$ws->send(json_encode(["id" => "logon", "method" => "session.logon",
+    "params" => ["apiKey" => $apiKey, "signature" => $signature, "timestamp" => $ts]]));
+echo "Auth: " . $ws->receive() . "\\n";
+
+// Step 2: Subscribe
+$ws->send(json_encode(["id" => "1", "method" => "userDataStream.subscribe"]));
+echo "Subscribed: " . $ws->receive() . "\\n";
+
+// Step 3: Listen for events
+echo "Listening for account events (Ctrl+C to stop)...\\n";
+while (true) {
+    echo $ws->receive() . "\\n";
+}`;
+
+T_uds.ed25519.ruby = `# Ruby 3.1+ with OpenSSL 3.0+
+# gem install websocket-client-simple
+require "websocket-client-simple"
+require "openssl"
+require "base64"
+require "json"
+
+API_KEY   = "YOUR_API_KEY"
+BASE_URL  = "{{EP}}"
+
+private_key = OpenSSL::PKey.read(File.read("private_key.pem"))
+ts          = (Time.now.to_f * 1000).round
+payload     = "apiKey=#{API_KEY}&timestamp=#{ts}"
+signature   = Base64.strict_encode64(private_key.sign(nil, payload))
+
+step = 0
+ws = WebSocket::Client::Simple.connect(BASE_URL)
+
+ws.on(:open) do
+  ws.send(JSON.generate({
+    id: "logon", method: "session.logon",
+    params: { apiKey: API_KEY, signature: signature, timestamp: ts }
+  }))
+end
+
+ws.on(:message) do |e|
+  msg = JSON.parse(e.data)
+  case step
+  when 0
+    puts "Auth: #{msg}"; step = 1
+    ws.send(JSON.generate({ id: "1", method: "userDataStream.subscribe" }))
+  when 1
+    puts "Subscribed: #{msg}"; step = 2
+    puts "Listening for account events (Ctrl+C to stop)..."
+  else
+    puts "Event: #{msg}"
+  end
+end
+
+ws.on(:error) { |e| puts "Error: #{e.message}" }
+loop {}`;
+
+T_uds.ed25519.typescript = `import * as crypto from "crypto";
+import * as fs     from "fs";
+import WebSocket   from "ws";
+
+const API_KEY:    string = "YOUR_API_KEY";
+const BASE_URL:   string = "{{EP}}";
+const privateKey: string = fs.readFileSync("private_key.pem", "utf8");
+
+const timestamp: number = Date.now();
+const params = { apiKey: API_KEY, timestamp };
+const payload: string   = Object.entries(params).sort().map(([k, v]) => k + "=" + v).join("&");
+const signature: string = crypto.sign(null, Buffer.from(payload), privateKey).toString("base64");
+
+let step = 0;
+const ws = new WebSocket(BASE_URL);
+
+ws.on("open", () => {
+  ws.send(JSON.stringify({ id: "logon", method: "session.logon", params: { ...params, signature } }));
+});
+
+ws.on("message", (data: WebSocket.RawData) => {
+  const msg = JSON.parse(data.toString());
+  if (step === 0) {
+    console.log("Auth:", msg); step = 1;
+    ws.send(JSON.stringify({ id: "1", method: "userDataStream.subscribe" }));
+  } else if (step === 1) {
+    console.log("Subscribed:", msg); step = 2;
+    console.log("Listening for account events (Ctrl+C to stop)...");
+  } else {
+    console.log("Event:", msg);
+  }
+});
+
+ws.on("error", (err: Error) => console.error(err));`;
+
+T_uds.ed25519.rust = `// Cargo.toml:
+// tungstenite = { version = "0.24", features = ["native-tls"] }
+// openssl = "0.10"  |  base64 = "0.22"
+
+use base64::{engine::general_purpose, Engine as _};
+use openssl::{pkey::PKey, sign::Signer};
+use std::time::{SystemTime, UNIX_EPOCH};
+use tungstenite::{connect, Message};
+
+fn main() {
+    let api_key  = "YOUR_API_KEY";
+    let base_url = "{{EP}}";
+
+    let pem  = std::fs::read("private_key.pem").unwrap();
+    let pkey = PKey::private_key_from_pem(&pem).unwrap();
+
+    let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
+    let payload = format!("apiKey={}&timestamp={}", api_key, ts);
+    let mut signer = Signer::new_without_digest(&pkey).unwrap();
+    signer.update(payload.as_bytes()).unwrap();
+    let sig = general_purpose::STANDARD.encode(signer.sign_to_vec().unwrap());
+
+    let logon = format!(
+        r#"{{"id":"logon","method":"session.logon","params":{{"apiKey":"{}","signature":"{}","timestamp":{}}}}}"#,
+        api_key, sig, ts
+    );
+    let sub = r#"{"id":"1","method":"userDataStream.subscribe"}"#;
+
+    let (mut ws, _) = connect(base_url).unwrap();
+
+    // Step 1: Authenticate
+    ws.send(Message::Text(logon)).unwrap();
+    println!("Auth: {}", ws.read().unwrap());
+
+    // Step 2: Subscribe
+    ws.send(Message::Text(sub.to_string())).unwrap();
+    println!("Subscribed: {}", ws.read().unwrap());
+
+    // Step 3: Listen for events
+    println!("Listening for account events (Ctrl+C to stop)...");
+    loop {
+        match ws.read() {
+            Ok(msg) => println!("{}", msg),
+            Err(e)  => { eprintln!("Error: {}", e); break; }
+        }
+    }
+}`;
+
+T_uds.ed25519.cpp = `// Requires OpenSSL 1.1.1+ for Ed25519. Install IXWebSocket.
+// Compile: g++ -std=c++17 main.cpp -lixwebsocket -lssl -lcrypto -lpthread
+#include <ixwebsocket/IXWebSocket.h>
+#include <openssl/evp.h>
+#include <openssl/pem.h>
+#include <openssl/bio.h>
+#include <iostream>
+#include <vector>
+#include <atomic>
+#include <chrono>
+#include <thread>
+
+std::string signEd25519Base64(const std::string& data) {
+    FILE* fp = fopen("private_key.pem", "r");
+    EVP_PKEY* pkey = PEM_read_PrivateKey(fp, nullptr, nullptr, nullptr); fclose(fp);
+    EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+    EVP_DigestSignInit(ctx, nullptr, nullptr, nullptr, pkey);
+    size_t sigLen = 0; EVP_DigestSign(ctx, nullptr, &sigLen, (unsigned char*)data.data(), data.size());
+    std::vector<unsigned char> sig(sigLen);
+    EVP_DigestSign(ctx, sig.data(), &sigLen, (unsigned char*)data.data(), data.size());
+    EVP_MD_CTX_free(ctx); EVP_PKEY_free(pkey);
+    BIO* b64 = BIO_push(BIO_new(BIO_f_base64()), BIO_new(BIO_s_mem()));
+    BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
+    BIO_write(b64, sig.data(), (int)sigLen); BIO_flush(b64);
+    BUF_MEM* bptr; BIO_get_mem_ptr(b64, &bptr);
+    std::string r(bptr->data, bptr->length); BIO_free_all(b64); return r;
+}
+
+int main() {
+    const std::string apiKey  = "YOUR_API_KEY";
+    const std::string baseUrl = "{{EP}}";
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                  std::chrono::system_clock::now().time_since_epoch()).count();
+    std::string payload = "apiKey=" + apiKey + "&timestamp=" + std::to_string(ms);
+    std::string sig     = signEd25519Base64(payload);
+    std::string logon   = R"({"id":"logon","method":"session.logon","params":{"apiKey":")" +
+                          apiKey + R"(","signature":")" + sig + R"(","timestamp":)" + std::to_string(ms) + "}}";
+    std::string sub     = R"({"id":"1","method":"userDataStream.subscribe"})";
+
+    std::atomic<int> step{0};
+    ix::WebSocket ws;
+    ws.setUrl(baseUrl);
+    ws.setOnMessageCallback([&](const ix::WebSocketMessagePtr& m) {
+        if (m->type == ix::WebSocketMessageType::Open) { ws.send(logon); }
+        if (m->type == ix::WebSocketMessageType::Message) {
+            int s = step.fetch_add(1);
+            if (s == 0)      { std::cout << "Auth: "        << m->str << "\\n"; ws.send(sub); }
+            else if (s == 1) { std::cout << "Subscribed: "  << m->str << "\\n";
+                               std::cout << "Listening for account events (Ctrl+C to stop)...\\n"; }
+            else             { std::cout << "Event: "       << m->str << "\\n"; }
+        }
+    });
+    ws.start();
+    std::this_thread::sleep_for(std::chrono::hours(24));
+    return 0;
+}`;
+
+T_uds.ed25519.bash = `#!/bin/bash
+# Requires: websocat, openssl 3.0+, python3, jq
+API_KEY="YOUR_API_KEY"
+BASE_URL="{{EP}}"
+PRIVATE_KEY="private_key.pem"
+
+TIMESTAMP=$(date +%s%3N)
+PAYLOAD="apiKey=\${API_KEY}&timestamp=\${TIMESTAMP}"
+RAW_SIG=$(echo -n "\$PAYLOAD" | openssl pkeyutl -sign -inkey "\$PRIVATE_KEY" | openssl base64 -A)
+
+LOGON='{"id":"logon","method":"session.logon","params":{"apiKey":"'\${API_KEY}'","signature":"'\${RAW_SIG}'","timestamp":'\${TIMESTAMP}'}}'
+SUBSCRIBE='{"id":"1","method":"userDataStream.subscribe"}'
+
+# Send logon then subscribe, then listen indefinitely
+(echo "\$LOGON"; sleep 1; echo "\$SUBSCRIBE"; sleep 86400) | websocat -n "\$BASE_URL"`;
+
 /* ── Extra-param injection per language ────────────────────────────── */
 function injectExtraParams(code, lang, params) {
   if (!params || params.length === 0) return code;
@@ -3065,24 +3602,25 @@ function syncMarketOptions() {
   }
   // Params panel: hide for WS (params go in JSON body, not query string)
   const _pc = document.getElementById("params-container");
-  if (_pc) _pc.style.display = state.apitype === "ws" ? "none" : "";
+  if (_pc) _pc.style.display = (state.apitype === "ws" || state.apitype === "uds") ? "none" : "";
 }
 
 /* ── Render ────────────────────────────────────────────────────────── */
 function render() {
   syncMarketOptions();
 
-  const isWs     = state.apitype === "ws";
-  const epMap    = ENDPOINTS[state.apitype][state.env];
-  const ep       = epMap ? (epMap[state.market] || "") : "";
-  const method   = isWs ? (WS_METHODS[state.market] || "") : "";
-  const templates = isWs ? T_ws : T;
-  const notesMap  = isWs ? WS_NOTES : NOTES;
+  const isWs  = state.apitype === "ws";
+  const isUds = state.apitype === "uds";
+  const epMap = ENDPOINTS[state.apitype] ? ENDPOINTS[state.apitype][state.env] : null;
+  const ep    = epMap ? (epMap[state.market] || "") : "";
+  const method = isWs ? (WS_METHODS[state.market] || "") : "";
+  const templates = isUds ? T_uds : (isWs ? T_ws : T);
+  const notesMap  = isUds ? UDS_NOTES : (isWs ? WS_NOTES : NOTES);
 
   const rawCode = (templates[state.auth][state.lang] || "// Not available for this combination")
     .replace(/\{\{EP\}\}/g, ep)
     .replace(/\{\{METHOD\}\}/g, method);
-  const code = isWs ? rawCode : injectExtraParams(rawCode, state.lang, extraParams);
+  const code = (isWs || isUds) ? rawCode : injectExtraParams(rawCode, state.lang, extraParams);
 
   const block = document.getElementById("code-block");
   block.className = "language-" + LANG_HL[state.lang];
@@ -3101,7 +3639,7 @@ function render() {
   const marketLabels = { spot:'Spot', usdm:'USD-M Futures', coinm:'COIN-M Futures', portfolio:'Portfolio Margin', options:'Options' };
   document.getElementById("print-meta").textContent =
     LANG_NAMES[state.lang] + "  |  " + AUTH_NAMES[state.auth] + "  |  " +
-    (isWs ? "WebSocket API" : "REST API") + "  |  " + marketLabels[state.market];
+    (isUds ? "User Data Stream" : isWs ? "WebSocket API" : "REST API") + "  |  " + marketLabels[state.market];
   document.getElementById("print-ep").textContent = ep;
 }
 
