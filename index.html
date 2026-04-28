@@ -1,0 +1,1093 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Binance API Code Generator</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #161b22;
+      border-bottom: 1px solid #30363d;
+      padding: 18px 32px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .logo {
+      width: 32px;
+      height: 32px;
+      background: #f0b90b;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 16px;
+      color: #000;
+      flex-shrink: 0;
+    }
+
+    header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      color: #e6edf3;
+    }
+
+    header p {
+      font-size: 13px;
+      color: #8b949e;
+      margin-top: 2px;
+    }
+
+    main {
+      max-width: 980px;
+      margin: 32px auto;
+      padding: 0 24px 48px;
+    }
+
+    .selectors {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+
+    .select-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .select-group label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: #8b949e;
+    }
+
+    .select-group select {
+      background: #161b22;
+      color: #e6edf3;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 9px 12px;
+      font-size: 14px;
+      cursor: pointer;
+      outline: none;
+      transition: border-color 0.15s;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%238b949e' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      padding-right: 30px;
+    }
+
+    .select-group select:hover { border-color: #58a6ff; }
+    .select-group select:focus { border-color: #58a6ff; box-shadow: 0 0 0 3px rgba(88,166,255,0.12); }
+
+    .endpoint-bar {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 10px 14px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .endpoint-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #8b949e;
+      white-space: nowrap;
+    }
+
+    .endpoint-url {
+      font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', Consolas, monospace;
+      font-size: 13px;
+      color: #79c0ff;
+      word-break: break-all;
+    }
+
+    .code-container {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .code-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      background: #1c2128;
+      border-bottom: 1px solid #30363d;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .lang-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #58a6ff;
+    }
+
+    .lang-badge {
+      font-size: 13px;
+      font-weight: 500;
+      color: #e6edf3;
+    }
+
+    .auth-badge {
+      font-size: 11px;
+      font-weight: 500;
+      color: #f0b90b;
+      background: rgba(240,185,11,0.12);
+      border: 1px solid rgba(240,185,11,0.25);
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    .copy-btn {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 6px 14px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .copy-btn:hover { background: #30363d; border-color: #8b949e; }
+    .copy-btn.copied { background: #1f4f2e; border-color: #2ea043; color: #3fb950; }
+
+    pre {
+      margin: 0;
+      overflow-x: auto;
+    }
+
+    pre code.hljs {
+      font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', Consolas, monospace;
+      font-size: 13.5px;
+      line-height: 1.65;
+      padding: 22px 24px;
+      background: transparent;
+    }
+
+    .note-box {
+      margin-top: 16px;
+      background: rgba(88, 166, 255, 0.06);
+      border: 1px solid rgba(88, 166, 255, 0.2);
+      border-radius: 6px;
+      padding: 11px 16px;
+      font-size: 13px;
+      color: #8b949e;
+      line-height: 1.6;
+    }
+
+    .note-box strong { color: #e6edf3; }
+    .note-box code {
+      font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+      font-size: 12px;
+      background: #21262d;
+      padding: 1px 6px;
+      border-radius: 4px;
+      color: #79c0ff;
+    }
+
+    @media (max-width: 640px) {
+      .selectors { grid-template-columns: 1fr 1fr; }
+      header { padding: 14px 16px; }
+      main { padding: 0 16px 32px; margin-top: 20px; }
+    }
+
+    @media (max-width: 400px) {
+      .selectors { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">B</div>
+  <div>
+    <h1>Binance API Code Generator</h1>
+    <p>Signed REST API request examples across languages and key types</p>
+  </div>
+</header>
+
+<main>
+  <div class="selectors">
+    <div class="select-group">
+      <label>Auth Type</label>
+      <select id="sel-auth">
+        <option value="hmac">HMAC-SHA256</option>
+        <option value="rsa">RSA</option>
+        <option value="ed25519">Ed25519</option>
+      </select>
+    </div>
+
+    <div class="select-group">
+      <label>Market</label>
+      <select id="sel-market">
+        <option value="spot">Spot</option>
+        <option value="usdm">USD-M Futures</option>
+        <option value="coinm">COIN-M Futures</option>
+        <option value="portfolio">Portfolio Margin</option>
+        <option value="options">Options</option>
+      </select>
+    </div>
+
+    <div class="select-group">
+      <label>API Type</label>
+      <select id="sel-apitype">
+        <option value="rest">REST API</option>
+      </select>
+    </div>
+
+    <div class="select-group">
+      <label>Language</label>
+      <select id="sel-lang">
+        <option value="python">Python</option>
+        <option value="javascript">Node.js</option>
+        <option value="java">Java</option>
+        <option value="go">Go</option>
+        <option value="csharp">C#</option>
+        <option value="php">PHP</option>
+        <option value="ruby">Ruby</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="endpoint-bar">
+    <span class="endpoint-label">Endpoint</span>
+    <span class="endpoint-url" id="endpoint-display">https://api.binance.com/api/v3/account</span>
+  </div>
+
+  <div class="code-container">
+    <div class="code-header">
+      <div class="header-left">
+        <div class="lang-dot"></div>
+        <span class="lang-badge" id="lang-badge">Python</span>
+        <span class="auth-badge" id="auth-badge">HMAC-SHA256</span>
+      </div>
+      <button class="copy-btn" id="copy-btn">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z"/>
+          <path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z"/>
+        </svg>
+        Copy
+      </button>
+    </div>
+    <pre><code id="code-block" class="language-python"></code></pre>
+  </div>
+
+  <div class="note-box" id="note-box">
+    Replace <code>YOUR_API_KEY</code> and <code>YOUR_API_SECRET</code> with your actual credentials.
+    Install dependencies: <code>pip install requests cryptography</code>
+  </div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>
+
+/* ── Endpoints ─────────────────────────────────────────────────────── */
+const ENDPOINTS = {
+  spot:      'https://api.binance.com/api/v3/account',
+  usdm:      'https://fapi.binance.com/fapi/v3/balance',
+  coinm:     'https://dapi.binance.com/dapi/v1/balance',
+  portfolio: 'https://papi.binance.com/papi/v1/balance',
+  options:   'https://eapi.binance.com/eapi/v1/marginAccount'
+};
+
+/* ── UI metadata ───────────────────────────────────────────────────── */
+const LANG_NAMES = { python:'Python', javascript:'Node.js', java:'Java', go:'Go', csharp:'C#', php:'PHP', ruby:'Ruby' };
+const LANG_HL    = { python:'python', javascript:'javascript', java:'java', go:'go', csharp:'csharp', php:'php', ruby:'ruby' };
+const AUTH_NAMES = { hmac:'HMAC-SHA256', rsa:'RSA', ed25519:'Ed25519' };
+
+const NOTES = {
+  hmac: {
+    python:     'Install: <code>pip install requests</code>',
+    javascript: 'Node.js built-in modules only — no extra packages needed.',
+    java:       'Requires Java 11+ (HttpClient). No external dependencies.',
+    go:         'No external dependencies. Run with <code>go run main.go</code>',
+    csharp:     'Requires .NET 6+. No external packages.',
+    php:        'Requires PHP 7.4+ with cURL extension enabled.',
+    ruby:       'Ruby standard library only — no gems needed.'
+  },
+  rsa: {
+    python:     'Install: <code>pip install requests cryptography</code> &nbsp;|&nbsp; Key format: PKCS#8 PEM',
+    javascript: 'Key format: PKCS#8 PEM. Node.js 15+ required.',
+    java:       'Key format: DER-encoded PKCS#8. Convert PEM → DER: <code>openssl pkcs8 -topk8 -nocrypt -in key.pem -outform DER -out private_key.der</code>',
+    go:         'Key format: PKCS#8 PEM. No external dependencies.',
+    csharp:     'Requires .NET 6+. <code>RSA.ImportFromPem()</code> available since .NET 5.',
+    php:        'Requires PHP 7.4+ with OpenSSL extension.',
+    ruby:       'Requires Ruby 2.4+. Key format: PEM.'
+  },
+  ed25519: {
+    python:     'Install: <code>pip install requests cryptography</code> &nbsp;|&nbsp; Key format: Ed25519 PEM',
+    javascript: 'Node.js 15+ required. Key format: Ed25519 PEM (PKCS#8).',
+    java:       'Java 15+ required (Ed25519 native support). Key format: DER PKCS#8.',
+    go:         'No external dependencies. Key format: PKCS#8 PEM.',
+    csharp:     'Install: <code>dotnet add package BouncyCastle.Cryptography</code> &nbsp;|&nbsp; Key format: Ed25519 PEM',
+    php:        'PHP 8.2+ with OpenSSL 3.0+ required for Ed25519.',
+    ruby:       'Ruby 3.1+ with OpenSSL 3.0+ required for Ed25519.'
+  }
+};
+
+/* ── Code templates ({{EP}} → endpoint URL) ────────────────────────── */
+const T = {};
+
+/* ════════════════════════════════════════════════════════════════════
+   HMAC-SHA256
+═══════════════════════════════════════════════════════════════════ */
+T.hmac = {};
+
+T.hmac.python = `import requests
+import hmac
+import hashlib
+import time
+import urllib.parse
+
+API_KEY    = "YOUR_API_KEY"
+API_SECRET = "YOUR_API_SECRET"
+ENDPOINT   = "{{EP}}"
+
+timestamp    = round(time.time() * 1000)
+params       = {"timestamp": timestamp}
+query_string = urllib.parse.urlencode(params)
+
+signature = hmac.new(
+    API_SECRET.encode("utf-8"),
+    msg=query_string.encode("utf-8"),
+    digestmod=hashlib.sha256
+).hexdigest()
+
+url     = ENDPOINT + "?" + query_string + "&signature=" + signature
+headers = {"X-MBX-APIKEY": API_KEY}
+
+response = requests.get(url, headers=headers)
+print(response.text)`;
+
+T.hmac.javascript = `const crypto = require("crypto");
+const https  = require("https");
+const { URL } = require("url");
+
+const API_KEY    = "YOUR_API_KEY";
+const API_SECRET = "YOUR_API_SECRET";
+const ENDPOINT   = "{{EP}}";
+
+const timestamp   = Date.now();
+const queryString = "timestamp=" + timestamp;
+const signature   = crypto
+  .createHmac("sha256", API_SECRET)
+  .update(queryString)
+  .digest("hex");
+
+const url = new URL(ENDPOINT + "?" + queryString + "&signature=" + signature);
+
+const options = {
+  hostname: url.hostname,
+  path: url.pathname + url.search,
+  method: "GET",
+  headers: { "X-MBX-APIKEY": API_KEY }
+};
+
+const req = https.request(options, (res) => {
+  let data = "";
+  res.on("data", (chunk) => (data += chunk));
+  res.on("end", () => console.log(JSON.parse(data)));
+});
+req.end();`;
+
+T.hmac.java = `import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Instant;
+
+public class BinanceHmacExample {
+    static final String API_KEY    = "YOUR_API_KEY";
+    static final String API_SECRET = "YOUR_API_SECRET";
+    static final String ENDPOINT   = "{{EP}}";
+
+    public static void main(String[] args) throws Exception {
+        long   timestamp   = Instant.now().toEpochMilli();
+        String queryString = "timestamp=" + timestamp;
+        String signature   = hmacSHA256(API_SECRET, queryString);
+        String url         = ENDPOINT + "?" + queryString + "&signature=" + signature;
+
+        HttpClient  client  = HttpClient.newHttpClient();
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .header("X-MBX-APIKEY", API_KEY)
+            .GET()
+            .build();
+
+        HttpResponse<String> resp = client.send(request, HttpResponse.BodyHandlers.ofString());
+        System.out.println(resp.body());
+    }
+
+    static String hmacSHA256(String secret, String data) throws Exception {
+        Mac mac = Mac.getInstance("HmacSHA256");
+        mac.init(new SecretKeySpec(secret.getBytes(), "HmacSHA256"));
+        byte[] raw = mac.doFinal(data.getBytes());
+        StringBuilder sb = new StringBuilder();
+        for (byte b : raw) sb.append(String.format("%02x", b));
+        return sb.toString();
+    }
+}`;
+
+T.hmac.go = `package main
+
+import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
+	"io"
+	"net/http"
+	"time"
+)
+
+const (
+	apiKey    = "YOUR_API_KEY"
+	apiSecret = "YOUR_API_SECRET"
+	endpoint  = "{{EP}}"
+)
+
+func main() {
+	timestamp   := time.Now().UnixMilli()
+	queryString := fmt.Sprintf("timestamp=%d", timestamp)
+	signature   := signHmac(apiSecret, queryString)
+	url         := endpoint + "?" + queryString + "&signature=" + signature
+
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("X-MBX-APIKEY", apiKey)
+
+	resp, _ := http.DefaultClient.Do(req)
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	fmt.Println(string(body))
+}
+
+func signHmac(secret, data string) string {
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(data))
+	return hex.EncodeToString(mac.Sum(nil))
+}`;
+
+T.hmac.csharp = `using System;
+using System.Net.Http;
+using System.Security.Cryptography;
+using System.Text;
+using System.Threading.Tasks;
+
+class BinanceHmacExample
+{
+    const string ApiKey    = "YOUR_API_KEY";
+    const string ApiSecret = "YOUR_API_SECRET";
+    const string Endpoint  = "{{EP}}";
+
+    static async Task Main()
+    {
+        long   timestamp   = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        string queryString = "timestamp=" + timestamp;
+        string signature   = ComputeHmac(ApiSecret, queryString);
+        string url         = Endpoint + "?" + queryString + "&signature=" + signature;
+
+        using var client = new HttpClient();
+        client.DefaultRequestHeaders.Add("X-MBX-APIKEY", ApiKey);
+        Console.WriteLine(await client.GetStringAsync(url));
+    }
+
+    static string ComputeHmac(string secret, string data)
+    {
+        using var mac  = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
+        byte[]    hash = mac.ComputeHash(Encoding.UTF8.GetBytes(data));
+        return BitConverter.ToString(hash).Replace("-", "").ToLower();
+    }
+}`;
+
+T.hmac.php = `<?php
+$apiKey    = "YOUR_API_KEY";
+$apiSecret = "YOUR_API_SECRET";
+$endpoint  = "{{EP}}";
+
+$timestamp   = round(microtime(true) * 1000);
+$queryString = "timestamp={$timestamp}";
+$signature   = hash_hmac("sha256", $queryString, $apiSecret);
+$url         = "{$endpoint}?{$queryString}&signature={$signature}";
+
+$ch = curl_init($url);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, ["X-MBX-APIKEY: {$apiKey}"]);
+$response = curl_exec($ch);
+curl_close($ch);
+
+echo $response;`;
+
+T.hmac.ruby = `require "net/http"
+require "openssl"
+require "uri"
+
+API_KEY    = "YOUR_API_KEY"
+API_SECRET = "YOUR_API_SECRET"
+ENDPOINT   = "{{EP}}"
+
+timestamp    = (Time.now.to_f * 1000).round
+query_string = "timestamp=#{timestamp}"
+signature    = OpenSSL::HMAC.hexdigest("SHA256", API_SECRET, query_string)
+url          = URI("#{ENDPOINT}?#{query_string}&signature=#{signature}")
+
+http         = Net::HTTP.new(url.host, url.port)
+http.use_ssl = true
+request      = Net::HTTP::Get.new(url)
+request["X-MBX-APIKEY"] = API_KEY
+
+puts http.request(request).body`;
+
+/* ════════════════════════════════════════════════════════════════════
+   RSA
+═══════════════════════════════════════════════════════════════════ */
+T.rsa = {};
+
+T.rsa.python = `import requests
+import time
+import urllib.parse
+import base64
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import padding
+
+API_KEY  = "YOUR_API_KEY"
+ENDPOINT = "{{EP}}"
+
+# Load RSA private key — PKCS#8 PEM format
+with open("private_key.pem", "rb") as f:
+    private_key = serialization.load_pem_private_key(f.read(), password=None)
+
+timestamp    = round(time.time() * 1000)
+params       = {"timestamp": timestamp}
+query_string = urllib.parse.urlencode(params)
+
+raw_sig   = private_key.sign(query_string.encode(), padding.PKCS1v15(), hashes.SHA256())
+signature = urllib.parse.quote(base64.b64encode(raw_sig).decode())
+
+url     = ENDPOINT + "?" + query_string + "&signature=" + signature
+headers = {"X-MBX-APIKEY": API_KEY}
+
+response = requests.get(url, headers=headers)
+print(response.text)`;
+
+T.rsa.javascript = `const crypto  = require("crypto");
+const fs      = require("fs");
+const https   = require("https");
+const { URL } = require("url");
+
+const API_KEY    = "YOUR_API_KEY";
+const ENDPOINT   = "{{EP}}";
+const privateKey = fs.readFileSync("private_key.pem", "utf8");
+
+const timestamp   = Date.now();
+const queryString = "timestamp=" + timestamp;
+
+const signature = encodeURIComponent(
+  crypto.sign("sha256", Buffer.from(queryString), {
+    key: privateKey,
+    padding: crypto.constants.RSA_PKCS1_PADDING
+  }).toString("base64")
+);
+
+const url = new URL(ENDPOINT + "?" + queryString + "&signature=" + signature);
+const options = {
+  hostname: url.hostname,
+  path: url.pathname + url.search,
+  method: "GET",
+  headers: { "X-MBX-APIKEY": API_KEY }
+};
+
+const req = https.request(options, (res) => {
+  let data = "";
+  res.on("data", (chunk) => (data += chunk));
+  res.on("end", () => console.log(data));
+});
+req.end();`;
+
+T.rsa.java = `import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.security.*;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.time.Instant;
+import java.util.Base64;
+
+public class BinanceRsaExample {
+    static final String API_KEY  = "YOUR_API_KEY";
+    static final String ENDPOINT = "{{EP}}";
+
+    public static void main(String[] args) throws Exception {
+        // Convert PEM to DER first:
+        // openssl pkcs8 -topk8 -nocrypt -in key.pem -outform DER -out private_key.der
+        byte[]     keyBytes   = Files.readAllBytes(Paths.get("private_key.der"));
+        PrivateKey privateKey = KeyFactory.getInstance("RSA")
+            .generatePrivate(new PKCS8EncodedKeySpec(keyBytes));
+
+        long   timestamp   = Instant.now().toEpochMilli();
+        String queryString = "timestamp=" + timestamp;
+        String signature   = URLEncoder.encode(sign(privateKey, queryString), StandardCharsets.UTF_8);
+        String url         = ENDPOINT + "?" + queryString + "&signature=" + signature;
+
+        HttpClient  client  = HttpClient.newHttpClient();
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .header("X-MBX-APIKEY", API_KEY)
+            .GET().build();
+
+        HttpResponse<String> resp = client.send(request, HttpResponse.BodyHandlers.ofString());
+        System.out.println(resp.body());
+    }
+
+    static String sign(PrivateKey key, String data) throws Exception {
+        Signature sig = Signature.getInstance("SHA256withRSA");
+        sig.initSign(key);
+        sig.update(data.getBytes(StandardCharsets.UTF_8));
+        return Base64.getEncoder().encodeToString(sig.sign());
+    }
+}`;
+
+T.rsa.go = `package main
+
+import (
+	"crypto"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/pem"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"os"
+	"time"
+)
+
+const (
+	apiKey   = "YOUR_API_KEY"
+	endpoint = "{{EP}}"
+)
+
+func main() {
+	keyData, _  := os.ReadFile("private_key.pem")
+	block, _    := pem.Decode(keyData)
+	keyIface, _ := x509.ParsePKCS8PrivateKey(block.Bytes)
+	rsaKey      := keyIface.(*rsa.PrivateKey)
+
+	timestamp   := time.Now().UnixMilli()
+	queryString := fmt.Sprintf("timestamp=%d", timestamp)
+
+	hash     := sha256.Sum256([]byte(queryString))
+	sig, _   := rsa.SignPKCS1v15(rand.Reader, rsaKey, crypto.SHA256, hash[:])
+	signature := url.QueryEscape(base64.StdEncoding.EncodeToString(sig))
+
+	reqURL := endpoint + "?" + queryString + "&signature=" + signature
+	req, _ := http.NewRequest("GET", reqURL, nil)
+	req.Header.Set("X-MBX-APIKEY", apiKey)
+
+	resp, _ := http.DefaultClient.Do(req)
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	fmt.Println(string(body))
+}`;
+
+T.rsa.csharp = `using System;
+using System.Net.Http;
+using System.Security.Cryptography;
+using System.Text;
+using System.Threading.Tasks;
+
+class BinanceRsaExample
+{
+    const string ApiKey   = "YOUR_API_KEY";
+    const string Endpoint = "{{EP}}";
+
+    static async Task Main()
+    {
+        string pem = System.IO.File.ReadAllText("private_key.pem");
+        using var rsa = RSA.Create();
+        rsa.ImportFromPem(pem);
+
+        long   timestamp   = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        string queryString = "timestamp=" + timestamp;
+
+        byte[] sigBytes = rsa.SignData(
+            Encoding.UTF8.GetBytes(queryString),
+            HashAlgorithmName.SHA256,
+            RSASignaturePadding.Pkcs1
+        );
+        string signature = Uri.EscapeDataString(Convert.ToBase64String(sigBytes));
+        string url       = Endpoint + "?" + queryString + "&signature=" + signature;
+
+        using var client = new HttpClient();
+        client.DefaultRequestHeaders.Add("X-MBX-APIKEY", ApiKey);
+        Console.WriteLine(await client.GetStringAsync(url));
+    }
+}`;
+
+T.rsa.php = `<?php
+$apiKey   = "YOUR_API_KEY";
+$endpoint = "{{EP}}";
+
+$privateKey  = openssl_pkey_get_private(file_get_contents("private_key.pem"));
+$timestamp   = round(microtime(true) * 1000);
+$queryString = "timestamp={$timestamp}";
+
+openssl_sign($queryString, $signature, $privateKey, OPENSSL_ALGO_SHA256);
+$encodedSig = urlencode(base64_encode($signature));
+$url        = "{$endpoint}?{$queryString}&signature={$encodedSig}";
+
+$ch = curl_init($url);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, ["X-MBX-APIKEY: {$apiKey}"]);
+$response = curl_exec($ch);
+curl_close($ch);
+
+echo $response;`;
+
+T.rsa.ruby = `require "net/http"
+require "openssl"
+require "base64"
+require "uri"
+
+API_KEY   = "YOUR_API_KEY"
+ENDPOINT  = "{{EP}}"
+
+private_key  = OpenSSL::PKey::RSA.new(File.read("private_key.pem"))
+timestamp    = (Time.now.to_f * 1000).round
+query_string = "timestamp=#{timestamp}"
+
+raw_sig   = private_key.sign(OpenSSL::Digest::SHA256.new, query_string)
+signature = URI.encode_www_form_component(Base64.strict_encode64(raw_sig))
+url       = URI("#{ENDPOINT}?#{query_string}&signature=#{signature}")
+
+http         = Net::HTTP.new(url.host, url.port)
+http.use_ssl = true
+request      = Net::HTTP::Get.new(url)
+request["X-MBX-APIKEY"] = API_KEY
+
+puts http.request(request).body`;
+
+/* ════════════════════════════════════════════════════════════════════
+   Ed25519
+═══════════════════════════════════════════════════════════════════ */
+T.ed25519 = {};
+
+T.ed25519.python = `import requests
+import time
+import urllib.parse
+import base64
+from cryptography.hazmat.primitives import serialization
+
+API_KEY  = "YOUR_API_KEY"
+ENDPOINT = "{{EP}}"
+
+# Load Ed25519 private key — PEM format
+with open("private_key.pem", "rb") as f:
+    private_key = serialization.load_pem_private_key(f.read(), password=None)
+
+timestamp    = round(time.time() * 1000)
+params       = {"timestamp": timestamp}
+query_string = urllib.parse.urlencode(params)
+
+raw_sig   = private_key.sign(query_string.encode())
+signature = urllib.parse.quote(base64.b64encode(raw_sig).decode())
+
+url     = ENDPOINT + "?" + query_string + "&signature=" + signature
+headers = {"X-MBX-APIKEY": API_KEY}
+
+response = requests.get(url, headers=headers)
+print(response.text)`;
+
+T.ed25519.javascript = `const crypto  = require("crypto");
+const fs      = require("fs");
+const https   = require("https");
+const { URL } = require("url");
+
+const API_KEY    = "YOUR_API_KEY";
+const ENDPOINT   = "{{EP}}";
+const privateKey = fs.readFileSync("private_key.pem", "utf8");
+
+const timestamp   = Date.now();
+const queryString = "timestamp=" + timestamp;
+
+// null algorithm → Ed25519 native signing
+const signature = encodeURIComponent(
+  crypto.sign(null, Buffer.from(queryString), privateKey).toString("base64")
+);
+
+const url = new URL(ENDPOINT + "?" + queryString + "&signature=" + signature);
+const options = {
+  hostname: url.hostname,
+  path: url.pathname + url.search,
+  method: "GET",
+  headers: { "X-MBX-APIKEY": API_KEY }
+};
+
+const req = https.request(options, (res) => {
+  let data = "";
+  res.on("data", (chunk) => (data += chunk));
+  res.on("end", () => console.log(data));
+});
+req.end();`;
+
+T.ed25519.java = `import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.security.*;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.time.Instant;
+import java.util.Base64;
+
+// Requires Java 15+ for native Ed25519 support
+public class BinanceEd25519Example {
+    static final String API_KEY  = "YOUR_API_KEY";
+    static final String ENDPOINT = "{{EP}}";
+
+    public static void main(String[] args) throws Exception {
+        // Convert PEM to DER first:
+        // openssl pkcs8 -topk8 -nocrypt -in key.pem -outform DER -out private_key.der
+        byte[]     keyBytes   = Files.readAllBytes(Paths.get("private_key.der"));
+        PrivateKey privateKey = KeyFactory.getInstance("Ed25519")
+            .generatePrivate(new PKCS8EncodedKeySpec(keyBytes));
+
+        long   timestamp   = Instant.now().toEpochMilli();
+        String queryString = "timestamp=" + timestamp;
+        String signature   = URLEncoder.encode(sign(privateKey, queryString), StandardCharsets.UTF_8);
+        String url         = ENDPOINT + "?" + queryString + "&signature=" + signature;
+
+        HttpClient  client  = HttpClient.newHttpClient();
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .header("X-MBX-APIKEY", API_KEY)
+            .GET().build();
+
+        HttpResponse<String> resp = client.send(request, HttpResponse.BodyHandlers.ofString());
+        System.out.println(resp.body());
+    }
+
+    static String sign(PrivateKey key, String data) throws Exception {
+        Signature sig = Signature.getInstance("Ed25519");
+        sig.initSign(key);
+        sig.update(data.getBytes(StandardCharsets.UTF_8));
+        return Base64.getEncoder().encodeToString(sig.sign());
+    }
+}`;
+
+T.ed25519.go = `package main
+
+import (
+	"crypto/ed25519"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/pem"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"os"
+	"time"
+)
+
+const (
+	apiKey   = "YOUR_API_KEY"
+	endpoint = "{{EP}}"
+)
+
+func main() {
+	keyData, _  := os.ReadFile("private_key.pem")
+	block, _    := pem.Decode(keyData)
+	keyIface, _ := x509.ParsePKCS8PrivateKey(block.Bytes)
+	privKey     := keyIface.(ed25519.PrivateKey)
+
+	timestamp   := time.Now().UnixMilli()
+	queryString := fmt.Sprintf("timestamp=%d", timestamp)
+
+	sig       := ed25519.Sign(privKey, []byte(queryString))
+	signature := url.QueryEscape(base64.StdEncoding.EncodeToString(sig))
+
+	reqURL := endpoint + "?" + queryString + "&signature=" + signature
+	req, _ := http.NewRequest("GET", reqURL, nil)
+	req.Header.Set("X-MBX-APIKEY", apiKey)
+
+	resp, _ := http.DefaultClient.Do(req)
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	fmt.Println(string(body))
+}`;
+
+T.ed25519.csharp = `// Install: dotnet add package BouncyCastle.Cryptography
+using Org.BouncyCastle.Crypto.Parameters;
+using Org.BouncyCastle.Crypto.Signers;
+using Org.BouncyCastle.OpenSsl;
+using System;
+using System.IO;
+using System.Net.Http;
+using System.Text;
+using System.Threading.Tasks;
+
+class BinanceEd25519Example
+{
+    const string ApiKey   = "YOUR_API_KEY";
+    const string Endpoint = "{{EP}}";
+
+    static async Task Main()
+    {
+        var keyParam = LoadKey("private_key.pem");
+
+        long   timestamp   = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        string queryString = "timestamp=" + timestamp;
+
+        var signer = new Ed25519Signer();
+        signer.Init(true, keyParam);
+        byte[] msg = Encoding.UTF8.GetBytes(queryString);
+        signer.BlockUpdate(msg, 0, msg.Length);
+        byte[] sigBytes = signer.GenerateSignature();
+
+        string signature = Uri.EscapeDataString(Convert.ToBase64String(sigBytes));
+        string url       = Endpoint + "?" + queryString + "&signature=" + signature;
+
+        using var client = new HttpClient();
+        client.DefaultRequestHeaders.Add("X-MBX-APIKEY", ApiKey);
+        Console.WriteLine(await client.GetStringAsync(url));
+    }
+
+    static Ed25519PrivateKeyParameters LoadKey(string path)
+    {
+        using var reader = new StreamReader(path);
+        return (Ed25519PrivateKeyParameters)new PemReader(reader).ReadObject();
+    }
+}`;
+
+T.ed25519.php = `<?php
+// Requires PHP 8.2+ with OpenSSL 3.0+
+$apiKey   = "YOUR_API_KEY";
+$endpoint = "{{EP}}";
+
+$privateKey  = openssl_pkey_get_private(file_get_contents("private_key.pem"));
+$timestamp   = round(microtime(true) * 1000);
+$queryString = "timestamp={$timestamp}";
+
+// OPENSSL_ALGO_ED25519 is available from PHP 8.2 / OpenSSL 3.0
+openssl_sign($queryString, $signature, $privateKey, OPENSSL_ALGO_ED25519);
+$encodedSig = urlencode(base64_encode($signature));
+$url        = "{$endpoint}?{$queryString}&signature={$encodedSig}";
+
+$ch = curl_init($url);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, ["X-MBX-APIKEY: {$apiKey}"]);
+$response = curl_exec($ch);
+curl_close($ch);
+
+echo $response;`;
+
+T.ed25519.ruby = `require "net/http"
+require "openssl"
+require "base64"
+require "uri"
+
+# Requires Ruby 3.1+ with OpenSSL 3.0+
+API_KEY   = "YOUR_API_KEY"
+ENDPOINT  = "{{EP}}"
+
+private_key  = OpenSSL::PKey.read(File.read("private_key.pem"))
+timestamp    = (Time.now.to_f * 1000).round
+query_string = "timestamp=#{timestamp}"
+
+# Ed25519: pass nil as digest
+raw_sig   = private_key.sign(nil, query_string)
+signature = URI.encode_www_form_component(Base64.strict_encode64(raw_sig))
+url       = URI("#{ENDPOINT}?#{query_string}&signature=#{signature}")
+
+http         = Net::HTTP.new(url.host, url.port)
+http.use_ssl = true
+request      = Net::HTTP::Get.new(url)
+request["X-MBX-APIKEY"] = API_KEY
+
+puts http.request(request).body`;
+
+/* ── State ─────────────────────────────────────────────────────────── */
+let state = { auth: "hmac", market: "spot", lang: "python" };
+
+/* ── Render ────────────────────────────────────────────────────────── */
+function render() {
+  const ep   = ENDPOINTS[state.market];
+  const code = T[state.auth][state.lang].replace(/\{\{EP\}\}/g, ep);
+
+  const block = document.getElementById("code-block");
+  block.className = "language-" + LANG_HL[state.lang];
+  block.textContent = code;
+  delete block.dataset.highlighted;
+  hljs.highlightElement(block);
+
+  document.getElementById("lang-badge").textContent  = LANG_NAMES[state.lang];
+  document.getElementById("auth-badge").textContent  = AUTH_NAMES[state.auth];
+  document.getElementById("endpoint-display").textContent = ep;
+  document.getElementById("note-box").innerHTML = NOTES[state.auth][state.lang];
+}
+
+/* ── Event listeners ───────────────────────────────────────────────── */
+document.getElementById("sel-auth").addEventListener("change",   e => { state.auth   = e.target.value; render(); });
+document.getElementById("sel-market").addEventListener("change", e => { state.market = e.target.value; render(); });
+document.getElementById("sel-lang").addEventListener("change",   e => { state.lang   = e.target.value; render(); });
+
+document.getElementById("copy-btn").addEventListener("click", () => {
+  const code = document.getElementById("code-block").textContent;
+  navigator.clipboard.writeText(code).then(() => {
+    const btn = document.getElementById("copy-btn");
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/></svg> Copied!`;
+    btn.classList.add("copied");
+    setTimeout(() => {
+      btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z"/><path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z"/></svg> Copy`;
+      btn.classList.remove("copied");
+    }, 2000);
+  });
+});
+
+render();
+</script>
+</body>
+</html>
