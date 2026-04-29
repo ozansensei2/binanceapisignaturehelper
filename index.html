@@ -171,7 +171,7 @@
 
     .btn-group { display: flex; gap: 8px; }
 
-    .copy-btn, .pdf-btn {
+    .copy-btn, .pdf-btn, .edit-btn {
       background: #21262d;
       color: #c9d1d9;
       border: 1px solid #30363d;
@@ -185,9 +185,19 @@
       gap: 6px;
     }
 
-    .copy-btn:hover, .pdf-btn:hover { background: #30363d; border-color: #8b949e; }
+    .copy-btn:hover, .pdf-btn:hover, .edit-btn:hover { background: #30363d; border-color: #8b949e; }
     .copy-btn.copied { background: #1f4f2e; border-color: #2ea043; color: #3fb950; }
     .pdf-btn:hover { color: #e6edf3; }
+    .edit-btn.editing { background: #1c2d40; border-color: #1f6feb; color: #58a6ff; }
+    .edit-btn.editing:hover { background: #1f3d55; }
+
+    #code-block[contenteditable="true"] {
+      outline: none;
+      box-shadow: inset 0 0 0 2px #1f6feb;
+      border-radius: 0 0 6px 6px;
+      caret-color: #e6edf3;
+      white-space: pre;
+    }
 
     /* ── Parameters section ─────────────────────────────────────────── */
     .params-container {
@@ -444,6 +454,12 @@
         <span class="auth-badge" id="auth-badge">HMAC-SHA256</span>
       </div>
       <div class="btn-group">
+      <button class="edit-btn" id="edit-btn">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M11.013 1.427a1.75 1.75 0 012.474 0l1.086 1.086a1.75 1.75 0 010 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 01-.927-.928l.929-3.25c.081-.286.235-.547.445-.758l8.61-8.61zm.176 4.823L9.75 4.81l-6.286 6.287a.253.253 0 00-.064.108l-.558 1.953 1.953-.558a.253.253 0 00.108-.064zm1.238-3.763a.25.25 0 00-.354 0L10.811 3.75l1.439 1.44 1.263-1.263a.25.25 0 000-.354z"/>
+        </svg>
+        Edit
+      </button>
       <button class="copy-btn" id="copy-btn">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
           <path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z"/>
@@ -4070,7 +4086,10 @@ function syncMarketOptions() {
 }
 
 /* ── Render ────────────────────────────────────────────────────────── */
+let isEditing = false;
+
 function render() {
+  if (isEditing) return;
   syncMarketOptions();
 
   const isWs       = state.apitype === "ws";
@@ -4181,6 +4200,43 @@ document.getElementById("pdf-btn").addEventListener("click", async () => {
 
   btn.classList.remove("loading");
   btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M14 4.5V14a2 2 0 01-2 2H4a2 2 0 01-2-2V2a2 2 0 012-2h5.5L14 4.5zm-3 0A1.5 1.5 0 019.5 3V1H4a1 1 0 00-1 1v12a1 1 0 001 1h8a1 1 0 001-1V4.5h-2z"/><path d="M5.5 10.5a.5.5 0 01.5-.5h4a.5.5 0 010 1H6a.5.5 0 01-.5-.5zm0 2a.5.5 0 01.5-.5h4a.5.5 0 010 1H6a.5.5 0 01-.5-.5zM6 7.5a.5.5 0 000 1h2a.5.5 0 000-1H6z"/></svg> PDF';
+});
+
+document.getElementById("edit-btn").addEventListener("click", () => {
+  const block = document.getElementById("code-block");
+  const btn   = document.getElementById("edit-btn");
+
+  const PENCIL_SVG = `<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M11.013 1.427a1.75 1.75 0 012.474 0l1.086 1.086a1.75 1.75 0 010 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 01-.927-.928l.929-3.25c.081-.286.235-.547.445-.758l8.61-8.61zm.176 4.823L9.75 4.81l-6.286 6.287a.253.253 0 00-.064.108l-.558 1.953 1.953-.558a.253.253 0 00.108-.064zm1.238-3.763a.25.25 0 00-.354 0L10.811 3.75l1.439 1.44 1.263-1.263a.25.25 0 000-.354z"/></svg>`;
+  const CHECK_SVG  = `<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/></svg>`;
+
+  if (!isEditing) {
+    // Strip hljs spans → plain editable text
+    block.textContent = block.textContent;
+    block.removeAttribute("data-highlighted");
+    block.contentEditable = "true";
+    block.spellcheck = false;
+    block.focus();
+    // Move cursor to end
+    const range = document.createRange();
+    range.selectNodeContents(block);
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    isEditing = true;
+    btn.innerHTML = CHECK_SVG + " Done";
+    btn.classList.add("editing");
+  } else {
+    // Exit edit mode: re-highlight
+    const edited = block.textContent;
+    block.removeAttribute("contenteditable");
+    block.textContent = edited;
+    delete block.dataset.highlighted;
+    hljs.highlightElement(block);
+    isEditing = false;
+    btn.innerHTML = PENCIL_SVG + " Edit";
+    btn.classList.remove("editing");
+  }
 });
 
 document.getElementById("copy-btn").addEventListener("click", () => {
