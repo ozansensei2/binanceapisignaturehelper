@@ -4539,16 +4539,17 @@ function syncMarketOptions() {
     sel.value    = state.market;
   }
 
-  // Spot UDS requires Ed25519 only; usdm/coinm UDS allow all auth types
+  // Spot UDS supports HMAC (subscribe.signature) and Ed25519 (session.logon); RSA not supported
   const selAuth   = document.getElementById("sel-auth");
   const isUdsSpot = state.apitype === "uds" && state.market === "spot";
   for (const opt of selAuth.options) {
-    opt.disabled    = isUdsSpot && opt.value !== "ed25519";
-    opt.style.color = (isUdsSpot && opt.value !== "ed25519") ? "#484f58" : "";
+    const unsupported = isUdsSpot && opt.value === "rsa";
+    opt.disabled    = unsupported;
+    opt.style.color = unsupported ? "#484f58" : "";
   }
-  if (isUdsSpot && state.auth !== "ed25519") {
-    state.auth    = "ed25519";
-    selAuth.value = "ed25519";
+  if (isUdsSpot && state.auth === "rsa") {
+    state.auth    = "hmac";
+    selAuth.value = "hmac";
   }
 
   // Params panel: hide for WS / UDS
