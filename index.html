@@ -603,7 +603,19 @@ const NOTES = {
 
 /* ── User Data Stream Notes ────────────────────────────────────────── */
 const UDS_NOTES = {
-  hmac:    Object.fromEntries(['python','javascript','java','go','csharp','php','ruby','typescript','rust','cpp','bash'].map(l => [l, '<strong>User Data Stream requires Ed25519 Session Authentication.</strong> HMAC is not supported — please select Ed25519.'])),
+  hmac: {
+    python:     'Install: <code>pip install websocket-client</code> &nbsp;|&nbsp; Uses <strong>Signature Subscription</strong> → <code>userDataStream.subscribe.signature</code> (no session.logon)',
+    javascript: 'Install: <code>npm install ws</code>. Uses <strong>Signature Subscription</strong> → <code>userDataStream.subscribe.signature</code>',
+    java:       'No extra dependencies. Java 11+ built-in HTTP/WebSocket client. Uses <strong>Signature Subscription</strong>.',
+    go:         'Install: <code>go get github.com/gorilla/websocket</code>. Uses <strong>Signature Subscription</strong>.',
+    csharp:     'Requires .NET 6+. <code>System.Net.WebSockets</code> built-in. Uses <strong>Signature Subscription</strong>.',
+    php:        'Install: <code>composer require textalk/websocket</code>. Uses <strong>Signature Subscription</strong>.',
+    ruby:       'Install: <code>gem install websocket-client-simple</code>. Uses <strong>Signature Subscription</strong>.',
+    typescript: 'Install: <code>npm install ws @types/ws</code>. Uses <strong>Signature Subscription</strong>.',
+    rust:       'Add to Cargo.toml: <code>tungstenite = { version = "0.24", features = ["native-tls"] }</code>, <code>hmac = "0.12"</code>, <code>sha2 = "0.10"</code>, <code>hex = "0.4"</code>',
+    cpp:        'Install IXWebSocket + OpenSSL. Compile: <code>g++ -std=c++17 main.cpp -lixwebsocket -lssl -lcrypto -lpthread</code>',
+    bash:       'Requires <code>openssl</code>, <code>websocat</code>, <code>jq</code>. Install websocat: <a href="https://github.com/vi/websocat" target="_blank">github.com/vi/websocat</a>'
+  },
   rsa:     Object.fromEntries(['python','javascript','java','go','csharp','php','ruby','typescript','rust','cpp','bash'].map(l => [l, '<strong>User Data Stream requires Ed25519 Session Authentication.</strong> RSA is not supported — please select Ed25519.'])),
   ed25519: {
     python:     'Install: <code>pip install websocket-client cryptography</code> &nbsp;|&nbsp; Requires Ed25519 private key. Uses <strong>Session Auth</strong> → <code>userDataStream.subscribe</code>',
@@ -3040,7 +3052,9 @@ REQUEST='{"id":"1","method":"'\${METHOD}'","params":{}}'
 (echo "\$LOGON"; sleep 1; echo "\$REQUEST"; sleep 1) | websocat "\$BASE_URL"`;
 
 /* ════════════════════════════════════════════════════════════════════
-   User Data Stream Templates  (Ed25519 + Session Auth required)
+   User Data Stream Templates
+   HMAC  → userDataStream.subscribe.signature  (no session.logon)
+   Ed25519 → session.logon + userDataStream.subscribe
    {{EP}} → endpoint
 ═══════════════════════════════════════════════════════════════════ */
 const T_uds = {};
@@ -3050,12 +3064,469 @@ const _UDS_NA = (lang) => {
   return p + 'User Data Stream only supports Ed25519 Session Authentication.\n' +
          p + 'Please select "Ed25519" as the Auth Type.';
 };
-T_uds.hmac = {};
 T_uds.rsa  = {};
 ['python','javascript','java','go','csharp','php','ruby','typescript','rust','cpp','bash'].forEach(l => {
-  T_uds.hmac[l] = _UDS_NA(l);
   T_uds.rsa[l]  = _UDS_NA(l);
 });
+
+/* ── HMAC User Data Stream (userDataStream.subscribe.signature) ───── */
+T_uds.hmac = {};
+
+T_uds.hmac.python = `import hmac, hashlib, time, json
+from websocket import create_connection
+
+API_KEY    = "YOUR_API_KEY"
+API_SECRET = "YOUR_API_SECRET"
+BASE_URL   = "{{EP}}"
+
+timestamp = int(time.time() * 1000)
+payload   = f"apiKey={API_KEY}&timestamp={timestamp}"
+signature = hmac.new(
+    API_SECRET.encode("utf-8"),
+    msg=payload.encode("utf-8"),
+    digestmod=hashlib.sha256
+).hexdigest()
+
+ws = create_connection(BASE_URL)
+
+# Subscribe to User Data Stream (no session.logon needed for HMAC)
+ws.send(json.dumps({
+    "id": "1",
+    "method": "userDataStream.subscribe.signature",
+    "params": {"apiKey": API_KEY, "timestamp": timestamp, "signature": signature}
+}))
+print("Subscribed:", ws.recv())
+
+# Listen for account events (balances, orders, positions...)
+print("Listening for account events (Ctrl+C to stop)...")
+try:
+    while True:
+        print(json.loads(ws.recv()))
+except KeyboardInterrupt:
+    ws.close()`;
+
+T_uds.hmac.javascript = `const crypto    = require("crypto");
+const WebSocket = require("ws");
+
+const API_KEY    = "YOUR_API_KEY";
+const API_SECRET = "YOUR_API_SECRET";
+const BASE_URL   = "{{EP}}";
+
+const timestamp = Date.now();
+const payload   = \`apiKey=\${API_KEY}&timestamp=\${timestamp}\`;
+const signature = crypto.createHmac("sha256", API_SECRET).update(payload).digest("hex");
+
+const ws = new WebSocket(BASE_URL);
+
+ws.on("open", () => {
+  // Subscribe to User Data Stream (no session.logon needed for HMAC)
+  ws.send(JSON.stringify({
+    id: "1",
+    method: "userDataStream.subscribe.signature",
+    params: { apiKey: API_KEY, timestamp, signature }
+  }));
+});
+
+ws.on("message", (data) => {
+  const msg = JSON.parse(data.toString());
+  if (msg.id === "1") {
+    console.log("Subscribed:", msg);
+    console.log("Listening for account events (Ctrl+C to stop)...");
+  } else {
+    console.log("Event:", msg);
+  }
+});
+
+ws.on("error", (err) => console.error(err));`;
+
+T_uds.hmac.java = `import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.net.URI;
+import java.net.http.*;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.HexFormat;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+public class BinanceUdsHmac {
+    static final String API_KEY    = "YOUR_API_KEY";
+    static final String API_SECRET = "YOUR_API_SECRET";
+    static final String BASE_URL   = "{{EP}}";
+
+    public static void main(String[] args) throws Exception {
+        long   ts      = Instant.now().toEpochMilli();
+        String payload = "apiKey=" + API_KEY + "&timestamp=" + ts;
+        String sig     = hmacHex(API_SECRET, payload);
+
+        String sub = String.format(
+            "{\\"id\\":\\"1\\",\\"method\\":\\"userDataStream.subscribe.signature\\"," +
+            "\\"params\\":{\\"apiKey\\":\\"%s\\",\\"timestamp\\":%d,\\"signature\\":\\"%s\\"}}",
+            API_KEY, ts, sig);
+
+        AtomicBoolean subscribed = new AtomicBoolean(false);
+        HttpClient.newHttpClient().newWebSocketBuilder()
+            .buildAsync(URI.create(BASE_URL), new WebSocket.Listener() {
+                public void onOpen(WebSocket ws) {
+                    ws.sendText(sub, true);
+                    ws.request(1);
+                }
+                public java.util.concurrent.CompletionStage<?> onText(WebSocket ws, CharSequence d, boolean last) {
+                    if (!subscribed.getAndSet(true)) {
+                        System.out.println("Subscribed: " + d);
+                        System.out.println("Listening for account events (Ctrl+C to stop)...");
+                    } else {
+                        System.out.println("Event: " + d);
+                    }
+                    ws.request(1); return null;
+                }
+            }).join();
+        Thread.currentThread().join();
+    }
+
+    static String hmacHex(String secret, String data) throws Exception {
+        Mac mac = Mac.getInstance("HmacSHA256");
+        mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+        return HexFormat.of().formatHex(mac.doFinal(data.getBytes(StandardCharsets.UTF_8)));
+    }
+}`;
+
+T_uds.hmac.go = `package main
+
+import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"os"
+	"os/signal"
+	"time"
+	"github.com/gorilla/websocket"
+)
+
+const (
+	apiKey    = "YOUR_API_KEY"
+	apiSecret = "YOUR_API_SECRET"
+	baseURL   = "{{EP}}"
+)
+
+func signHmac(secret, data string) string {
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(data))
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
+func main() {
+	ts      := time.Now().UnixMilli()
+	payload := fmt.Sprintf("apiKey=%s&timestamp=%d", apiKey, ts)
+	sig     := signHmac(apiSecret, payload)
+
+	sub, _ := json.Marshal(map[string]interface{}{
+		"id":     "1",
+		"method": "userDataStream.subscribe.signature",
+		"params": map[string]interface{}{"apiKey": apiKey, "timestamp": ts, "signature": sig},
+	})
+
+	conn, _, _ := websocket.DefaultDialer.Dial(baseURL, nil)
+	defer conn.Close()
+
+	// Subscribe (no session.logon needed for HMAC)
+	conn.WriteMessage(websocket.TextMessage, sub)
+	_, r, _ := conn.ReadMessage()
+	fmt.Println("Subscribed:", string(r))
+
+	// Listen for events
+	fmt.Println("Listening for account events (Ctrl+C to stop)...")
+	interrupt := make(chan os.Signal, 1)
+	signal.Notify(interrupt, os.Interrupt)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for {
+			_, msg, err := conn.ReadMessage()
+			if err != nil { return }
+			fmt.Println(string(msg))
+		}
+	}()
+	select {
+	case <-interrupt:
+		conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+	case <-done:
+	}
+}`;
+
+T_uds.hmac.csharp = `using System;
+using System.Net.WebSockets;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+
+class BinanceUdsHmac
+{
+    const string ApiKey    = "YOUR_API_KEY";
+    const string ApiSecret = "YOUR_API_SECRET";
+    const string BaseUrl   = "{{EP}}";
+
+    static async Task Main()
+    {
+        long   ts      = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        string payload = "apiKey=" + ApiKey + "&timestamp=" + ts;
+        string sig     = ComputeHmac(ApiSecret, payload);
+
+        string sub = JsonSerializer.Serialize(new {
+            id = "1", method = "userDataStream.subscribe.signature",
+            @params = new { apiKey = ApiKey, timestamp = ts, signature = sig }
+        });
+
+        using var ws = new ClientWebSocket();
+        await ws.ConnectAsync(new Uri(BaseUrl), CancellationToken.None);
+
+        var buf = new byte[65536]; WebSocketReceiveResult r;
+
+        // Subscribe (no session.logon needed for HMAC)
+        await ws.SendAsync(Encoding.UTF8.GetBytes(sub), WebSocketMessageType.Text, true, CancellationToken.None);
+        r = await ws.ReceiveAsync(buf, CancellationToken.None);
+        Console.WriteLine("Subscribed: " + Encoding.UTF8.GetString(buf, 0, r.Count));
+
+        // Listen for events
+        Console.WriteLine("Listening for account events (Ctrl+C to stop)...");
+        using var cts = new CancellationTokenSource();
+        Console.CancelKeyPress += (s, e) => { e.Cancel = true; cts.Cancel(); };
+        while (!cts.IsCancellationRequested) {
+            try { r = await ws.ReceiveAsync(buf, cts.Token); }
+            catch (OperationCanceledException) { break; }
+            if (r.MessageType == WebSocketMessageType.Close) break;
+            Console.WriteLine(Encoding.UTF8.GetString(buf, 0, r.Count));
+        }
+        await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None);
+    }
+
+    static string ComputeHmac(string secret, string data)
+    {
+        using var mac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
+        return Convert.ToHexString(mac.ComputeHash(Encoding.UTF8.GetBytes(data))).ToLower();
+    }
+}`;
+
+T_uds.hmac.php = `<?php
+// composer require textalk/websocket
+require "vendor/autoload.php";
+use WebSocket\\Client;
+
+$apiKey    = "YOUR_API_KEY";
+$apiSecret = "YOUR_API_SECRET";
+$baseUrl   = "{{EP}}";
+
+$ts        = round(microtime(true) * 1000);
+$payload   = "apiKey={$apiKey}&timestamp={$ts}";
+$signature = hash_hmac("sha256", $payload, $apiSecret);
+
+$sub = json_encode([
+    "id"     => "1",
+    "method" => "userDataStream.subscribe.signature",
+    "params" => ["apiKey" => $apiKey, "timestamp" => $ts, "signature" => $signature]
+]);
+
+$ws = new Client($baseUrl);
+
+// Subscribe (no session.logon needed for HMAC)
+$ws->send($sub);
+echo "Subscribed: " . $ws->receive() . "\\n";
+
+// Listen for events
+echo "Listening for account events (Ctrl+C to stop)...\\n";
+while (true) {
+    echo $ws->receive() . "\\n";
+}`;
+
+T_uds.hmac.ruby = `# gem install websocket-client-simple
+require "websocket-client-simple"
+require "openssl"
+require "json"
+
+API_KEY    = "YOUR_API_KEY"
+API_SECRET = "YOUR_API_SECRET"
+BASE_URL   = "{{EP}}"
+
+ts         = (Time.now.to_f * 1000).round
+payload    = "apiKey=#{API_KEY}&timestamp=#{ts}"
+signature  = OpenSSL::HMAC.hexdigest("SHA256", API_SECRET, payload)
+
+subscribed = false
+ws = WebSocket::Client::Simple.connect(BASE_URL)
+
+ws.on(:open) do
+  ws.send(JSON.generate({
+    id: "1", method: "userDataStream.subscribe.signature",
+    params: { apiKey: API_KEY, timestamp: ts, signature: signature }
+  }))
+end
+
+ws.on(:message) do |e|
+  msg = JSON.parse(e.data)
+  unless subscribed
+    puts "Subscribed: #{msg}"; subscribed = true
+    puts "Listening for account events (Ctrl+C to stop)..."
+  else
+    puts "Event: #{msg}"
+  end
+end
+
+ws.on(:error) { |e| puts "Error: #{e.message}" }
+loop {}`;
+
+T_uds.hmac.typescript = `import * as crypto from "crypto";
+import WebSocket   from "ws";
+
+const API_KEY:    string = "YOUR_API_KEY";
+const API_SECRET: string = "YOUR_API_SECRET";
+const BASE_URL:   string = "{{EP}}";
+
+const timestamp: number = Date.now();
+const payload: string   = \`apiKey=\${API_KEY}&timestamp=\${timestamp}\`;
+const signature: string = crypto.createHmac("sha256", API_SECRET).update(payload).digest("hex");
+
+let subscribed = false;
+const ws = new WebSocket(BASE_URL);
+
+ws.on("open", () => {
+  ws.send(JSON.stringify({
+    id: "1",
+    method: "userDataStream.subscribe.signature",
+    params: { apiKey: API_KEY, timestamp, signature }
+  }));
+});
+
+ws.on("message", (data: WebSocket.RawData) => {
+  const msg = JSON.parse(data.toString());
+  if (!subscribed) {
+    console.log("Subscribed:", msg); subscribed = true;
+    console.log("Listening for account events (Ctrl+C to stop)...");
+  } else {
+    console.log("Event:", msg);
+  }
+});
+
+ws.on("error", (err: Error) => console.error(err));`;
+
+T_uds.hmac.rust = `// Cargo.toml:
+// tungstenite = { version = "0.24", features = ["native-tls"] }
+// hmac = "0.12"  |  sha2 = "0.10"  |  hex = "0.4"
+
+use hmac::{Hmac, Mac};
+use sha2::Sha256;
+use std::time::{SystemTime, UNIX_EPOCH};
+use tungstenite::{connect, Message};
+
+type HmacSha256 = Hmac<Sha256>;
+
+fn main() {
+    let api_key    = "YOUR_API_KEY";
+    let api_secret = "YOUR_API_SECRET";
+    let base_url   = "{{EP}}";
+
+    let ts      = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
+    let payload = format!("apiKey={}&timestamp={}", api_key, ts);
+    let mut mac = HmacSha256::new_from_slice(api_secret.as_bytes()).unwrap();
+    mac.update(payload.as_bytes());
+    let sig = hex::encode(mac.finalize().into_bytes());
+
+    let sub = format!(
+        r#"{{"id":"1","method":"userDataStream.subscribe.signature","params":{{"apiKey":"{}","timestamp":{},"signature":"{}"}}}}"#,
+        api_key, ts, sig
+    );
+
+    let (mut ws, _) = connect(base_url).unwrap();
+
+    // Subscribe (no session.logon needed for HMAC)
+    ws.send(Message::Text(sub)).unwrap();
+    println!("Subscribed: {}", ws.read().unwrap());
+
+    // Listen for events
+    println!("Listening for account events (Ctrl+C to stop)...");
+    loop {
+        match ws.read() {
+            Ok(msg) => println!("{}", msg),
+            Err(e)  => { eprintln!("Error: {}", e); break; }
+        }
+    }
+}`;
+
+T_uds.hmac.cpp = `// Requires IXWebSocket + OpenSSL. Install IXWebSocket: https://github.com/machinezone/IXWebSocket
+// Compile: g++ -std=c++17 main.cpp -lixwebsocket -lssl -lcrypto -lpthread
+#include <ixwebsocket/IXWebSocket.h>
+#include <openssl/hmac.h>
+#include <openssl/evp.h>
+#include <iostream>
+#include <iomanip>
+#include <sstream>
+#include <chrono>
+#include <thread>
+#include <atomic>
+
+std::string hmacSha256Hex(const std::string& key, const std::string& msg) {
+    unsigned char digest[EVP_MAX_MD_SIZE];
+    unsigned int  dlen = 0;
+    HMAC(EVP_sha256(), key.data(), (int)key.size(),
+         (unsigned char*)msg.data(), msg.size(), digest, &dlen);
+    std::ostringstream ss;
+    for (unsigned i = 0; i < dlen; ++i)
+        ss << std::hex << std::setw(2) << std::setfill('0') << (int)digest[i];
+    return ss.str();
+}
+
+int main() {
+    const std::string apiKey    = "YOUR_API_KEY";
+    const std::string apiSecret = "YOUR_API_SECRET";
+    const std::string baseUrl   = "{{EP}}";
+
+    auto ms      = std::chrono::duration_cast<std::chrono::milliseconds>(
+                       std::chrono::system_clock::now().time_since_epoch()).count();
+    std::string payload = "apiKey=" + apiKey + "&timestamp=" + std::to_string(ms);
+    std::string sig     = hmacSha256Hex(apiSecret, payload);
+    std::string sub     = R"({"id":"1","method":"userDataStream.subscribe.signature","params":{"apiKey":")" +
+                          apiKey + R"(","timestamp":)" + std::to_string(ms) +
+                          R"(,"signature":")" + sig + R"("}})";
+
+    std::atomic<bool> subscribed{false};
+    ix::WebSocket ws;
+    ws.setUrl(baseUrl);
+    ws.setOnMessageCallback([&](const ix::WebSocketMessagePtr& m) {
+        if (m->type == ix::WebSocketMessageType::Open) {
+            ws.send(sub);
+        }
+        if (m->type == ix::WebSocketMessageType::Message) {
+            if (!subscribed.exchange(true)) {
+                std::cout << "Subscribed: " << m->str << "\\n";
+                std::cout << "Listening for account events (Ctrl+C to stop)...\\n";
+            } else {
+                std::cout << "Event: " << m->str << "\\n";
+            }
+        }
+    });
+    ws.start();
+    std::this_thread::sleep_for(std::chrono::hours(24));
+    return 0;
+}`;
+
+T_uds.hmac.bash = `#!/bin/bash
+# Requires: websocat, openssl, jq
+API_KEY="YOUR_API_KEY"
+API_SECRET="YOUR_API_SECRET"
+BASE_URL="{{EP}}"
+
+TIMESTAMP=$(date +%s%3N)
+PAYLOAD="apiKey=\${API_KEY}&timestamp=\${TIMESTAMP}"
+SIGNATURE=$(echo -n "\$PAYLOAD" | openssl dgst -sha256 -hmac "\$API_SECRET" | awk '{print \$2}')
+
+SUBSCRIBE=\$(jq -nc --arg k "\$API_KEY" --argjson ts "\$TIMESTAMP" --arg s "\$SIGNATURE" \\
+  '{id:"1",method:"userDataStream.subscribe.signature",params:{apiKey:\$k,timestamp:\$ts,signature:\$s}}')
+
+# Subscribe then listen indefinitely
+(echo "\$SUBSCRIBE"; sleep 86400) | websocat -n "\$BASE_URL"`;
+
 T_uds.ed25519 = {};
 
 T_uds.ed25519.python = `import base64, time, json
