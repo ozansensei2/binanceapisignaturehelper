@@ -543,6 +543,50 @@
       color: #8b949e;
     }
 
+    .travel-rule-q-panel {
+      padding: 8px 12px;
+      margin: 0 8px 6px;
+      background: rgba(88, 166, 255, 0.06);
+      border: 1px solid rgba(88, 166, 255, 0.22);
+      border-radius: 6px;
+      font-size: 12px;
+      color: #c9d1d9;
+    }
+    .travel-rule-q-panel[hidden],
+    .travel-rule-q-panel.travel-rule-q-panel--hidden { display: none !important; }
+    .travel-rule-q-panel label.travel-rule-q-title {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 600;
+      color: #79c0ff;
+      letter-spacing: 0.03em;
+    }
+    .travel-rule-q-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+    .travel-rule-q-panel select.travel-rule-q-select {
+      min-width: 200px;
+      max-width: 100%;
+      background: #0d1117;
+      color: #e6edf3;
+      border: 1px solid #30363d;
+      border-radius: 5px;
+      padding: 5px 22px 5px 8px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .travel-rule-q-hint {
+      display: block;
+      margin-top: 8px;
+      font-size: 11px;
+      line-height: 1.45;
+      color: #8b949e;
+    }
+    .travel-rule-q-hint a { color: #58a6ff; }
+
     .docs-import-badge {
       font-size: 10px;
       font-weight: 600;
@@ -822,6 +866,15 @@
             <svg width="11" height="11" viewBox="0 0 12 12" fill="currentColor"><path d="M6.5 1a.5.5 0 00-1 0v4H1a.5.5 0 000 1h4.5v4a.5.5 0 001 0V6.5H11a.5.5 0 000-1H6.5V1z"/></svg>
             Add Parameter
           </button>
+        </div>
+        <div id="travel-rule-q-panel" class="travel-rule-q-panel travel-rule-q-panel--hidden" hidden aria-live="polite">
+          <span class="travel-rule-q-title" id="travel-rule-q-heading">Travel Rule · questionnaire templates</span>
+          <div class="travel-rule-q-controls">
+            <select id="travel-rule-q-region" class="travel-rule-q-select" title="Regional questionnaire JSON template">
+              <!-- options filled by JS per endpoint -->
+            </select>
+          </div>
+          <p class="travel-rule-q-hint" id="travel-rule-q-hint-p"></p>
         </div>
         <div class="params-rows" id="params-rows">
           <div class="param-fixed-row">
@@ -5300,7 +5353,9 @@ function injectExtraParams(code, lang, params) {
 
   switch (lang) {
     case 'python': {
-      const extra = params.map(p => '"' + p.key + '": "' + p.val + '"').join(', ');
+      const escPyStr = v =>
+        String(v).replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n");
+      const extra = params.map(p => '"' + p.key + '": "' + escPyStr(p.val) + '"').join(', ');
       return code.replace(
         'params       = {"timestamp": timestamp}',
         'params       = {"timestamp": timestamp, ' + extra + '}'
@@ -5630,6 +5685,321 @@ let state   = {
 };
 let extraParams = [];
 let paramIdSeed = 0;
+
+/* Travel-rule `questionnaire` JSON templates — fields follow Binance Open Platform schemas (see Binance Wallet Travel Rule questionnaire pages). Replace placeholders before production use. */
+const TRAVEL_RULE_Q_WITHDRAW_ORDER = ["japan", "kazakhstan", "newZealand", "bahrain", "uae", "india", "euPolandFrance", "southAfrica"];
+const TRAVEL_RULE_Q_DEPOSIT_ORDER = ["japan", "kazakhstan", "bahrain", "uae", "india", "euPolandFrance", "southAfrica"];
+
+const TRAVEL_RULE_WITHDRAW_QUESTIONNAIRE = {
+  japan: {
+    isAddressOwner: 1,
+    bnfType: 0,
+    kanjiName: "",
+    kanaName: "",
+    latinName: "",
+    country: "jp",
+    city: "tokyo",
+    sendTo: 1,
+    vasp: "",
+    vaspCountry: "jp",
+    vaspRegion: "other",
+    txnPurpose: 1,
+    isAttested: true,
+  },
+  kazakhstan: {
+    isAddressOwner: true,
+    bnfType: 0,
+    beneficiaryName: "",
+    beneficiaryCountry: "kz",
+    beneficiaryCity: "",
+    txnPurpose: "service",
+    txnPurposeOthers: "",
+    sendTo: 2,
+    vasp: "",
+    vaspName: "",
+    isAttested: true,
+  },
+  newZealand: {
+    isAddressOwner: 1,
+    bnfType: 0,
+    bnfName: "",
+    country: "nz",
+    bnfCorpName: "",
+    bnfCorpCountry: "",
+    sendTo: 1,
+    vasp: "",
+    vaspName: "",
+    declaration: true,
+  },
+  bahrain: {
+    isAddressOwner: 1,
+    bnfType: 0,
+    bnfFirstName: "",
+    bnfLastName: "",
+    bnfName: "",
+    country: "bh",
+    city: "",
+    sendTo: 1,
+    vasp: "",
+    vaspName: "",
+  },
+  uae: {
+    isAddressOwner: 1,
+    bnfType: 0,
+    bnfName: "",
+    country: "ae",
+    city: "",
+    sendTo: 1,
+    vasp: "",
+    vaspName: "",
+  },
+  india: {
+    isAddressOwner: 1,
+    bnfType: 0,
+    bnfName: "",
+    country: "in",
+    city: "mumbai",
+    sendTo: 1,
+    vasp: "",
+    vaspName: "",
+  },
+  euPolandFrance: {
+    isAddressOwner: 1,
+    bnfType: 0,
+    bnfFirstName: "",
+    bnfLastName: "",
+    country: "fr",
+    bnfCorpName: "",
+    bnfCorpCountry: "",
+    sendTo: 1,
+    vasp: "",
+    vaspName: "",
+    declaration: true,
+  },
+  southAfrica: {
+    isAddressOwner: 1,
+    bnfType: 0,
+    bnfName: "",
+    country: "za",
+    bnfCorpName: "",
+    bnfCorpCountry: "",
+    sendTo: 1,
+    vasp: "",
+    vaspName: "",
+    declaration: true,
+  },
+};
+
+const TRAVEL_RULE_DEPOSIT_QUESTIONNAIRE = {
+  japan: {
+    depositOriginator: 2,
+    bnfType: 0,
+    country: "jp",
+    region: "other",
+    city: "tokyo",
+    kanjiName: "",
+    kanaName: "",
+    latinName: "",
+    vaspName: "",
+    isAttested: true,
+  },
+  kazakhstan: {
+    originatorName: "",
+    country: "kz",
+    city: "",
+    txnPurpose: "service",
+    txnPurposeOthers: "",
+  },
+  bahrain: {
+    depositOriginator: 1,
+    orgType: 0,
+    orgFirstName: "",
+    orgLastName: "",
+    country: "bh",
+    city: "",
+    receiveFrom: 1,
+    vasp: "",
+    vaspName: "",
+  },
+  uae: {
+    depositOriginator: 1,
+    orgType: 0,
+    orgName: "",
+    country: "ae",
+    city: "",
+    receiveFrom: 1,
+    vasp: "",
+    vaspName: "",
+  },
+  india: {
+    depositOriginator: 1,
+    orgType: 0,
+    orgName: "",
+    pan: "",
+    country: "in",
+    state: "",
+    city: "",
+    pinCode: "",
+    address: "",
+    receiveFrom: 1,
+    vasp: "",
+    vaspName: "",
+  },
+  euPolandFrance: {
+    depositOriginator: 1,
+    orgType: 0,
+    orgFirstName: "",
+    orgLastName: "",
+    country: "fr",
+    corpName: "",
+    corpCountry: "",
+    receiveFrom: 1,
+    vasp: "",
+    vaspName: "",
+    declaration: true,
+  },
+  southAfrica: {
+    depositOriginator: 1,
+    orgType: 0,
+    orgName: "",
+    country: "za",
+    corpName: "",
+    corpCountry: "",
+    receiveFrom: 1,
+    vasp: "",
+    vaspName: "",
+    declaration: true,
+  },
+};
+
+let travelQuestionnaireUiKind = "";
+let travelQuestionnaireUiPath = "";
+
+function regionLabel(kind, key) {
+  const labs = {
+    japan: "Japan",
+    kazakhstan: "Kazakhstan",
+    newZealand: "New Zealand",
+    bahrain: "Bahrain",
+    uae: "UAE",
+    india: "India",
+    euPolandFrance: "EU (Poland, France)",
+    southAfrica: "South Africa",
+  };
+  return labs[key] || key;
+}
+
+function getActiveTravelRuleRestPathNorm() {
+  try {
+    const t = (document.getElementById("endpoint-display") || {}).textContent.trim();
+    if (!t || t === "N/A") return "";
+    const pth = new URL(t).pathname.replace(/\/+$/, "");
+    return pth || "";
+  } catch (_) {
+    return "";
+  }
+}
+
+function travelRuleQuestionnaireKindForRestPath(normPath) {
+  const low = String(normPath || "").toLowerCase();
+  if (low === "/sapi/v1/localentity/withdraw/apply") return "withdraw";
+  if (low === "/sapi/v2/localentity/deposit/provide-info") return "deposit";
+  return "";
+}
+
+/** Do not overwrite a user-edited questionnaire when (re-)opening these endpoints from docs import. */
+function travelRuleQuestionnaireValueLooksEmpty() {
+  const rows = document.querySelectorAll("#params-rows .param-row");
+  for (let x = 0; x < rows.length; x++) {
+    const row = rows[x];
+    const ki = row.querySelector(".param-key-input");
+    const vi = row.querySelector(".param-val-input");
+    if (!ki || !vi) continue;
+    if (ki.value.trim() !== "questionnaire") continue;
+    const t = vi.value.trim();
+    return !t || t === "{}";
+  }
+  return true;
+}
+
+/** Compact JSON string for `questionnaire` query param (use with urlencode — see Binance Wallet Travel Rule Withdraw / Deposit questionnaires). */
+function stringifyTravelRuleQuestionnaire(obj) {
+  return JSON.stringify(obj);
+}
+
+function upsertQuestionnaireParamRow(jsonCompactStr) {
+  const rows = document.querySelectorAll("#params-rows .param-row");
+  for (let x = 0; x < rows.length; x++) {
+    const row = rows[x];
+    const ki = row.querySelector(".param-key-input");
+    const vi = row.querySelector(".param-val-input");
+    if (!ki || !vi) continue;
+    if (ki.value.trim() === "questionnaire") {
+      vi.value = jsonCompactStr;
+      return;
+    }
+  }
+  addMandatoryParamRow("questionnaire", jsonCompactStr, "{\"…\": …} compact JSON");
+}
+
+function applyTravelRuleQuestionnairePreset(kind, regionKey) {
+  const table = kind === "withdraw" ? TRAVEL_RULE_WITHDRAW_QUESTIONNAIRE : TRAVEL_RULE_DEPOSIT_QUESTIONNAIRE;
+  const obj = table[regionKey];
+  if (!obj) return;
+  upsertQuestionnaireParamRow(stringifyTravelRuleQuestionnaire(obj));
+}
+
+function refillTravelRegionSelect(kind, selEl) {
+  if (!selEl) return;
+  const order = kind === "withdraw" ? TRAVEL_RULE_Q_WITHDRAW_ORDER : TRAVEL_RULE_Q_DEPOSIT_ORDER;
+  selEl.innerHTML = order
+    .map(k => `<option value="${escapeAttr(k)}">${escapeHtml(regionLabel(kind, k))}</option>`)
+    .join("");
+}
+
+function refreshTravelRuleQuestionnaireDock() {
+  const panel = document.getElementById("travel-rule-q-panel");
+  const sel = document.getElementById("travel-rule-q-region");
+  const hint = document.getElementById("travel-rule-q-hint-p");
+  const heading = document.getElementById("travel-rule-q-heading");
+  if (!panel || !sel || !hint || !heading) return;
+
+  const pathNorm = getActiveTravelRuleRestPathNorm();
+  const kind = travelRuleQuestionnaireKindForRestPath(pathNorm);
+
+  if (!kind) {
+    panel.classList.add("travel-rule-q-panel--hidden");
+    panel.hidden = true;
+    travelQuestionnaireUiKind = "";
+    travelQuestionnaireUiPath = "";
+    return;
+  }
+
+  panel.classList.remove("travel-rule-q-panel--hidden");
+  panel.hidden = false;
+
+  heading.textContent =
+    kind === "withdraw"
+      ? "Travel Rule — withdraw questionnaire (JSON → questionnaire param)"
+      : "Travel Rule — deposit questionnaire (JSON → questionnaire param)";
+  hint.innerHTML =
+    kind === "withdraw"
+      ? 'Templates match <a href="https://developers.binance.com/docs/wallet/travel-rule/withdraw-questionnaire" target="_blank" rel="noopener">Withdraw questionnaire content</a> by region (edit the <code>questionnaire</code> row as needed — conditional YES * fields in docs).'
+      : 'Templates match <a href="https://developers.binance.com/docs/wallet/travel-rule/deposit-questionnaire" target="_blank" rel="noopener">Deposit questionnaire content</a> by region. Endpoint: <a href="https://developers.binance.com/docs/wallet/travel-rule/deposit-provide-info-v2" target="_blank" rel="noopener">Submit Deposit Questionnaire V2</a>.';
+
+  const fingerprint = kind + "::" + pathNorm;
+  if (travelQuestionnaireUiKind !== kind) {
+    travelQuestionnaireUiKind = kind;
+    refillTravelRegionSelect(kind, sel);
+    travelQuestionnaireUiPath = "";
+  }
+
+  if (travelQuestionnaireUiPath !== fingerprint) {
+    travelQuestionnaireUiPath = fingerprint;
+    sel.selectedIndex = 0;
+    if (travelRuleQuestionnaireValueLooksEmpty()) applyTravelRuleQuestionnairePreset(kind, sel.value);
+  }
+}
 
 function resolveRestUrl(ctx) {
   const env = ctx.env;
@@ -6601,6 +6971,15 @@ function render() {
     ? (UDS_LK_NOTES[state.lang] || "")
     : ((notesMap ? (notesMap[state.auth] || {}) : {})[state.lang] || "");
 
+  document.getElementById("sel-apitype").value = state.apitype;
+  document.getElementById("sel-lang").value = state.lang;
+  document.getElementById("sel-auth").value = state.auth;
+  document.getElementById("endpoint-display").textContent = ep || "N/A";
+  document.getElementById("note-box").innerHTML           = noteStr;
+
+  refreshTravelRuleQuestionnaireDock();
+  syncExtraParamsFromParamRows();
+
   const code =
     isRest ? injectExtraParams(rawCode, state.lang, extraParams)
       : isWs ? injectWsTradingParams(rawCode, state.lang, state.auth, extraParams)
@@ -6611,12 +6990,6 @@ function render() {
   block.textContent = code;
   delete block.dataset.highlighted;
   hljs.highlightElement(block);
-
-  document.getElementById("sel-apitype").value = state.apitype;
-  document.getElementById("sel-lang").value = state.lang;
-  document.getElementById("sel-auth").value = state.auth;
-  document.getElementById("endpoint-display").textContent = ep || "N/A";
-  document.getElementById("note-box").innerHTML           = noteStr;
 
   const envBadge = document.getElementById("env-badge");
   envBadge.style.display = state.env === "testnet" ? "inline" : "none";
@@ -6634,7 +7007,7 @@ function render() {
 }
 
 /* ── Parameter management ──────────────────────────────────────────── */
-function collectParams() {
+function syncExtraParamsFromParamRows() {
   extraParams = [];
   document.querySelectorAll('#params-rows .param-row').forEach(row => {
     if (row.dataset.docOptional === "1" && row.dataset.docOptCollapsed === "1") return;
@@ -6645,6 +7018,9 @@ function collectParams() {
     const v = vi.value.trim();
     if (k) extraParams.push({ key: k, val: v });
   });
+}
+
+function collectParams() {
   render();
 }
 
@@ -6675,6 +7051,14 @@ document.getElementById("sel-market").addEventListener("change",  e => { state.m
 document.getElementById("sel-auth").addEventListener("change",    e => { state.auth    = e.target.value; render(); });
 document.getElementById("sel-lang").addEventListener("change",    e => { state.lang    = e.target.value; render(); });
 document.getElementById("add-param-btn").addEventListener("click", addParamRow);
+
+document.getElementById("travel-rule-q-region").addEventListener("change", () => {
+  const pathNorm = getActiveTravelRuleRestPathNorm();
+  const kind = travelRuleQuestionnaireKindForRestPath(pathNorm);
+  if (!kind) return;
+  applyTravelRuleQuestionnairePreset(kind, document.getElementById("travel-rule-q-region").value);
+  collectParams();
+});
 
 document.getElementById("doc-paste-toggle").addEventListener("click", () => {
   const panel = document.getElementById("doc-paste-collapsible");
