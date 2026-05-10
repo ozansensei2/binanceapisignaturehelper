@@ -2466,6 +2466,8 @@ func main() {
 }`
 
 T_ws.hmac.csharp = `using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Net.WebSockets;
 using System.Security.Cryptography;
 using System.Text;
@@ -2482,13 +2484,24 @@ class BinanceWsHmac
 
     static async Task Main()
     {
-        long   ts  = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        string qs  = "apiKey=" + ApiKey + "&timestamp=" + ts;
+        long ts = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var signSorted = new SortedDictionary<string, string>
+        {
+            ["apiKey"] = ApiKey,
+            ["timestamp"] = ts.ToString()
+        };
+        string qs = string.Join("&", signSorted.Select(kv => $"{kv.Key}={kv.Value}"));
         string sig = ComputeHmac(ApiSecret, qs);
 
+        var sendParams = new Dictionary<string, object>();
+        foreach (var kv in signSorted)
+            sendParams[kv.Key] = kv.Key == "timestamp" ? (object)ts : kv.Value;
+        sendParams["signature"] = sig;
+
         string payload = JsonSerializer.Serialize(new {
-            id = "1", method = Method,
-            @params = new { apiKey = ApiKey, signature = sig, timestamp = ts }
+            id = "1",
+            method = Method,
+            @params = sendParams
         });
 
         using var ws = new ClientWebSocket();
@@ -2520,12 +2533,17 @@ $baseUrl   = "{{EP}}";
 $method    = "{{METHOD}}";
 
 $ts        = round(microtime(true) * 1000);
-$qs        = "apiKey={$apiKey}&timestamp={$ts}";
+$signParams = ["apiKey" => $apiKey, "timestamp" => $ts];
+ksort($signParams);
+$qs        = http_build_query($signParams, "", "&", PHP_QUERY_RFC3986);
 $signature = hash_hmac("sha256", $qs, $apiSecret);
+
+$paramsSend = $signParams;
+$paramsSend["signature"] = $signature;
 
 $request = json_encode([
     "id" => "1", "method" => $method,
-    "params" => ["apiKey" => $apiKey, "signature" => $signature, "timestamp" => $ts]
+    "params" => $paramsSend
 ]);
 
 $ws = new Client($baseUrl);
@@ -2538,19 +2556,21 @@ T_ws.hmac.ruby = `# gem install websocket-client-simple
 require "websocket-client-simple"
 require "openssl"
 require "json"
+require "uri"
 
 API_KEY    = "YOUR_API_KEY"
 API_SECRET = "YOUR_API_SECRET"
 BASE_URL   = "{{EP}}"
 METHOD     = "{{METHOD}}"
 
-ts        = (Time.now.to_f * 1000).round
-qs        = "apiKey=#{API_KEY}&timestamp=#{ts}"
-signature = OpenSSL::HMAC.hexdigest("SHA256", API_SECRET, qs)
+ts          = (Time.now.to_f * 1000).round
+sign_params = { "apiKey" => API_KEY, "timestamp" => ts }
+qs          = URI.encode_www_form(sign_params.sort)
+signature   = OpenSSL::HMAC.hexdigest("SHA256", API_SECRET, qs)
 
 request = JSON.generate({
   id: "1", method: METHOD,
-  params: { apiKey: API_KEY, signature: signature, timestamp: ts }
+  params: sign_params.merge("signature" => signature)
 })
 
 ws = WebSocket::Client::Simple.connect(BASE_URL)
@@ -2872,6 +2892,8 @@ func main() {
 }`;
 
 T_ws.rsa.csharp = `using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Net.WebSockets;
 using System.Security.Cryptography;
 using System.Text;
@@ -2891,13 +2913,24 @@ class BinanceWsRsa
         using var rsa = RSA.Create();
         rsa.ImportFromPem(pem);
 
-        long   ts  = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        string qs  = "apiKey=" + ApiKey + "&timestamp=" + ts;
+        long ts = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var signSorted = new SortedDictionary<string, string>
+        {
+            ["apiKey"] = ApiKey,
+            ["timestamp"] = ts.ToString()
+        };
+        string qs = string.Join("&", signSorted.Select(kv => $"{kv.Key}={kv.Value}"));
         string sig = Convert.ToBase64String(rsa.SignData(Encoding.UTF8.GetBytes(qs), HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1));
 
+        var sendParams = new Dictionary<string, object>();
+        foreach (var kv in signSorted)
+            sendParams[kv.Key] = kv.Key == "timestamp" ? (object)ts : kv.Value;
+        sendParams["signature"] = sig;
+
         string payload = JsonSerializer.Serialize(new {
-            id = "1", method = Method,
-            @params = new { apiKey = ApiKey, signature = sig, timestamp = ts }
+            id = "1",
+            method = Method,
+            @params = sendParams
         });
 
         using var ws = new ClientWebSocket();
@@ -2923,14 +2956,19 @@ $method   = "{{METHOD}}";
 
 $privateKey = openssl_pkey_get_private(file_get_contents("private_key.pem"));
 $ts         = round(microtime(true) * 1000);
-$qs         = "apiKey={$apiKey}&timestamp={$ts}";
+$signParams = ["apiKey" => $apiKey, "timestamp" => $ts];
+ksort($signParams);
+$qs         = http_build_query($signParams, "", "&", PHP_QUERY_RFC3986);
 
 openssl_sign($qs, $sig, $privateKey, OPENSSL_ALGO_SHA256);
 $signature = base64_encode($sig);
 
+$paramsSend = $signParams;
+$paramsSend["signature"] = $signature;
+
 $request = json_encode([
     "id" => "1", "method" => $method,
-    "params" => ["apiKey" => $apiKey, "signature" => $signature, "timestamp" => $ts]
+    "params" => $paramsSend
 ]);
 
 $ws = new Client($baseUrl);
@@ -2944,6 +2982,7 @@ require "websocket-client-simple"
 require "openssl"
 require "base64"
 require "json"
+require "uri"
 
 API_KEY   = "YOUR_API_KEY"
 BASE_URL  = "{{EP}}"
@@ -2951,12 +2990,13 @@ METHOD    = "{{METHOD}}"
 
 private_key = OpenSSL::PKey::RSA.new(File.read("private_key.pem"))
 ts          = (Time.now.to_f * 1000).round
-qs          = "apiKey=#{API_KEY}&timestamp=#{ts}"
+sign_params = { "apiKey" => API_KEY, "timestamp" => ts }
+qs          = URI.encode_www_form(sign_params.sort)
 signature   = Base64.strict_encode64(private_key.sign(OpenSSL::Digest::SHA256.new, qs))
 
 request = JSON.generate({
   id: "1", method: METHOD,
-  params: { apiKey: API_KEY, signature: signature, timestamp: ts }
+  params: sign_params.merge("signature" => signature)
 })
 
 ws = WebSocket::Client::Simple.connect(BASE_URL)
@@ -3498,7 +3538,8 @@ int main() {
     std::string sig     = signEd25519Base64(payload);
     std::string logon   = R"({"id":"logon","method":"session.logon","params":{"apiKey":")" +
                           apiKey + R"(","signature":")" + sig + R"(","timestamp":)" + std::to_string(ms) + "}}";
-    std::string req     = R"({"id":"1","method":")" + method + R"(","params":{}})";
+    std::string tradeParamsJson = R"({})";
+    std::string req     = R"({"id":"1","method":")" + method + R"(","params":)" + tradeParamsJson + ")";
 
     std::atomic<bool> loggedIn{false};
     ix::WebSocket ws;
@@ -5004,7 +5045,28 @@ function injectExtraParams(code, lang, params) {
   }
 }
 
-/** Merge UI parameters into WebSocket API signed request templates (HMAC/RSA: signing map; Ed25519: post-logon params). */
+function wsSanitizeCSharpId(key) {
+  const k = String(key || "");
+  const s = /^[a-zA-Z_]/.test(k) ? k : "_" + k;
+  return s.replace(/[^a-zA-Z0-9_]/g, "_");
+}
+
+function wsPhpSingleQuoted(val) {
+  return String(val).replace(/\\/g, "\\\\").replace(/'/g, "'\\''");
+}
+
+function wsCsharpAnonymousPairs(params, escJs) {
+  return params.map(p => wsSanitizeCSharpId(p.key) + ' = "' + escJs(p.val) + '"').join(", ");
+}
+
+function wsSortedJsonObjectString(params) {
+  const o = {};
+  [...params].sort((a, b) => String(a.key).localeCompare(String(b.key))).forEach(p => {
+    o[String(p.key)] = String(p.val);
+  });
+  return JSON.stringify(o);
+}
+
 function injectWsTradingParams(code, lang, auth, params) {
   if (!params || params.length === 0) return code;
   const escPy = s => String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
@@ -5014,7 +5076,8 @@ function injectWsTradingParams(code, lang, auth, params) {
   const rbInner = params.map(p => p.key + ': "' + escPy(p.val) + '"').join(", ");
 
   if (auth === "ed25519") {
-    if (lang === "python" && pyInner) {
+    const jp = params.map(p => '\\"' + escPy(p.key) + '\\":\\"' + escPy(p.val) + '\\"').join(",");
+    if (lang === "python" && jp) {
       code = code.replace('{"id": "1", "method": "{{METHOD}}", "params": {}}', '{"id": "1", "method": "{{METHOD}}", "params": {' + pyInner + "}}");
     } else if ((lang === "javascript" || lang === "typescript") && jsInner) {
       code = code.replace("method: METHOD, params: {}", "method: METHOD, params: { " + jsInner + " }");
@@ -5023,6 +5086,75 @@ function injectWsTradingParams(code, lang, auth, params) {
         'JSON.generate({ id: "1", method: METHOD, params: {} })',
         'JSON.generate({ id: "1", method: METHOD, params: { ' + rbInner + " } })"
       );
+    } else if (lang === "java" && jp) {
+      code = code.replace(
+        'String req = String.format("{\\"id\\":\\"1\\",\\"method\\":\\"%s\\",\\"params\\":{}}", METHOD);',
+        'String req = String.format("{\\"id\\":\\"1\\",\\"method\\":\\"%s\\",\\"params\\":{' +
+          jp +
+          '}}", METHOD);'
+      );
+    } else if (lang === "csharp" && jsInner) {
+      code = code.replace("@params = new { }", "@params = new { " + wsCsharpAnonymousPairs(params, escJs) + " }");
+    } else if (lang === "go" && jp) {
+      const trades = [...params].sort((a, b) => String(a.key).localeCompare(String(b.key)));
+      const goKv = trades.map(p => '\n\t\t"' + escPy(p.key) + '": "' + escPy(String(p.val)) + '"').join(",");      code = code.replace(
+        `\treq, _ := json.Marshal(map[string]interface{}{"id": "1", "method": wsMethod, "params": map[string]interface{}{}})`,
+        `\ttradeParams := map[string]interface{}{` +
+          goKv +
+          `\n\t}\n\treq, _ := json.Marshal(map[string]interface{}{"id": "1", "method": wsMethod, "params": tradeParams})`
+      );
+    } else if (lang === "php" && jp) {
+      const lit = [...params].sort((a, b) => String(a.key).localeCompare(String(b.key)))
+        .map(p => "'" + wsPhpSingleQuoted(p.key) + "' => '" + wsPhpSingleQuoted(String(p.val)) + "'")
+        .join(", ");
+      code = code.replace(
+        `$ws->send(json_encode(["id" => "1", "method" => $method, "params" => new stdClass()]));`,
+        `$ws->send(json_encode(["id" => "1", "method" => $method, "params" => [` + lit + `]));`
+      );
+    } else if (lang === "rust" && jp) {
+      const innerJson = wsSortedJsonObjectString(params);
+      let h = 2;
+      for (; h <= 48; h++) {
+        const cap = '"' + "#".repeat(h);
+        if (!innerJson.includes(cap)) break;
+      }
+      const m = "#".repeat(h);
+      code = code.replace(
+        `    let req = format!(r#"{{"id":"1","method":"{}","params":{{}}}}"#, method);`,
+        `    let trade_params_json: &str = r` +
+          m +
+          `"` +
+          innerJson +
+          `"` +
+          m +
+          `;\n    let req = format!("{{\\"id\\":\\"1\\",\\"method\\":\\"{}\\",\\"params\\":{}}}", method, trade_params_json);\n`
+      );
+    } else if (lang === "cpp" && jp) {
+      let innerCpp = wsSortedJsonObjectString(params);
+      if (/\)EOS/.test(innerCpp)) innerCpp = innerCpp.replace(/\)/g, "\\u0029");
+      code = code.replace(
+        `std::string tradeParamsJson = R"({})";`,
+        `std::string tradeParamsJson = R"EOS(` + innerCpp + `)EOS";`
+      );
+    } else if (lang === "bash" && jp) {
+      const bashKv = [...params].sort((a, b) => String(a.key).localeCompare(String(b.key)))
+        .map(p => '\\"' + escPy(p.key) + '\\":\\"' + escPy(String(p.val)) + '\\"')
+        .join(",");
+      const oldReq =
+        "REQUEST='" +
+        '{"id":"1","method":"' +
+        "'${METHOD}'" +
+        '","params":{}}' +
+        "'";
+      const newReq =
+        "REQUEST='" +
+        '{"id":"1","method":"' +
+        "'${METHOD}'" +
+        '","params":{' +
+        bashKv +
+        "}}" +
+        "'";
+      code = code.replace(oldReq, newReq);
     }
     return code;
   }
@@ -5064,6 +5196,50 @@ function injectWsTradingParams(code, lang, auth, params) {
     const extraGo = params.map(p => '\t\t"' + p.key + '": "' + escPy(p.val) + '",\n').join("");
     if (extraGo) {
       code = code.replace(/(\t\t"timestamp":\s+ts,)\s*\n(\t\})/, "$1\n" + extraGo + "$2");
+    }
+    return code;
+  }
+
+  if ((auth === "hmac" || auth === "rsa") && lang === "csharp") {
+    const escC = s =>
+      String(s)
+        .replace(/\\/g, "\\\\")
+        .replace(/"/g, '\\"');
+    const extraLines = [...params]
+      .sort((a, b) => String(a.key).localeCompare(String(b.key)))
+      .map(p => `            ["${escC(p.key)}"] = "${escC(String(p.val))}"`)
+      .join(",\n");
+    if (extraLines) {
+      code = code.replace('["timestamp"] = ts.ToString()', '["timestamp"] = ts.ToString(),\n' + extraLines);
+    }
+    return code;
+  }
+
+  if ((auth === "hmac" || auth === "rsa") && lang === "php") {
+    const phpExtra = [...params]
+      .sort((a, b) => String(a.key).localeCompare(String(b.key)))
+      .map(p => "'" + wsPhpSingleQuoted(String(p.key)) + "' => '" + wsPhpSingleQuoted(String(p.val)) + "'")
+      .join(", ");
+    if (phpExtra) {
+      code = code.replace(
+        '$signParams = ["apiKey" => $apiKey, "timestamp" => $ts];',
+        '$signParams = ["apiKey" => $apiKey, "timestamp" => $ts, ' + phpExtra + "];"
+      );
+    }
+    return code;
+  }
+
+  if ((auth === "hmac" || auth === "rsa") && lang === "ruby") {
+    const escRb = s => String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    const rbExtra = [...params]
+      .sort((a, b) => String(a.key).localeCompare(String(b.key)))
+      .map(p => '"' + escRb(p.key) + '" => "' + escRb(String(p.val)) + '"')
+      .join(", ");
+    if (rbExtra) {
+      code = code.replace(
+        'sign_params = { "apiKey" => API_KEY, "timestamp" => ts }',
+        'sign_params = { "apiKey" => API_KEY, "timestamp" => ts, ' + rbExtra + " }"
+      );
     }
     return code;
   }
