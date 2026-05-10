@@ -51,14 +51,14 @@
     }
 
     .layout-root {
-      max-width: 1280px;
+      max-width: 1360px;
       margin: 32px auto;
       padding: 0 24px 48px;
     }
 
     .main-workspace {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1.22fr);
+      grid-template-columns: minmax(0, 0.74fr) minmax(0, 1.4fr);
       gap: 20px;
       align-items: start;
     }
@@ -130,6 +130,22 @@
     .doc-fetch-btn:disabled {
       opacity: 0.55;
       cursor: not-allowed;
+    }
+
+    .doc-url-row .docs-reset-btn {
+      flex-shrink: 0;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #8b949e;
+      text-decoration: none;
+    }
+    .doc-url-row .docs-reset-btn:hover {
+      border-color: #58a6ff;
+      color: #58a6ff;
     }
 
     .doc-fetch-hint {
@@ -729,6 +745,7 @@
         <div class="doc-url-row">
           <input type="url" class="doc-url-input" id="doc-url-input" placeholder="https://developers.binance.com/docs/..." autocomplete="off" spellcheck="false">
           <button type="button" class="doc-fetch-btn" id="doc-fetch-btn">Fetch</button>
+          <button type="button" class="docs-reset-btn" id="doc-reset-btn">Clear doc endpoint</button>
         </div>
         <p class="doc-fetch-hint">This step can take a while (often 30–90 seconds through the proxy). If it fails, tap <strong>Manually paste doc</strong>, paste the page text there, then use Parse.</p>
         <div id="doc-fetch-loading" class="doc-fetch-loading" role="status" aria-live="polite" aria-busy="false">
@@ -746,7 +763,6 @@
             <textarea id="doc-paste-text" spellcheck="false" placeholder='Paste excerpt: POST /fapi/v1/order and Parameters table — mandatory YES rows appear below. STRING / ENUM placeholders as hint &quot;&quot;.'></textarea>
             <div class="doc-actions">
               <button type="button" class="docs-parse-btn" id="doc-parse-btn">Parse &amp; fill</button>
-              <button type="button" class="docs-reset-btn" id="doc-reset-btn">Clear doc endpoint</button>
             </div>
           </div>
         </div>
@@ -5766,7 +5782,8 @@ document.getElementById("doc-parse-btn").addEventListener("click", () => {
 });
 document.getElementById("doc-reset-btn").addEventListener("click", () => {
   clearDocsImport();
-  render();
+  document.querySelectorAll("#params-rows .param-row").forEach(row => row.remove());
+  collectParams();
 });
 
 document.getElementById("pdf-btn").addEventListener("click", async () => {
