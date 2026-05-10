@@ -4963,6 +4963,32 @@ function extractDocUrlFragment(docPageUrl) {
   return "";
 }
 
+/** Hash from docs URL bar, or Jina’s first line `Source URL: …#anchor` when pasted text omits URL field. */
+function extractMergedDocsFragment(docPageUrl, rawPasteText) {
+  const fromBar = extractDocUrlFragment(docPageUrl || "");
+  if (fromBar) return fromBar;
+  const n = (rawPasteText || "").replace(/\r\n/g, "\n");
+  const ml = /^Source URL:\s*(.+)\s*$/mi.exec(n);
+  if (!ml) return "";
+  return extractDocUrlFragment(ml[1].trim());
+}
+
+/** Full docs URL when URL bar empty but pasted Jina text has `Source URL: …`. */
+function extractMergedDocsPageUrl(docPageUrl, rawPasteText) {
+  const u = (docPageUrl || "").trim();
+  if (u) return u;
+  const n = (rawPasteText || "").replace(/\r\n/g, "\n");
+  const ml = /^Source URL:\s*(.+)\s*$/mi.exec(n);
+  return ml ? ml[1].trim() : "";
+}
+
+/** Invisible chars + MDX-style `{#anchor}` so `#new-order-trade` ↔ `New order (TRADE){#…}`. */
+function prepareMarkdownHeadingTitleForSlug(raw) {
+  let s = String(raw || "").replace(/[\u200b-\u200d\ufeff]/g, "");
+  s = s.replace(/\{#[^}]+\}/g, "");
+  return s.trim();
+}
+
 /**
  * When a docs page bundles many endpoints under one fetched document, anchor to one section only.
  * E.g. https://developers.binance.com/docs/.../general-endpoints#exchange-information — keep the
@@ -4994,6 +5020,77 @@ function narrowDocPasteByHtmlAnchorId(norm, slug) {
   return slice.length > 0 ? slice : null;
 }
 
+/** Last Markdown heading line strictly before absolute index upto. */
+function findLastMarkdownHeadingLineStart(norm, upto) {
+  const max = Math.min(norm.length, Math.max(0, upto));
+  let last = -1;
+  let lineStart = 0;
+  for (let i = 0; i < max; i++) {
+    if (norm[i] === "\n") {
+      const ln = norm.slice(lineStart, i);
+      if (/^#{1,6}\s/.test(ln)) last = lineStart;
+      lineStart = i + 1;
+    }
+  }
+  const tail = norm.slice(lineStart, max);
+  if (/^#{1,6}\s/.test(tail)) last = lineStart;
+  return last;
+}
+
+function collectMarkdownHeadingIndex(norm) {
+  /** @type {{ index:number, level:number, titleSlug:string }[]} */
+  const headings = [];
+  const re = /^(#{1,6})\s+(.+)$/gm;
+  let mh;
+  while ((mh = re.exec(norm)) !== null) {
+    const level = mh[1].length;
+    let titleRaw = mh[2].trim().replace(/\s+#+\s*$/, "").trim();
+    titleRaw = titleRaw.replace(/[#*`]+$/g, "").trim();
+    titleRaw = prepareMarkdownHeadingTitleForSlug(titleRaw);
+    const titleSlug = slugifyDocHeading(titleRaw);
+    headings.push({ index: mh.index, level, titleSlug });
+  }
+  return headings;
+}
+
+function sliceMarkdownHeadingSection(norm, headings, idx) {
+  const start = headings[idx].index;
+  const startLevel = headings[idx].level;
+  let end = norm.length;
+  for (let j = idx + 1; j < headings.length; j++) {
+    if (headings[j].level <= startLevel) {
+      end = headings[j].index;
+      break;
+    }
+  }
+  const slice = norm.slice(start, end).trim();
+  return slice.length > 0 ? slice : null;
+}
+
+function narrowMarkdownBySlugHeadings(norm, slug, requireFirstHeadingIsMatch) {
+  const headings = collectMarkdownHeadingIndex(norm);
+  const matchIdx = headings.findIndex(h => h.titleSlug === slug);
+  if (matchIdx < 0) return null;
+  if (requireFirstHeadingIsMatch && matchIdx !== 0) return null;
+  return sliceMarkdownHeadingSection(norm, headings, matchIdx);
+}
+
+/** `id="…"` on markup before headings in some crawls — rewind to preceding `### …` slice. */
+function narrowDocPasteByBareHtmlId(norm, slug) {
+  if (!slug || !norm) return null;
+  const esc = slug.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp('\\bid\\s*=\\s*["\']' + esc + '["\']', "gi");
+  let mb;
+  while ((mb = re.exec(norm)) !== null) {
+    const sliceStart = findLastMarkdownHeadingLineStart(norm, mb.index);
+    if (sliceStart < 0) continue;
+    const sub = norm.slice(sliceStart).replace(/^[ \t]+/m, "");
+    const narrowed = narrowMarkdownBySlugHeadings(sub, slug, true);
+    if (narrowed) return narrowed;
+  }
+  return null;
+}
+
 function narrowDocPasteByUrlFragment(fullText, fragment) {
   if (!fragment || !fullText) return null;
   const slug = slugifyDocHeading(fragment);
@@ -5001,46 +5098,13 @@ function narrowDocPasteByUrlFragment(fullText, fragment) {
 
   const norm = fullText.replace(/\r\n/g, "\n");
 
-  /** @type {{ index:number, level:number, titleSlug:string }[]} */
-  const headings = [];
-  const re = /^(#{1,6})\s+(.+?)\s*$/gm;
-  let mh;
-  while ((mh = re.exec(norm)) !== null) {
-    const level = mh[1].length;
-    let titleRaw = mh[2].trim().replace(/\s+#+\s*$/, "").trim();
-    titleRaw = titleRaw.replace(/[#*`]+$/g, "").trim();
-    const titleSlug = slugifyDocHeading(titleRaw);
-    headings.push({
-      index: mh.index,
-      level,
-      titleSlug
-    });
-  }
+  let narrowed = narrowMarkdownBySlugHeadings(norm, slug, false);
+  if (narrowed) return narrowed;
 
-  let matchIdx = -1;
-  for (let i = 0; i < headings.length; i++) {
-    const ts = headings[i].titleSlug;
-    if (ts && ts === slug) {
-      matchIdx = i;
-      break;
-    }
-  }
+  narrowed = narrowDocPasteByHtmlAnchorId(norm, slug);
+  if (narrowed) return narrowed;
 
-  if (matchIdx >= 0) {
-    const start = headings[matchIdx].index;
-    const startLevel = headings[matchIdx].level;
-    let end = norm.length;
-    for (let j = matchIdx + 1; j < headings.length; j++) {
-      if (headings[j].level <= startLevel) {
-        end = headings[j].index;
-        break;
-      }
-    }
-    const slice = norm.slice(start, end).trim();
-    if (slice.length > 0) return slice;
-  }
-
-  return narrowDocPasteByHtmlAnchorId(norm, slug);
+  return narrowDocPasteByBareHtmlId(norm, slug);
 }
 
 function parseBinanceDocsPaste(text) {
@@ -5153,7 +5217,8 @@ function applyDocsImportFromText(rawText, alertEmpty, docPageUrl) {
     return false;
   }
 
-  const frag = extractDocUrlFragment(docPageUrl || "");
+  const frag = extractMergedDocsFragment(docPageUrl || "", rawText || "");
+  const docUrlGuess = extractMergedDocsPageUrl(docPageUrl || "", rawText || "");
   let body = (rawText || "").replace(/\r\n/g, "\n");
   if (frag) {
     const narrowed = narrowDocPasteByUrlFragment(body, frag);
@@ -5178,7 +5243,7 @@ function applyDocsImportFromText(rawText, alertEmpty, docPageUrl) {
   }
 
   const fromPath = hasEp ? inferMarketFromPath(parsed.path) : null;
-  const fromUrl = inferMarketFromDocUrl(docPageUrl || "");
+  const fromUrl = inferMarketFromDocUrl(docUrlGuess);
   const inferred = inferMarketCombined(fromPath, fromUrl);
   syncMarketOptions();
   const available = MARKET_AVAILABLE.rest[state.env] || [];
