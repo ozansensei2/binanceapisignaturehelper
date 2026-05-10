@@ -51,16 +51,25 @@
     }
 
     .layout-root {
-      max-width: min(1720px, 100%);
+      max-width: 1360px;
       margin: 32px auto;
       padding: 0 24px 48px;
     }
 
+    .layout-root.layout-root--questionnaire-wide {
+      max-width: min(1720px, 100%);
+    }
+
     .main-workspace {
       display: grid;
+      grid-template-columns: minmax(0, 0.74fr) minmax(0, 1.4fr);
+      gap: 20px;
+      align-items: start;
+    }
+
+    .main-workspace.main-workspace--questionnaire-wide {
       grid-template-columns: minmax(380px, 1.08fr) minmax(0, 1fr);
       gap: 24px;
-      align-items: start;
     }
 
     @media (max-width: 920px) {
@@ -378,10 +387,14 @@
 
     .endpoint-url {
       font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', Consolas, monospace;
-      font-size: 13.5px;
-      line-height: 1.45;
+      font-size: 13px;
       color: #79c0ff;
       word-break: break-all;
+    }
+
+    .main-workspace--questionnaire-wide .endpoint-url {
+      font-size: 13.5px;
+      line-height: 1.45;
       flex: 1 1 min(100%, 360px);
       min-width: 0;
     }
@@ -660,9 +673,14 @@
     .param-row,
     .param-fixed-row {
       display: grid;
-      grid-template-columns: 32px minmax(120px, 1fr) minmax(140px, 1.35fr) auto;
+      grid-template-columns: 32px 1fr 1fr auto;
       gap: 6px;
       align-items: center;
+    }
+
+    .main-workspace--questionnaire-wide .param-row,
+    .main-workspace--questionnaire-wide .param-fixed-row {
+      grid-template-columns: 32px minmax(120px, 1fr) minmax(140px, 1.35fr) auto;
     }
 
     .param-eye-spacer {
@@ -738,6 +756,10 @@
       margin-top: 6px;
     }
     .param-row.param-row--qnest-root {
+      grid-template-columns: 32px minmax(100px, 0.92fr) minmax(0, 1fr) auto;
+    }
+
+    .main-workspace--questionnaire-wide .param-row.param-row--qnest-root {
       grid-template-columns: 32px minmax(112px, 0.82fr) minmax(260px, 1.85fr) auto;
     }
     .param-qnest-wrap {
@@ -8094,6 +8116,30 @@ function syncMarketOptions() {
 /* ── Render ────────────────────────────────────────────────────────── */
 let isEditing = false;
 
+function questionnaireParamRowPresent() {
+  const rows = document.querySelectorAll("#params-rows .param-row");
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const ki = row.querySelector(".param-key-input");
+    if (ki && paramUsesJsonQuestionnaire(ki.value.trim())) return true;
+    if (paramUsesJsonQuestionnaire(row.dataset.docKey)) return true;
+    if (row.dataset.docOptional === "1" && row.dataset.docOptCollapsed === "1") {
+      const ok = row.querySelector(".param-opt-key");
+      if (ok && paramUsesJsonQuestionnaire(ok.textContent.trim())) return true;
+    }
+  }
+  return false;
+}
+
+function syncQuestionnaireWideLayoutMode() {
+  const root = document.querySelector(".layout-root");
+  const mw = document.querySelector(".main-workspace");
+  if (!root || !mw) return;
+  const wide = questionnaireParamRowPresent();
+  root.classList.toggle("layout-root--questionnaire-wide", wide);
+  mw.classList.toggle("main-workspace--questionnaire-wide", wide);
+}
+
 function render() {
   if (isEditing) return;
   syncMarketOptions();
@@ -8164,6 +8210,7 @@ function render() {
     LANG_NAMES[state.lang] + "  |  " + AUTH_NAMES[state.auth] + "  |  " +
     (isUds ? "User Data Stream" : isWs ? "WebSocket API" : "REST API") + "  |  " + marketLabels[state.market];
   document.getElementById("print-ep").textContent = ep;
+  syncQuestionnaireWideLayoutMode();
 }
 
 /* ── Parameter management ──────────────────────────────────────────── */
