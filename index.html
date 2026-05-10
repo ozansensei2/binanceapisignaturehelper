@@ -6135,27 +6135,94 @@ function normalizeDocMandatoryCell(s) {
     .toUpperCase();
 }
 
+/** Binance REST path segment (drops trailing punctuation from pasted docs). */
+function normalizeImportedDocRestPath(raw) {
+  return String(raw || "")
+    .replace(/[.,;:]+$/, "")
+    .replace(/\)+$/g, "")
+    .replace(/`+$/g, "")
+    .trim();
+}
+
+/**
+ * Text immediately under the Markdown "HTTP Request" heading — avoids picking
+ * unrelated `Get /sapi/...` cross-references in blockquotes later on the page.
+ */
+function sliceBinanceHttpRequestBlock(normIn) {
+  const norm = (normIn || "").replace(/\r\n/g, "\n");
+  const hdr = /(?:^|\n)(?:#+\s*)(?:\*{2})?\s*HTTP\s+Request(?:\*{2})?\b[^\n\r]*/i;
+  const m = hdr.exec(norm);
+  if (!m) return "";
+  let tail = norm.slice(m.index + m[0].length);
+  let end = tail.search(/\n(?:#+\s*)(?:\*{2})?[ \t]*(API\s|Description|HTTP\s|Endpoint|Request\s+Weight|Weight|Parameters|Response|Notes?|Examples?)/i);
+  if (end < 0 || end > 4096) end = Math.min(tail.length, 1400);
+  return tail.slice(0, end);
+}
+
+function extractBinanceVerbPathRestFromSnippet(snippet) {
+  const s = (snippet || "").replace(/\r\n/g, "\n");
+  if (!s) return null;
+  const ticked =
+    /\b(GET|POST|PUT|DELETE|PATCH)\s+[`'"]((?:\/(?:api|fapi|dapi|papi|eapi|sapi)\/[^`'"\r\n]+))[`'"]/i.exec(
+      s
+    );
+  let m = ticked;
+  if (!m)
+    m = /\b(GET|POST|PUT|DELETE|PATCH)\s+(\/(?:api|fapi|dapi|papi|eapi|sapi)\/[^\s`'")\]]+)/i.exec(
+      s
+    );
+  if (!m) return null;
+  return { method: m[1].toUpperCase(), path: normalizeImportedDocRestPath(m[2]) };
+}
+
+/** Drop Markdown blockquote lines (notes often say `Get /sapi/v1/other/endpoint`). */
+function stripMarkdownBlockquoteLines(normIn) {
+  return (normIn || "")
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .filter(line => !/^\s*>[\s>]?/.test(line))
+    .join("\n");
+}
+
 function parseBinanceDocsPaste(text) {
   const out = { method: null, path: null, rows: [], wsRpcMethod: null };
   const norm = text.replace(/\r\n/g, "\n");
 
-  const mVerb = norm.match(/\b(GET|POST|PUT|DELETE|PATCH)\s+(\/[^\s`'")\]]+)/i);
-  if (mVerb) {
-    out.method = mVerb[1].toUpperCase();
-    out.path = mVerb[2].replace(/[.,;:]+$/, "");
+  const httpSnippet = sliceBinanceHttpRequestBlock(norm);
+  const fromHttp = httpSnippet ? extractBinanceVerbPathRestFromSnippet(httpSnippet) : null;
+  if (fromHttp) {
+    out.method = fromHttp.method;
+    out.path = fromHttp.path;
+  }
+
+  let searchNorm = stripMarkdownBlockquoteLines(norm);
+
+  const mVerb = /\b(GET|POST|PUT|DELETE|PATCH)\s+(\/(?:api|fapi|dapi|papi|eapi|sapi)\/[^\s`'")\]]+)/i.exec(
+    searchNorm
+  );
+  if (!out.method || !out.path) {
+    if (mVerb) {
+      out.method = mVerb[1].toUpperCase();
+      out.path = normalizeImportedDocRestPath(mVerb[2]);
+    }
   }
 
   if (!out.path || !out.method) {
-    const tick = norm.match(/\b(GET|POST|PUT|DELETE|PATCH)\s+[`'"](\/[^`'"\r\n]+)[`'"]/im);
+    const tick =
+      /\b(GET|POST|PUT|DELETE|PATCH)\s+[`'"]((?:\/(?:api|fapi|dapi|papi|eapi|sapi)\/[^`'"\r\n]+))[`'"]/im.exec(
+        searchNorm
+      );
     if (tick) {
       out.method = tick[1].toUpperCase();
-      out.path = tick[2].replace(/[.,;:]+$/, "");
+      out.path = normalizeImportedDocRestPath(tick[2]);
     }
   }
 
   if (!out.path) {
-    const onlyPath = norm.match(/(?:^|\n)\s*(\/(?:api|fapi|dapi|papi|eapi|sapi)\/[^\s`'")\]]+)/i);
-    if (onlyPath) out.path = onlyPath[1].replace(/[.,;:]+$/, "");
+    const onlyPath = /(?:^|\n)\s*(\/(?:api|fapi|dapi|papi|eapi|sapi)\/[^\s`'")\]]+)/i.exec(
+      searchNorm
+    );
+    if (onlyPath) out.path = normalizeImportedDocRestPath(onlyPath[1]);
   }
 
   let paramBlock = norm;
