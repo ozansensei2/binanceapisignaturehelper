@@ -51,15 +51,15 @@
     }
 
     .layout-root {
-      max-width: 1360px;
+      max-width: min(1720px, 100%);
       margin: 32px auto;
       padding: 0 24px 48px;
     }
 
     .main-workspace {
       display: grid;
-      grid-template-columns: minmax(0, 0.74fr) minmax(0, 1.4fr);
-      gap: 20px;
+      grid-template-columns: minmax(380px, 1.08fr) minmax(0, 1fr);
+      gap: 24px;
       align-items: start;
     }
 
@@ -378,9 +378,12 @@
 
     .endpoint-url {
       font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', Consolas, monospace;
-      font-size: 13px;
+      font-size: 13.5px;
+      line-height: 1.45;
       color: #79c0ff;
       word-break: break-all;
+      flex: 1 1 min(100%, 360px);
+      min-width: 0;
     }
 
     .code-container {
@@ -657,7 +660,7 @@
     .param-row,
     .param-fixed-row {
       display: grid;
-      grid-template-columns: 32px 1fr 1fr auto;
+      grid-template-columns: 32px minmax(120px, 1fr) minmax(140px, 1.35fr) auto;
       gap: 6px;
       align-items: center;
     }
@@ -735,7 +738,7 @@
       margin-top: 6px;
     }
     .param-row.param-row--qnest-root {
-      grid-template-columns: 32px minmax(100px, 0.92fr) minmax(0, 1fr) auto;
+      grid-template-columns: 32px minmax(112px, 0.82fr) minmax(260px, 1.85fr) auto;
     }
     .param-qnest-wrap {
       display: flex;
