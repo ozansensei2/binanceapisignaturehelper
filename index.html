@@ -50,10 +50,149 @@
       margin-top: 2px;
     }
 
-    main {
-      max-width: 980px;
+    .layout-root {
+      max-width: 1580px;
       margin: 32px auto;
       padding: 0 24px 48px;
+    }
+
+    .app-split {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 20px;
+      align-items: start;
+    }
+
+    @media (max-width: 1100px) {
+      .app-split { grid-template-columns: 1fr; }
+    }
+
+    .pane {
+      min-width: 0;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      background: #0d1117;
+      overflow: hidden;
+    }
+
+    .pane-classic {
+      background: transparent;
+      border: none;
+      border-radius: 0;
+    }
+
+    .pane-head {
+      padding: 12px 16px;
+      background: #161b22;
+      border-bottom: 1px solid #30363d;
+    }
+
+    .pane-classic .pane-head {
+      background: #161b22;
+      border-radius: 8px 8px 0 0;
+      border: 1px solid #30363d;
+      border-bottom: 1px solid #30363d;
+    }
+
+    .pane-head h2 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #e6edf3;
+      letter-spacing: 0.02em;
+    }
+
+    .pane-head p {
+      font-size: 12px;
+      color: #8b949e;
+      margin-top: 4px;
+      line-height: 1.45;
+    }
+
+    .pane-body {
+      padding: 16px 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .pane-classic .pane-body {
+      padding: 16px 0 0;
+    }
+
+    .doc-url-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: stretch;
+      margin-top: 6px;
+    }
+
+    .doc-url-input {
+      flex: 1;
+      min-width: 160px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 12px;
+      color: #e6edf3;
+      font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+      outline: none;
+    }
+    .doc-url-input:focus { border-color: #58a6ff; }
+
+    .doc-fetch-btn {
+      background: #238636;
+      border: 1px solid #2ea043;
+      color: #fff;
+      border-radius: 6px;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .doc-fetch-btn:hover { background: #2ea043; }
+    .doc-fetch-btn:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .doc-paste-box {
+      margin-top: 4px;
+    }
+
+    .doc-paste-box textarea {
+      width: 100%;
+      min-height: 100px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+      font-size: 12px;
+      color: #e6edf3;
+      resize: vertical;
+      outline: none;
+      line-height: 1.45;
+    }
+    .doc-paste-box textarea:focus { border-color: #58a6ff; }
+
+    .doc-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin-top: 8px;
+    }
+
+    .pane .selectors.doc-selectors {
+      margin-bottom: 0;
+      grid-template-columns: repeat(4, 1fr);
+    }
+
+    @media (max-width: 640px) {
+      .pane .selectors.doc-selectors { grid-template-columns: 1fr 1fr; }
     }
 
     .selectors {
@@ -454,7 +593,7 @@
     @media (max-width: 640px) {
       .selectors { grid-template-columns: 1fr 1fr; }
       header { padding: 14px 16px; }
-      main { padding: 0 16px 32px; margin-top: 20px; }
+      .layout-root { padding: 0 16px 32px; margin-top: 20px; }
     }
 
     @media (max-width: 400px) {
@@ -468,11 +607,136 @@
   <div class="logo">B</div>
   <div>
     <h1>Binance API Code Generator</h1>
-    <p>Signed REST &amp; WebSocket API request examples across languages and key types</p>
+    <p>Documentation → signed REST (left) &nbsp;·&nbsp; classic presets: REST, WebSocket, User Data Stream (right)</p>
   </div>
 </header>
 
-<main>
+<main class="layout-root">
+  <div class="app-split">
+    <aside class="pane pane-doc" aria-label="Documentation to REST">
+      <div class="pane-head">
+        <h2>Docs → signed REST</h2>
+        <p>Fetch or paste a Binance Open Platform docs page. Parser fills the endpoint and mandatory query fields; choose environment, market, auth, and language.</p>
+      </div>
+      <div class="pane-body">
+        <div class="selectors doc-selectors">
+          <div class="select-group">
+            <label>Environment</label>
+            <select id="sel-doc-env">
+              <option value="mainnet">Mainnet</option>
+              <option value="testnet">Testnet</option>
+            </select>
+          </div>
+          <div class="select-group">
+            <label>Market</label>
+            <select id="sel-doc-market">
+              <option value="spot">Spot</option>
+              <option value="usdm">USD-M Futures</option>
+              <option value="coinm">COIN-M Futures</option>
+              <option value="portfolio">Portfolio Margin</option>
+              <option value="options">Options</option>
+            </select>
+          </div>
+          <div class="select-group">
+            <label>Auth Type</label>
+            <select id="sel-doc-auth">
+              <option value="hmac">HMAC-SHA256</option>
+              <option value="rsa">RSA</option>
+              <option value="ed25519">Ed25519</option>
+            </select>
+          </div>
+          <div class="select-group">
+            <label>Language</label>
+            <select id="sel-doc-lang">
+              <option value="python">Python</option>
+              <option value="javascript">Node.js</option>
+              <option value="java">Java</option>
+              <option value="go">Go</option>
+              <option value="csharp">C#</option>
+              <option value="php">PHP</option>
+              <option value="ruby">Ruby</option>
+              <option value="typescript">TypeScript</option>
+              <option value="rust">Rust</option>
+              <option value="cpp">C++</option>
+              <option value="bash">Bash</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="endpoint-label" style="display:block;margin-bottom:4px;">Documentation URL</label>
+          <div class="doc-url-row">
+            <input type="url" class="doc-url-input" id="doc-url-input" placeholder="https://developers.binance.com/docs/..." autocomplete="off" spellcheck="false">
+            <button type="button" class="doc-fetch-btn" id="doc-fetch-btn">Fetch</button>
+          </div>
+          <p class="docs-parse-hint" style="margin-top:6px;">Fetches via <code>r.jina.ai</code> (read-only text). If blocked or slow, paste the page content under it.</p>
+        </div>
+
+        <div class="doc-paste-box">
+          <label class="endpoint-label" style="display:block;margin-bottom:6px;">Paste page text</label>
+          <textarea id="doc-paste-text" spellcheck="false" placeholder='Or paste excerpt: POST /fapi/v1/order and Parameters table — mandatory YES rows appear below. STRING / ENUM placeholders as hint &quot;&quot;.'></textarea>
+          <div class="doc-actions">
+            <button type="button" class="docs-parse-btn" id="doc-parse-btn">Parse &amp; fill</button>
+            <button type="button" class="docs-reset-btn" id="doc-reset-btn">Clear doc endpoint</button>
+          </div>
+        </div>
+
+        <div class="endpoint-bar">
+          <span class="endpoint-label">Endpoint</span>
+          <span class="endpoint-url" id="endpoint-display-doc">—</span>
+          <span id="docs-ep-note-doc" class="endpoint-from-docs-badge" style="display:none;">Docs</span>
+          <span class="endpoint-bar-actions">
+            <span id="env-badge-doc" style="display:none; font-size:11px; font-weight:700; color:#f0b90b; background:rgba(240,185,11,0.13); border:1px solid rgba(240,185,11,0.35); padding:2px 8px; border-radius:4px; white-space:nowrap; letter-spacing:0.05em;">TESTNET</span>
+          </span>
+        </div>
+
+        <div class="params-container" id="params-container-doc">
+          <div class="params-header">
+            <span class="params-title">Parameters</span>
+            <button class="add-param-btn" id="add-param-btn-doc" type="button">
+              <svg width="11" height="11" viewBox="0 0 12 12" fill="currentColor"><path d="M6.5 1a.5.5 0 00-1 0v4H1a.5.5 0 000 1h4.5v4a.5.5 0 001 0V6.5H11a.5.5 0 000-1H6.5V1z"/></svg>
+              Add Parameter
+            </button>
+          </div>
+          <div class="params-rows" id="params-rows-doc">
+            <div class="param-fixed-row">
+              <span class="param-fixed-key">timestamp</span>
+              <span class="param-fixed-val">(auto)</span>
+              <span style="width:28px;"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="code-container">
+          <div class="code-header">
+            <div class="header-left">
+              <div class="lang-dot"></div>
+              <span class="lang-badge" id="lang-badge-doc">Python</span>
+              <span class="auth-badge" id="auth-badge-doc">HMAC-SHA256</span>
+            </div>
+            <div class="btn-group">
+              <button class="copy-btn" id="copy-doc-btn" type="button">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z"/>
+                  <path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z"/>
+                </svg>
+                Copy
+              </button>
+            </div>
+          </div>
+          <pre><code id="code-block-doc" class="language-python"></code></pre>
+        </div>
+
+        <div class="note-box" id="note-box-doc"></div>
+      </div>
+    </aside>
+
+    <section class="pane pane-classic" aria-label="Classic generator">
+      <div class="pane-head">
+        <h2>Classic generator</h2>
+        <p>Pick API type (REST / WebSocket / User Data Stream), market, auth, and language. Endpoint follows built-in presets.</p>
+      </div>
+      <div class="pane-body">
   <div class="selectors">
     <div class="select-group">
       <label>Environment</label>
@@ -532,20 +796,7 @@
   <div class="endpoint-bar">
     <span class="endpoint-label">Endpoint</span>
     <span class="endpoint-url" id="endpoint-display">https://api.binance.com/api/v3/account</span>
-    <span id="docs-ep-note" class="endpoint-from-docs-badge" style="display:none;">Docs path</span>
-    <span class="endpoint-bar-actions">
-      <button type="button" class="docs-toggle-btn" id="docs-toggle-btn" title="Paste a Binance API doc excerpt">Paste from docs</button>
-      <span id="env-badge" style="display:none; font-size:11px; font-weight:700; color:#f0b90b; background:rgba(240,185,11,0.13); border:1px solid rgba(240,185,11,0.35); padding:2px 8px; border-radius:4px; white-space:nowrap; letter-spacing:0.05em;">TESTNET</span>
-    </span>
-  </div>
-
-  <div class="docs-paste-panel" id="docs-paste-panel">
-    <textarea id="docs-paste-text" placeholder='Paste excerpt: line like POST /api/v3/order and the Parameters table (Name / Type / Mandatory). Mandatory fields become rows — STRING &amp; ENUM get "" placeholders, numeric types get 0. Timestamp is omitted (already auto).' spellcheck="false"></textarea>
-    <div class="docs-paste-actions">
-      <button type="button" class="docs-parse-btn" id="docs-parse-btn">Parse &amp; fill</button>
-      <button type="button" class="docs-reset-btn" id="docs-reset-override-btn">Restore default endpoint</button>
-    </div>
-    <p class="docs-parse-hint">Works with Binance REST docs copied as plain text or markdown tables (<code>Name | Type | Mandatory</code>).</p>
+    <span id="env-badge" style="display:none; font-size:11px; font-weight:700; color:#f0b90b; background:rgba(240,185,11,0.13); border:1px solid rgba(240,185,11,0.35); padding:2px 8px; border-radius:4px; margin-left:auto; white-space:nowrap; letter-spacing:0.05em;">TESTNET</span>
   </div>
 
   <div class="params-container" id="params-container">
@@ -608,6 +859,9 @@
   <div class="note-box" id="note-box">
     Replace <code>YOUR_API_KEY</code> and <code>YOUR_API_SECRET</code> with your actual credentials.
     Install dependencies: <code>pip install requests cryptography</code>
+  </div>
+      </div>
+    </section>
   </div>
 </main>
 
@@ -4648,41 +4902,76 @@ function injectExtraParams(code, lang, params) {
 }
 
 /* ── State ─────────────────────────────────────────────────────────── */
-let state   = {
-  auth: "hmac", env: "mainnet", apitype: "rest", market: "spot", lang: "python",
+let state   = { auth: "hmac", env: "mainnet", apitype: "rest", market: "spot", lang: "python" };
+let stateDoc = {
+  auth: "hmac",
+  env: "mainnet",
+  market: "spot",
+  lang: "python",
   docsRestPath: null,
   docsRestMethod: null
 };
 let extraParams = [];
+let extraParamsDoc = [];
 let paramIdSeed = 0;
+let paramIdSeedDoc = 0;
 
-function getRestOriginForMarket() {
-  const row = ENDPOINTS.rest[state.env];
-  const base = row ? row[state.market] : "";
-  if (!base) return "https://api.binance.com";
-  try { return new URL(base).origin; } catch (_) { return "https://api.binance.com"; }
-}
-
-function mergedDisplayEp(isRest) {
-  if (isRest && state.docsRestPath) {
+function resolveRestUrl(ctx) {
+  const env = ctx.env;
+  const market = ctx.market;
+  const docsPath = ctx.docsRestPath || null;
+  const row = ENDPOINTS.rest[env];
+  const catalog = row ? row[market] || "" : "";
+  let origin = "https://api.binance.com";
+  if (catalog) {
     try {
-      const u = state.docsRestPath.startsWith("http")
-        ? new URL(state.docsRestPath)
-        : new URL(getRestOriginForMarket() + state.docsRestPath);
-      return u.href.replace(/\/$/, "");
-    } catch (_) {
-      return getRestOriginForMarket() + state.docsRestPath;
-    }
+      origin = new URL(catalog).origin;
+    } catch (_) { /* ignore */ }
   }
-  const epMap = ENDPOINTS[state.apitype] ? ENDPOINTS[state.apitype][state.env] : null;
-  return epMap ? (epMap[state.market] || "") : "";
+  if (docsPath) {
+    const p = String(docsPath).trim().split("?")[0];
+    if (p.startsWith("http://") || p.startsWith("https://")) {
+      try {
+        return new URL(p).href.replace(/\/$/, "");
+      } catch (_) {
+        return p;
+      }
+    }
+    const pathNorm = p.startsWith("/") ? p : "/" + p;
+    return (origin.replace(/\/$/, "") + pathNorm).replace(/\/+$/, "");
+  }
+  return catalog.replace(/\/$/, "");
 }
 
-function clearDocsEndpointOverride() {
-  state.docsRestPath = null;
-  state.docsRestMethod = null;
-  const badge = document.getElementById("docs-ep-note");
-  if (badge) badge.style.display = "none";
+function clearDocPanelOverride() {
+  stateDoc.docsRestPath = null;
+  stateDoc.docsRestMethod = null;
+  const bd = document.getElementById("docs-ep-note-doc");
+  if (bd) bd.style.display = "none";
+}
+
+function inferMarketFromPath(path) {
+  if (!path) return null;
+  const p = path.toLowerCase();
+  if (p.indexOf("/fapi/") >= 0) return "usdm";
+  if (p.indexOf("/dapi/") >= 0) return "coinm";
+  if (p.indexOf("/papi/") >= 0) return "portfolio";
+  if (p.indexOf("/eapi/") >= 0) return "options";
+  if (p.indexOf("/sapi/") >= 0 || p.indexOf("/api/") >= 0) return "spot";
+  return null;
+}
+
+function syncDocMarketAvailability() {
+  const sel = document.getElementById("sel-doc-market");
+  const available = MARKET_AVAILABLE.rest[stateDoc.env] || [];
+  for (const opt of sel.options) {
+    opt.disabled = !available.includes(opt.value);
+    opt.style.color = !available.includes(opt.value) ? "#484f58" : "";
+  }
+  if (!available.includes(stateDoc.market)) {
+    stateDoc.market = available[0] || "spot";
+    sel.value = stateDoc.market;
+  }
 }
 
 function defaultParamValueAndPlaceholder(type) {
@@ -4707,13 +4996,23 @@ function parseBinanceDocsPaste(text) {
   if (mVerb) {
     out.method = mVerb[1].toUpperCase();
     out.path = mVerb[2].replace(/[.,;:]+$/, "");
-  } else {
+  }
+
+  if (!out.path || !out.method) {
+    const tick = norm.match(/\b(GET|POST|PUT|DELETE|PATCH)\s+[`'"](\/[^`'"\r\n]+)[`'"]/im);
+    if (tick) {
+      out.method = tick[1].toUpperCase();
+      out.path = tick[2].replace(/[.,;:]+$/, "");
+    }
+  }
+
+  if (!out.path) {
     const onlyPath = norm.match(/(?:^|\n)\s*(\/(?:api|fapi|dapi|papi|eapi|sapi)\/[^\s`'")\]]+)/i);
     if (onlyPath) out.path = onlyPath[1].replace(/[.,;:]+$/, "");
   }
 
   let paramBlock = norm;
-  const pIdx = norm.search(/\nParameters\s*:?\s*\n/i);
+  const pIdx = norm.search(/\n(?:#+\s*)?(?:Request\s+)?Parameters\s*:?\s*\n/i);
   if (pIdx >= 0) paramBlock = norm.slice(pIdx);
 
   const lines = paramBlock.split("\n");
@@ -4736,7 +5035,7 @@ function parseBinanceDocsPaste(text) {
       if (/^Name$/i.test(name)) continue;
       if (/^---+$/i.test(name)) continue;
       const type = cells[1].replace(/`+/g, "").trim();
-      const manCell = cells[2].replace(/`/g, "").trim().toUpperCase();
+      const manCell = cells[2].replace(/`/g, "").trim().replace(/\*{2}/g, "").trim().toUpperCase();
       if (!/^YES\b/.test(manCell)) continue;
       if (!/^[a-zA-Z_]\w*$/.test(name)) continue;
       if (name === "timestamp" || name === "signature") continue;
@@ -4778,8 +5077,8 @@ function parseBinanceDocsPaste(text) {
   return out;
 }
 
-function addParamRowFilled(key, val, valuePlaceholder) {
-  const id  = ++paramIdSeed;
+function addParamRowDocFilled(key, val, valuePlaceholder) {
+  const id  = ++paramIdSeedDoc;
   const row = document.createElement("div");
   row.className   = "param-row";
   row.dataset.pid = id;
@@ -4787,38 +5086,108 @@ function addParamRowFilled(key, val, valuePlaceholder) {
     ? " placeholder=\"" + escapeAttr(valuePlaceholder) + "\""
     : " placeholder=\"value\"";
   row.innerHTML   =
-    '<input class="param-input param-key-input" placeholder="key" value="' + escapeAttr(key) + '" oninput="collectParams()">' +
-    '<input class="param-input param-val-input"' + valPhAttr + ' value="' + escapeAttr(val) + '" oninput="collectParams()">' +
-    '<button class="param-remove-btn" onclick="removeParam(' + id + ')">×</button>';
-  document.getElementById("params-rows").appendChild(row);
+    '<input class="param-input param-key-input" placeholder="key" value="' + escapeAttr(key) + '" oninput="collectParamsDoc()">' +
+    '<input class="param-input param-val-input"' + valPhAttr + ' value="' + escapeAttr(val) + '" oninput="collectParamsDoc()">' +
+    '<button class="param-remove-btn" onclick="removeDocParam(' + id + ')">×</button>';
+  document.getElementById("params-rows-doc").appendChild(row);
 }
 
-function applyDocsPaste() {
-  const ta = document.getElementById("docs-paste-text");
-  if (!ta || state.apitype !== "rest") return;
+function collectParamsDoc() {
+  extraParamsDoc = [];
+  document.querySelectorAll("#params-rows-doc .param-row").forEach(row => {
+    const k = row.querySelector(".param-key-input").value.trim();
+    const v = row.querySelector(".param-val-input").value.trim();
+    if (k) extraParamsDoc.push({ key: k, val: v });
+  });
+  renderDoc();
+}
 
-  const parsed = parseBinanceDocsPaste(ta.value);
-  const hasEp   = !!parsed.path;
+function removeDocParam(id) {
+  const row = document.querySelector('#params-rows-doc [data-pid="' + id + '"]');
+  if (row) row.remove();
+  collectParamsDoc();
+}
+
+function addParamRowDoc() {
+  const id  = ++paramIdSeedDoc;
+  const row = document.createElement("div");
+  row.className   = "param-row";
+  row.dataset.pid = id;
+  row.innerHTML   =
+    '<input class="param-input param-key-input" placeholder="key"   oninput="collectParamsDoc()">' +
+    '<input class="param-input param-val-input" placeholder="value" oninput="collectParamsDoc()">' +
+    '<button class="param-remove-btn" onclick="removeDocParam(' + id + ')">×</button>';
+  document.getElementById("params-rows-doc").appendChild(row);
+  row.querySelector(".param-key-input").focus();
+}
+
+function applyDocPanelParseFromText(rawText, alertEmpty) {
+  const parsed = parseBinanceDocsPaste(rawText || "");
+  const hasEp = !!parsed.path;
   const hasRows = parsed.rows.length > 0;
   if (!hasEp && !hasRows) {
-    window.alert("Could not parse an endpoint (e.g. POST /api/v3/order) nor mandatory parameters from the Parameters table.");
-    return;
+    if (alertEmpty) window.alert("Could not parse an HTTP endpoint (e.g. POST /fapi/v1/order) or mandatory parameters from Parameters / Request Parameters tables.");
+    return false;
+  }
+
+  const inferred = hasEp ? inferMarketFromPath(parsed.path) : null;
+  syncDocMarketAvailability();
+  const available = MARKET_AVAILABLE.rest[stateDoc.env] || [];
+  if (inferred && available.includes(inferred)) {
+    stateDoc.market = inferred;
+    const selM = document.getElementById("sel-doc-market");
+    if (selM) selM.value = inferred;
+    syncDocMarketAvailability();
   }
 
   if (hasEp) {
-    state.docsRestPath = parsed.path.split("?")[0];
-    state.docsRestMethod = parsed.method;
+    stateDoc.docsRestPath = parsed.path.split("?")[0];
+    stateDoc.docsRestMethod = parsed.method;
+    const bd = document.getElementById("docs-ep-note-doc");
+    if (bd) bd.style.display = "inline";
   }
 
   if (hasRows) {
-    document.querySelectorAll("#params-rows .param-row").forEach(row => row.remove());
+    document.querySelectorAll("#params-rows-doc .param-row").forEach(row => row.remove());
     for (const r of parsed.rows) {
       const d = defaultParamValueAndPlaceholder(r.type);
-      addParamRowFilled(r.name, d.val, d.ph);
+      addParamRowDocFilled(r.name, d.val, d.ph);
     }
   }
 
-  collectParams();
+  collectParamsDoc();
+  return true;
+}
+
+async function fetchDocUrlAndParse() {
+  const input = document.getElementById("doc-url-input");
+  const btn = document.getElementById("doc-fetch-btn");
+  const url = input && input.value.trim();
+  if (!url) {
+    window.alert("Enter a documentation URL.");
+    return;
+  }
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "…";
+  }
+  try {
+    const proxied = "https://r.jina.ai/" + encodeURIComponent(url);
+    const res = await fetch(proxied, { headers: { Accept: "text/plain" } });
+    const text = await res.text();
+    if (!text || text.length < 40) throw new Error("Empty or short response");
+    const ta = document.getElementById("doc-paste-text");
+    if (ta) ta.value = text;
+    applyDocPanelParseFromText(text, true);
+  } catch (err) {
+    console.error(err);
+    window.alert("Fetch failed (network, proxy, or CORS). Paste the doc page text manually and tap Parse.");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "Fetch";
+    }
+  }
 }
 
 
@@ -4851,21 +5220,44 @@ function syncMarketOptions() {
   // Params panel: hide for WS / UDS
   const _pc = document.getElementById("params-container");
   if (_pc) _pc.style.display = (state.apitype === "ws" || state.apitype === "uds") ? "none" : "";
-
-  const docTog = document.getElementById("docs-toggle-btn");
-  const docPan = document.getElementById("docs-paste-panel");
-  const isRest = state.apitype === "rest";
-  if (!isRest) {
-    if (state.docsRestPath) clearDocsEndpointOverride();
-    if (docPan) docPan.classList.remove("visible");
-    if (docTog) docTog.classList.remove("open");
-  }
-  if (docTog) docTog.style.display = isRest ? "" : "none";
-  if (!isRest && docPan) docPan.classList.remove("visible");
 }
 
 /* ── Render ────────────────────────────────────────────────────────── */
 let isEditing = false;
+
+function renderDoc() {
+  syncDocMarketAvailability();
+
+  const ep = resolveRestUrl(stateDoc);
+  const tpl = T[stateDoc.auth] && T[stateDoc.auth][stateDoc.lang];
+  let rawCode = tpl || "// Not available for this combination";
+  rawCode = rawCode
+    .replace(/\{\{EP\}\}/g, ep)
+    .replace(/\{\{METHOD\}\}/g, "")
+    .replace(/\{\{REST_EP\}\}/g, "");
+
+  const noteStr = ((NOTES[stateDoc.auth] || {})[stateDoc.lang] || "");
+  const code = injectExtraParams(rawCode, stateDoc.lang, extraParamsDoc);
+
+  const blockDoc = document.getElementById("code-block-doc");
+  if (!blockDoc) return;
+  blockDoc.className = "language-" + LANG_HL[stateDoc.lang];
+  blockDoc.textContent = code;
+  delete blockDoc.dataset.highlighted;
+  hljs.highlightElement(blockDoc);
+
+  document.getElementById("lang-badge-doc").textContent = LANG_NAMES[stateDoc.lang];
+  document.getElementById("auth-badge-doc").textContent = AUTH_NAMES[stateDoc.auth];
+  document.getElementById("endpoint-display-doc").textContent = ep || "N/A";
+
+  document.getElementById("note-box-doc").innerHTML = noteStr;
+
+  const bd = document.getElementById("docs-ep-note-doc");
+  if (bd) bd.style.display = stateDoc.docsRestPath ? "inline" : "none";
+
+  const envBd = document.getElementById("env-badge-doc");
+  if (envBd) envBd.style.display = stateDoc.env === "testnet" ? "inline" : "none";
+}
 
 function render() {
   if (isEditing) return;
@@ -4877,7 +5269,7 @@ function render() {
   const isRest       = state.apitype === "rest";
   const epOtherMap   = !isRest && ENDPOINTS[state.apitype] ? ENDPOINTS[state.apitype][state.env] : null;
   const ep           = isRest
-    ? mergedDisplayEp(true)
+    ? resolveRestUrl(state)
     : (epOtherMap ? (epOtherMap[state.market] || "") : "");
   const method       = isWs ? (WS_METHODS[state.market] || "") : "";
   const restEp     = isUdsFutures && UDS_REST_EP[state.market]
@@ -4916,9 +5308,6 @@ function render() {
   document.getElementById("endpoint-display").textContent = ep || "N/A";
   document.getElementById("note-box").innerHTML           = noteStr;
 
-  const docBadge = document.getElementById("docs-ep-note");
-  if (docBadge) docBadge.style.display = (isRest && state.docsRestPath) ? "inline" : "none";
-
   const envBadge = document.getElementById("env-badge");
   envBadge.style.display = state.env === "testnet" ? "inline" : "none";
 
@@ -4954,7 +5343,7 @@ function addParamRow() {
 }
 
 function removeParam(id) {
-  const row = document.querySelector('[data-pid="' + id + '"]');
+  const row = document.querySelector('#params-rows [data-pid="' + id + '"]');
   if (row) row.remove();
   collectParams();
 }
@@ -4967,17 +5356,34 @@ document.getElementById("sel-auth").addEventListener("change",    e => { state.a
 document.getElementById("sel-lang").addEventListener("change",    e => { state.lang    = e.target.value; render(); });
 document.getElementById("add-param-btn").addEventListener("click", addParamRow);
 
-document.getElementById("docs-toggle-btn").addEventListener("click", () => {
-  const panel = document.getElementById("docs-paste-panel");
-  const btn = document.getElementById("docs-toggle-btn");
-  if (!panel || !btn || state.apitype !== "rest") return;
-  const open = panel.classList.toggle("visible");
-  btn.classList.toggle("open", open);
+document.getElementById("add-param-btn-doc").addEventListener("click", addParamRowDoc);
+document.getElementById("sel-doc-env").addEventListener("change", e => { stateDoc.env = e.target.value; syncDocMarketAvailability(); collectParamsDoc(); });
+document.getElementById("sel-doc-market").addEventListener("change", e => { stateDoc.market = e.target.value; collectParamsDoc(); });
+document.getElementById("sel-doc-auth").addEventListener("change", e => { stateDoc.auth = e.target.value; renderDoc(); });
+document.getElementById("sel-doc-lang").addEventListener("change", e => { stateDoc.lang = e.target.value; renderDoc(); });
+
+document.getElementById("doc-fetch-btn").addEventListener("click", () => { fetchDocUrlAndParse(); });
+document.getElementById("doc-parse-btn").addEventListener("click", () => {
+  const ta = document.getElementById("doc-paste-text");
+  applyDocPanelParseFromText(ta ? ta.value : "", true);
 });
-document.getElementById("docs-parse-btn").addEventListener("click", applyDocsPaste);
-document.getElementById("docs-reset-override-btn").addEventListener("click", () => {
-  clearDocsEndpointOverride();
-  render();
+document.getElementById("doc-reset-btn").addEventListener("click", () => {
+  clearDocPanelOverride();
+  syncDocMarketAvailability();
+  collectParamsDoc();
+});
+
+document.getElementById("copy-doc-btn").addEventListener("click", () => {
+  const code = document.getElementById("code-block-doc").textContent;
+  navigator.clipboard.writeText(code).then(() => {
+    const btn = document.getElementById("copy-doc-btn");
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/></svg> Copied!`;
+    btn.classList.add("copied");
+    setTimeout(() => {
+      btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z"/><path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z"/></svg> Copy`;
+      btn.classList.remove("copied");
+    }, 2000);
+  });
 });
 
 document.getElementById("pdf-btn").addEventListener("click", async () => {
@@ -4986,7 +5392,7 @@ document.getElementById("pdf-btn").addEventListener("click", async () => {
   btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 3a5 5 0 100 10A5 5 0 008 3zm0-3a8 8 0 110 16A8 8 0 018 0z" opacity=".3"/><path d="M8 0a8 8 0 018 8h-2a6 6 0 00-6-6V0z"><animateTransform attributeName="transform" type="rotate" from="0 8 8" to="360 8 8" dur=".8s" repeatCount="indefinite"/></path></svg> Generating…';
 
   try {
-    const pre    = document.querySelector("pre");
+    const pre = document.querySelector(".pane-classic pre");
     const canvas = await html2canvas(pre, { backgroundColor: "#161b22", scale: 2, logging: false });
     const img    = canvas.toDataURL("image/png");
     const { jsPDF } = window.jspdf;
@@ -5052,6 +5458,7 @@ document.getElementById("copy-btn").addEventListener("click", () => {
 });
 
 render();
+renderDoc();
 </script>
 </body>
 </html>
