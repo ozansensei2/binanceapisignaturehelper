@@ -608,6 +608,14 @@
       opacity: 0.92;
     }
     .travel-rule-q-hint a { color: #79c0ff; }
+    .travel-rule-fetch-note {
+      font-size: 11px;
+      font-weight: 600;
+      color: #ffa657;
+      white-space: normal;
+    }
+    .travel-rule-fetch-note--ok { color: #7ee787; }
+    .travel-rule-fetch-note--warn { color: #ff7b72; }
 
     .docs-import-badge {
       font-size: 10px;
@@ -5730,10 +5738,7 @@ let state   = {
 let extraParams = [];
 let paramIdSeed = 0;
 
-/* Travel-rule `questionnaire` JSON templates — fields follow Binance Open Platform schemas (see Binance Wallet Travel Rule questionnaire pages). Replace placeholders before production use. */
-const TRAVEL_RULE_Q_WITHDRAW_ORDER = ["japan", "kazakhstan", "newZealand", "bahrain", "uae", "india", "euPolandFrance", "southAfrica"];
-const TRAVEL_RULE_Q_DEPOSIT_ORDER = ["japan", "kazakhstan", "bahrain", "uae", "india", "euPolandFrance", "southAfrica"];
-
+/* Travel-rule `questionnaire` JSON templates — fallback if live fetch of questionnaire docs fails / still loading */
 const TRAVEL_RULE_WITHDRAW_QUESTIONNAIRE = {
   japan: {
     isAddressOwner: 1,
@@ -5916,22 +5921,218 @@ const TRAVEL_RULE_DEPOSIT_QUESTIONNAIRE = {
   },
 };
 
+const TRAVEL_RULE_QUESTIONNAIRE_DOC_URL = {
+  withdraw: "https://developers.binance.com/docs/wallet/travel-rule/withdraw-questionnaire",
+  deposit: "https://developers.binance.com/docs/wallet/travel-rule/deposit-questionnaire",
+};
+
+const TRAVEL_FETCH_SLUG_TO_LEGACY_CAMEL = {
+  withdraw: { "new-zealand": "newZealand", "south-africa": "southAfrica", "eu-poland-france": "euPolandFrance" },
+  deposit: {
+    "united-arab-emirates": "uae",
+    "new-zealand": "newZealand",
+    "south-africa": "southAfrica",
+    "eu-poland-france": "euPolandFrance",
+  },
+};
+
+const TRAVEL_QUESTIONNAIRE_STATIC_REGIONS = {
+  withdraw: [
+    { key: "japan", label: "Japan", camel: "japan" },
+    { key: "kazakhstan", label: "Kazakhstan", camel: "kazakhstan" },
+    { key: "new-zealand", label: "New Zealand", camel: "newZealand" },
+    { key: "bahrain", label: "Bahrain", camel: "bahrain" },
+    { key: "uae", label: "UAE", camel: "uae" },
+    { key: "india", label: "India", camel: "india" },
+    { key: "eu-poland-france", label: "EU (Poland, France)", camel: "euPolandFrance" },
+    { key: "south-africa", label: "South Africa", camel: "southAfrica" },
+  ],
+  deposit: [
+    { key: "japan", label: "Japan", camel: "japan" },
+    { key: "kazakhstan", label: "Kazakhstan", camel: "kazakhstan" },
+    { key: "bahrain", label: "Bahrain", camel: "bahrain" },
+    { key: "united-arab-emirates", label: "United Arab Emirates", camel: "uae" },
+    { key: "india", label: "India", camel: "india" },
+    { key: "eu-poland-france", label: "EU (Poland, France)", camel: "euPolandFrance" },
+    { key: "south-africa", label: "South Africa", camel: "southAfrica" },
+  ],
+};
+
+let travelRuleQuestionnaireFetched = { withdraw: null, deposit: null };
+let travelRuleQuestionnaireFetchStatus = /** @type {Record<string,string>} */ { withdraw: "idle", deposit: "idle" };
+
+/** New Zealand → newZealand, south-africa → southAfrica — only when no explicit legacy map row. */
+function travelSlugHyphenToCamelGuess(slug) {
+  const parts = String(slug || "")
+    .split("-")
+    .filter(Boolean);
+  if (!parts.length) return slug;
+  let out = parts[0];
+  for (let i = 1; i < parts.length; i++) {
+    const p = parts[i];
+    out += p.charAt(0).toUpperCase() + p.slice(1);
+  }
+  return out;
+}
+
+function travelLegacyCamelForRegionSlug(kind, fetchSlug) {
+  const ov = TRAVEL_FETCH_SLUG_TO_LEGACY_CAMEL[kind] && TRAVEL_FETCH_SLUG_TO_LEGACY_CAMEL[kind][fetchSlug];
+  if (ov) return ov;
+  const row = TRAVEL_QUESTIONNAIRE_STATIC_REGIONS[kind].find(r => r.key === fetchSlug);
+  if (row) return row.camel;
+  return travelSlugHyphenToCamelGuess(fetchSlug);
+}
+
+function travelFallbackTemplate(kind, fetchSlug) {
+  const camel = travelLegacyCamelForRegionSlug(kind, fetchSlug);
+  const tbl = kind === "withdraw" ? TRAVEL_RULE_WITHDRAW_QUESTIONNAIRE : TRAVEL_RULE_DEPOSIT_QUESTIONNAIRE;
+  const o = tbl[camel];
+  return o ? Object.assign({}, o) : {};
+}
+
+function travelStaticRegionsFull(kind) {
+  return TRAVEL_QUESTIONNAIRE_STATIC_REGIONS[kind].map(r => ({
+    key: r.key,
+    label: r.label,
+    template: travelFallbackTemplate(kind, r.key),
+  }));
+}
+
+function travelFetchedRegions(kind) {
+  const v = travelRuleQuestionnaireFetched[kind];
+  if (v && v.regions && v.regions.length) return v.regions;
+  return null;
+}
+
+function travelRegionsResolved(kind) {
+  return travelFetchedRegions(kind) || travelStaticRegionsFull(kind);
+}
+
+function defaultTravelQuestionnaireFieldValue(fieldName, typeStr) {
+  const tRaw = String(typeStr || "").toUpperCase().replace(/\s+/g, "");
+  const n = String(fieldName || "");
+  const boolDefaultTrue = /\bBOOLEAN\b/.test(tRaw) && /\b(attested|declaration)\b/i.test(n);
+  if (boolDefaultTrue) return true;
+  if (/^BOOLEAN$/.test(tRaw)) return false;
+  if (/^(INT|LONG|INTEGER|DOUBLE|DECIMAL)$/.test(tRaw)) return 0;
+  if (/^ARRAY$/.test(tRaw)) return [];
+  return "";
+}
+
+/** Extract Binance markdown pipe rows (Name / Type / Mandatory) from an H2 subsection. */
+function extractTravelQuestionnairePipeRows(sliceLines) {
+  /** @type {{name:string,type:string,mandatory:string}[]} */
+  const out = [];
+  for (let q = 0; q < sliceLines.length; q++) {
+    const raw = sliceLines[q].trim();
+    if (!raw.includes("|")) continue;
+    const cells = raw.split("|").map(c => c.trim()).filter(c => c.length > 0);
+    if (cells.length < 3) continue;
+    const nameCell = cells[0].replace(/^`+|`+$/g, "");
+    if (/^Name$/i.test(nameCell)) continue;
+    if (/^-+$/.test(nameCell.replace(/^`+|`+$/g, "").replace(/\s+/g, ""))) continue;
+    if (!/^[a-zA-Z_]\w*$/.test(nameCell)) continue;
+    const typ = cells[1].replace(/`+/g, "").trim();
+    const typUp = typ.toUpperCase().replace(/\s+/g, "");
+    if (!/^(STRING|ENUM|DECIMAL|INT|LONG|BOOLEAN|DOUBLE|ARRAY|[A-Z][A-Z0-9_-]{1,31})$/.test(typUp)) continue;
+    const manCell = normalizeDocMandatoryCell(cells[2]);
+    if (!/^YES\b/.test(manCell) && !/^NO\b/.test(manCell)) continue;
+    out.push({ name: nameCell, type: typ, mandatory: manCell });
+  }
+  return out;
+}
+
+function travelSliceHasParamsTable(sliceLines) {
+  return sliceLines.some(l => /^\|?\s*Name\s*\|/i.test(l.trim()));
+}
+
+function shouldSkipTravelRegionHeadingSlug(slug) {
+  if (!slug) return true;
+  if (/^local-entities$/.test(slug)) return true;
+  if (/^withdraw-questionnaire-contents/.test(slug)) return true;
+  if (/^deposit-questionnaire-contents/.test(slug)) return true;
+  if (/^on-this-page$/.test(slug)) return true;
+  return false;
+}
+
+/**
+ * Parse https://developers.binance.com/docs/wallet/travel-rule/withdraw-questionnaire (or deposit) Jina/Markdown.
+ * Returns [{ key, label, template }] in document order.
+ */
+function parseRegionalQuestionnairesFromMarkdown(rawText) {
+  const norm = String(rawText || "").replace(/\r\n/g, "\n");
+  const core = jinaMarkdownContentBody(norm);
+  const lines = core.split("\n");
+  /** @type {{i:number,slug:string,label:string}[]} */
+  const heads = [];
+  for (let i = 0; i < lines.length; i++) {
+    const m = /^\#{2}\s+(.+)$/.exec(lines[i]);
+    if (!m) continue;
+    const titleClean = prepareMarkdownHeadingTitleForSlug(m[1]);
+    const slug = slugifyDocHeading(titleClean);
+    if (shouldSkipTravelRegionHeadingSlug(slug)) continue;
+    heads.push({ i, slug, label: titleClean });
+  }
+  /** @type {{key:string,label:string,template:Record<string,unknown>}[]} */
+  const regions = [];
+  for (let h = 0; h < heads.length; h++) {
+    const start = heads[h].i + 1;
+    const end = h + 1 < heads.length ? heads[h + 1].i : lines.length;
+    const slice = lines.slice(start, end);
+    if (!travelSliceHasParamsTable(slice)) continue;
+    const pipeRows = extractTravelQuestionnairePipeRows(slice);
+    if (!pipeRows.length) continue;
+    const template = {};
+    for (const pr of pipeRows) {
+      template[pr.name] = defaultTravelQuestionnaireFieldValue(pr.name, pr.type);
+    }
+    regions.push({ key: heads[h].slug, label: heads[h].label, template });
+  }
+  return regions;
+}
+
+async function fetchTravelQuestionnaireRegionsFromBinance(kind) {
+  const url = TRAVEL_RULE_QUESTIONNAIRE_DOC_URL[kind];
+  if (!url) throw new Error("no url");
+  const proxied = "https://r.jina.ai/" + encodeURIComponent(url);
+  const res = await fetch(proxied, { headers: { Accept: "text/plain" } });
+  const text = await res.text();
+  if (!text || text.length < 80) throw new Error("short body");
+  const parsed = parseRegionalQuestionnairesFromMarkdown(text);
+  if (!parsed.length) throw new Error("no regions");
+  return parsed;
+}
+
+function maybeStartTravelQuestionnaireFetch(kind) {
+  if (kind !== "withdraw" && kind !== "deposit") return;
+  if (travelRuleQuestionnaireFetchStatus[kind] === "loading") return;
+  if (travelRuleQuestionnaireFetchStatus[kind] === "ok" && travelRuleQuestionnaireFetched[kind]?.regions?.length) return;
+  if (travelRuleQuestionnaireFetchStatus[kind] === "fail") return;
+
+  travelRuleQuestionnaireFetchStatus[kind] = "loading";
+  fetchTravelQuestionnaireRegionsFromBinance(kind)
+    .then(regions => {
+      travelRuleQuestionnaireFetched[kind] = { regions, fetchedAt: Date.now() };
+      travelRuleQuestionnaireFetchStatus[kind] = "ok";
+    })
+    .catch(() => {
+      travelRuleQuestionnaireFetched[kind] = null;
+      travelRuleQuestionnaireFetchStatus[kind] = "fail";
+    })
+    .finally(() => {
+      render();
+    });
+}
+
+function getTravelQuestionnaireTemplate(kind, regionKey) {
+  const list = travelRegionsResolved(kind);
+  const hit = list.find(r => r.key === regionKey);
+  if (hit && hit.template && Object.keys(hit.template).length) return Object.assign({}, hit.template);
+  return travelFallbackTemplate(kind, regionKey);
+}
+
 let travelQuestionnaireUiKind = "";
 let travelQuestionnaireUiPath = "";
-
-function regionLabel(kind, key) {
-  const labs = {
-    japan: "Japan",
-    kazakhstan: "Kazakhstan",
-    newZealand: "New Zealand",
-    bahrain: "Bahrain",
-    uae: "UAE",
-    india: "India",
-    euPolandFrance: "EU (Poland, France)",
-    southAfrica: "South Africa",
-  };
-  return labs[key] || key;
-}
 
 function getActiveTravelRuleRestPathNorm() {
   try {
@@ -5998,18 +6199,19 @@ function upsertQuestionnaireParamRow(jsonCompactStr) {
 }
 
 function applyTravelRuleQuestionnairePreset(kind, regionKey) {
-  const table = kind === "withdraw" ? TRAVEL_RULE_WITHDRAW_QUESTIONNAIRE : TRAVEL_RULE_DEPOSIT_QUESTIONNAIRE;
-  const obj = table[regionKey];
-  if (!obj) return;
+  const obj = getTravelQuestionnaireTemplate(kind, regionKey);
+  if (!obj || !Object.keys(obj).length) return;
   upsertQuestionnaireParamRow(stringifyTravelRuleQuestionnaire(obj));
 }
 
-function refillTravelRegionSelect(kind, selEl) {
+function refillTravelRegionSelect(kind, selEl, previousValue) {
   if (!selEl) return;
-  const order = kind === "withdraw" ? TRAVEL_RULE_Q_WITHDRAW_ORDER : TRAVEL_RULE_Q_DEPOSIT_ORDER;
-  selEl.innerHTML = order
-    .map(k => `<option value="${escapeAttr(k)}">${escapeHtml(regionLabel(kind, k))}</option>`)
+  const regs = travelRegionsResolved(kind);
+  selEl.innerHTML = regs
+    .map(r => `<option value="${escapeAttr(r.key)}">${escapeHtml(r.label)}</option>`)
     .join("");
+  const pv = (previousValue || "").trim();
+  if (pv && regs.some(r => r.key === pv)) selEl.value = pv;
 }
 
 function refreshTravelRuleQuestionnaireDock() {
@@ -6030,6 +6232,8 @@ function refreshTravelRuleQuestionnaireDock() {
     return;
   }
 
+  maybeStartTravelQuestionnaireFetch(kind);
+
   panel.classList.remove("travel-rule-q-panel--hidden");
   panel.hidden = false;
 
@@ -6037,17 +6241,31 @@ function refreshTravelRuleQuestionnaireDock() {
     kind === "withdraw"
       ? "Travel Rule — withdraw questionnaire (JSON → questionnaire param)"
       : "Travel Rule — deposit questionnaire (JSON → questionnaire param)";
+
+  const st = travelRuleQuestionnaireFetchStatus[kind];
+  const liveNote =
+    st === "loading"
+      ? " <span class=\"travel-rule-fetch-note\">(fetching latest regions from Binance docs…)</span>"
+      : st === "fail"
+      ? ' <span class=\"travel-rule-fetch-note travel-rule-fetch-note--warn\">(live fetch failed — using bundled fallback list)</span>'
+      : st === "ok" && travelRuleQuestionnaireFetched[kind]?.regions?.length
+      ? ' <span class=\"travel-rule-fetch-note travel-rule-fetch-note--ok\">(regions from Binance questionnaire page)</span>'
+      : "";
+
   hint.innerHTML =
-    kind === "withdraw"
-      ? 'Templates match <a href="https://developers.binance.com/docs/wallet/travel-rule/withdraw-questionnaire" target="_blank" rel="noopener">Withdraw questionnaire content</a> by region (edit the <code>questionnaire</code> row as needed — conditional YES * fields in docs).'
-      : 'Templates match <a href="https://developers.binance.com/docs/wallet/travel-rule/deposit-questionnaire" target="_blank" rel="noopener">Deposit questionnaire content</a> by region. Endpoint: <a href="https://developers.binance.com/docs/wallet/travel-rule/deposit-provide-info-v2" target="_blank" rel="noopener">Submit Deposit Questionnaire V2</a>.';
+    (kind === "withdraw"
+      ? 'Pick a region → fills <code>questionnaire</code> JSON from the live questionnaire doc when available: <a href="https://developers.binance.com/docs/wallet/travel-rule/withdraw-questionnaire" target="_blank" rel="noopener">Withdraw questionnaire content</a>. Conditional YES * rows in Binance docs still apply — edit JSON as needed.'
+      : 'Pick a region → fills <code>questionnaire</code> JSON from the live questionnaire doc when available: <a href="https://developers.binance.com/docs/wallet/travel-rule/deposit-questionnaire" target="_blank" rel="noopener">Deposit questionnaire content</a>. PUT endpoint: <a href="https://developers.binance.com/docs/wallet/travel-rule/deposit-provide-info-v2" target="_blank" rel="noopener">Submit Deposit Questionnaire V2</a>.') + liveNote;
 
   const fingerprint = kind + "::" + pathNorm;
+  const prevSelVal = sel.value;
   if (travelQuestionnaireUiKind !== kind) {
     travelQuestionnaireUiKind = kind;
-    refillTravelRegionSelect(kind, sel);
     travelQuestionnaireUiPath = "";
-  } else if (sel.options.length === 0) refillTravelRegionSelect(kind, sel);
+    refillTravelRegionSelect(kind, sel, "");
+  } else {
+    refillTravelRegionSelect(kind, sel, prevSelVal);
+  }
 
   if (travelQuestionnaireUiPath !== fingerprint) {
     travelQuestionnaireUiPath = fingerprint;
