@@ -776,7 +776,7 @@
   <div class="params-container" id="docs-import-panel">
     <div class="params-header">
       <span class="params-title">Documentation import</span>
-      <span class="docs-import-badge">REST only</span>
+      <span class="docs-import-badge">REST · WS API</span>
     </div>
     <div class="doc-import-body">
       <div>
@@ -799,7 +799,7 @@
         <div id="doc-paste-collapsible" class="doc-paste-collapsible" role="region" aria-label="Manual documentation paste">
           <div class="doc-paste-box">
             <label class="endpoint-label" style="display:block;margin-bottom:6px;">Paste page text</label>
-            <textarea id="doc-paste-text" spellcheck="false" placeholder='Paste excerpt: POST /fapi/v1/order and Parameters table — mandatory YES rows appear below. STRING / ENUM placeholders as hint &quot;&quot;.'></textarea>
+            <textarea id="doc-paste-text" spellcheck="false" placeholder='REST: POST /fapi/v1/order + Parameters table. WebSocket: section with Method `order.place` or JSON "method":"order.place" + same parameter table. apiKey/signature/timestamp omitted from rows.'></textarea>
             <div class="doc-actions">
               <button type="button" class="docs-parse-btn" id="doc-parse-btn">Parse &amp; fill</button>
             </div>
@@ -2307,15 +2307,18 @@ API_KEY    = "YOUR_API_KEY"
 API_SECRET = "YOUR_API_SECRET"
 BASE_URL   = "{{EP}}"
 
-timestamp    = round(time.time() * 1000)
-params       = {"apiKey": API_KEY, "timestamp": timestamp}
-query_string = urlencode(params)
+timestamp = round(time.time() * 1000)
+params    = {"apiKey": API_KEY, "timestamp": timestamp}
+query_string = urlencode(sorted(params.items()))
 signature    = hmac.new(API_SECRET.encode("utf-8"), query_string.encode("utf-8"), hashlib.sha256).hexdigest()
+
+params_send = dict(params)
+params_send["signature"] = signature
 
 request = json.dumps({
     "id":     "1",
     "method": "{{METHOD}}",
-    "params": {"apiKey": API_KEY, "signature": signature, "timestamp": timestamp}
+    "params": params_send
 })
 
 ws = websocket.WebSocket()
@@ -2333,12 +2336,17 @@ const API_SECRET = "YOUR_API_SECRET";
 const BASE_URL   = "{{EP}}";
 
 const timestamp = Date.now();
-const qs        = "apiKey=" + API_KEY + "&timestamp=" + timestamp;
+const signParams = { apiKey: API_KEY, timestamp };
+const qs = Object.keys(signParams).sort()
+  .map((k) => encodeURIComponent(k) + "=" + encodeURIComponent(String(signParams[k])))
+  .join("&");
 const signature = crypto.createHmac("sha256", API_SECRET).update(qs).digest("hex");
 
+const outbound = { ...signParams, signature };
 const request = JSON.stringify({
-  id: "1", method: "{{METHOD}}",
-  params: { apiKey: API_KEY, signature, timestamp }
+  id: "1",
+  method: "{{METHOD}}",
+  params: outbound
 });
 
 const ws = new WebSocket(BASE_URL);
@@ -2397,6 +2405,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"sort"
+	"strings"
 	"time"
 	"github.com/gorilla/websocket"
 )
@@ -2408,14 +2418,43 @@ const (
 	wsMethod  = "{{METHOD}}"
 )
 
+func wsSortedQuery(m map[string]interface{}) string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	parts := make([]string, 0, len(keys))
+	for _, k := range keys {
+		parts = append(parts, fmt.Sprintf("%s=%v", k, m[k]))
+	}
+	return strings.Join(parts, "&")
+}
+
+func signHmac(secret, data string) string {
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(data))
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
 func main() {
-	ts  := time.Now().UnixMilli()
-	qs  := fmt.Sprintf("apiKey=%s&timestamp=%d", apiKey, ts)
+	ts := time.Now().UnixMilli()
+	p := map[string]interface{}{
+		"apiKey":    apiKey,
+		"timestamp": ts,
+	}
+	qs := wsSortedQuery(p)
 	sig := signHmac(apiSecret, qs)
+	pSend := map[string]interface{}{}
+	for k, v := range p {
+		pSend[k] = v
+	}
+	pSend["signature"] = sig
 
 	req, _ := json.Marshal(map[string]interface{}{
-		"id": "1", "method": wsMethod,
-		"params": map[string]interface{}{"apiKey": apiKey, "signature": sig, "timestamp": ts},
+		"id":     "1",
+		"method": wsMethod,
+		"params": pSend,
 	})
 
 	conn, _, _ := websocket.DefaultDialer.Dial(baseURL, nil)
@@ -2424,13 +2463,7 @@ func main() {
 	conn.WriteMessage(websocket.TextMessage, req)
 	_, msg, _ := conn.ReadMessage()
 	fmt.Println(string(msg))
-}
-
-func signHmac(secret, data string) string {
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write([]byte(data))
-	return hex.EncodeToString(mac.Sum(nil))
-}`;
+}`
 
 T_ws.hmac.csharp = `using System;
 using System.Net.WebSockets;
@@ -2534,13 +2567,19 @@ const API_SECRET: string = "YOUR_API_SECRET";
 const BASE_URL:   string = "{{EP}}";
 const METHOD:     string = "{{METHOD}}";
 
-const ts:  number = Date.now();
-const qs:  string = "apiKey=" + API_KEY + "&timestamp=" + ts;
+const ts = Date.now();
+const signParams: Record<string, string | number> = { apiKey: API_KEY, timestamp: ts };
+const qs = Object.keys(signParams)
+  .sort()
+  .map((k) => encodeURIComponent(k) + "=" + encodeURIComponent(String(signParams[k])))
+  .join("&");
 const sig: string = crypto.createHmac("sha256", API_SECRET).update(qs).digest("hex");
 
+const outbound: Record<string, string | number> = { ...signParams, signature: sig };
 const request: string = JSON.stringify({
-  id: "1", method: METHOD,
-  params: { apiKey: API_KEY, signature: sig, timestamp: ts }
+  id: "1",
+  method: METHOD,
+  params: outbound
 });
 
 const ws = new WebSocket(BASE_URL);
@@ -2657,17 +2696,20 @@ BASE_URL = "{{EP}}"
 with open("private_key.pem", "rb") as f:
     private_key = serialization.load_pem_private_key(f.read(), password=None)
 
-timestamp    = round(time.time() * 1000)
-params       = {"apiKey": API_KEY, "timestamp": timestamp}
-query_string = urlencode(params)
+timestamp = round(time.time() * 1000)
+params    = {"apiKey": API_KEY, "timestamp": timestamp}
+query_string = urlencode(sorted(params.items()))
 
 raw_sig   = private_key.sign(query_string.encode(), padding.PKCS1v15(), hashes.SHA256())
 signature = base64.b64encode(raw_sig).decode()
 
+params_send = dict(params)
+params_send["signature"] = signature
+
 request = json.dumps({
     "id":     "1",
     "method": "{{METHOD}}",
-    "params": {"apiKey": API_KEY, "signature": signature, "timestamp": timestamp}
+    "params": params_send
 })
 
 ws = websocket.WebSocket()
@@ -2686,14 +2728,19 @@ const BASE_URL   = "{{EP}}";
 const privateKey = fs.readFileSync("private_key.pem", "utf8");
 
 const timestamp = Date.now();
-const qs        = "apiKey=" + API_KEY + "&timestamp=" + timestamp;
+const signParams = { apiKey: API_KEY, timestamp };
+const qs = Object.keys(signParams).sort()
+  .map((k) => encodeURIComponent(k) + "=" + encodeURIComponent(String(signParams[k])))
+  .join("&");
 const signature = crypto.sign("sha256", Buffer.from(qs), {
   key: privateKey, padding: crypto.constants.RSA_PKCS1_PADDING
 }).toString("base64");
 
+const outbound = { ...signParams, signature };
 const request = JSON.stringify({
-  id: "1", method: "{{METHOD}}",
-  params: { apiKey: API_KEY, signature, timestamp }
+  id: "1",
+  method: "{{METHOD}}",
+  params: outbound
 });
 
 const ws = new WebSocket(BASE_URL);
@@ -2762,6 +2809,8 @@ import (
 	"encoding/pem"
 	"fmt"
 	"os"
+	"sort"
+	"strings"
 	"time"
 	"github.com/gorilla/websocket"
 )
@@ -2772,21 +2821,46 @@ const (
 	wsMethod = "{{METHOD}}"
 )
 
+func wsSortedQuery(m map[string]interface{}) string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	parts := make([]string, 0, len(keys))
+	for _, k := range keys {
+		parts = append(parts, fmt.Sprintf("%s=%v", k, m[k]))
+	}
+	return strings.Join(parts, "&")
+}
+
 func main() {
 	keyData, _  := os.ReadFile("private_key.pem")
 	block, _    := pem.Decode(keyData)
 	keyIface, _ := x509.ParsePKCS8PrivateKey(block.Bytes)
 	rsaKey      := keyIface.(*rsa.PrivateKey)
 
-	ts  := time.Now().UnixMilli()
-	qs  := fmt.Sprintf("apiKey=%s&timestamp=%d", apiKey, ts)
+	ts := time.Now().UnixMilli()
+	p := map[string]interface{}{
+		"apiKey":    apiKey,
+		"timestamp": ts,
+	}
+	qs := wsSortedQuery(p)
+
 	hash := sha256.Sum256([]byte(qs))
 	sigBytes, _ := rsa.SignPKCS1v15(rand.Reader, rsaKey, crypto.SHA256, hash[:])
 	sig := base64.StdEncoding.EncodeToString(sigBytes)
 
+	pSend := map[string]interface{}{}
+	for k, v := range p {
+		pSend[k] = v
+	}
+	pSend["signature"] = sig
+
 	req, _ := json.Marshal(map[string]interface{}{
-		"id": "1", "method": wsMethod,
-		"params": map[string]interface{}{"apiKey": apiKey, "signature": sig, "timestamp": ts},
+		"id":     "1",
+		"method": wsMethod,
+		"params": pSend,
 	})
 
 	conn, _, _ := websocket.DefaultDialer.Dial(baseURL, nil)
@@ -2900,15 +2974,21 @@ const BASE_URL:   string = "{{EP}}";
 const METHOD:     string = "{{METHOD}}";
 const privateKey: string = fs.readFileSync("private_key.pem", "utf8");
 
-const ts:  number = Date.now();
-const qs:  string = "apiKey=" + API_KEY + "&timestamp=" + ts;
+const ts = Date.now();
+const signParams: Record<string, string | number> = { apiKey: API_KEY, timestamp: ts };
+const qs = Object.keys(signParams)
+  .sort()
+  .map((k) => encodeURIComponent(k) + "=" + encodeURIComponent(String(signParams[k])))
+  .join("&");
 const sig: string = crypto.sign("sha256", Buffer.from(qs), {
   key: privateKey, padding: crypto.constants.RSA_PKCS1_PADDING
 }).toString("base64");
 
+const outbound: Record<string, string | number> = { ...signParams, signature: sig };
 const request: string = JSON.stringify({
-  id: "1", method: METHOD,
-  params: { apiKey: API_KEY, signature: sig, timestamp: ts }
+  id: "1",
+  method: METHOD,
+  params: outbound
 });
 
 const ws = new WebSocket(BASE_URL);
@@ -4924,6 +5004,73 @@ function injectExtraParams(code, lang, params) {
   }
 }
 
+/** Merge UI parameters into WebSocket API signed request templates (HMAC/RSA: signing map; Ed25519: post-logon params). */
+function injectWsTradingParams(code, lang, auth, params) {
+  if (!params || params.length === 0) return code;
+  const escPy = s => String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  const escJs = s => String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n");
+  const pyInner = params.map(p => '"' + p.key + '": "' + escPy(p.val) + '"').join(", ");
+  const jsInner = params.map(p => p.key + ': "' + escJs(p.val) + '"').join(", ");
+  const rbInner = params.map(p => p.key + ': "' + escPy(p.val) + '"').join(", ");
+
+  if (auth === "ed25519") {
+    if (lang === "python" && pyInner) {
+      code = code.replace('{"id": "1", "method": "{{METHOD}}", "params": {}}', '{"id": "1", "method": "{{METHOD}}", "params": {' + pyInner + "}}");
+    } else if ((lang === "javascript" || lang === "typescript") && jsInner) {
+      code = code.replace("method: METHOD, params: {}", "method: METHOD, params: { " + jsInner + " }");
+    } else if (lang === "ruby" && rbInner) {
+      code = code.replace(
+        'JSON.generate({ id: "1", method: METHOD, params: {} })',
+        'JSON.generate({ id: "1", method: METHOD, params: { ' + rbInner + " } })"
+      );
+    }
+    return code;
+  }
+
+  if ((auth === "hmac" || auth === "rsa") && lang === "python") {
+    if (pyInner) {
+      code = code.replace(
+        /\nparams\s+=\s+\{"apiKey": API_KEY, "timestamp": timestamp\}/,
+        '\nparams    = {"apiKey": API_KEY, "timestamp": timestamp, ' + pyInner + "}"
+      );
+    }
+    return code;
+  }
+
+  if ((auth === "hmac" || auth === "rsa") && (lang === "javascript" || lang === "typescript")) {
+    if (!jsInner) return code;
+    if (/^const signParams = \{ apiKey: API_KEY, timestamp \};$/m.test(code)) {
+      code = code.replace(
+        /^const signParams = \{ apiKey: API_KEY, timestamp \};$/m,
+        "const signParams = { apiKey: API_KEY, timestamp, " + jsInner + " };"
+      );
+    } else if (/^const signParams = \{ apiKey: API_KEY, timestamp: timestamp \};$/m.test(code)) {
+      code = code.replace(
+        /^const signParams = \{ apiKey: API_KEY, timestamp: timestamp \};$/m,
+        "const signParams = { apiKey: API_KEY, timestamp: timestamp, " + jsInner + " };"
+      );
+    } else if (
+      /^const signParams: Record<string, string \| number> = \{ apiKey: API_KEY, timestamp: ts \};$/m.test(code)
+    ) {
+      code = code.replace(
+        /^const signParams: Record<string, string \| number> = \{ apiKey: API_KEY, timestamp: ts \};$/m,
+        "const signParams: Record<string, string | number> = { apiKey: API_KEY, timestamp: ts, " + jsInner + " };"
+      );
+    }
+    return code;
+  }
+
+  if ((auth === "hmac" || auth === "rsa") && lang === "go") {
+    const extraGo = params.map(p => '\t\t"' + p.key + '": "' + escPy(p.val) + '",\n').join("");
+    if (extraGo) {
+      code = code.replace(/(\t\t"timestamp":\s+ts,)\s*\n(\t\})/, "$1\n" + extraGo + "$2");
+    }
+    return code;
+  }
+
+  return code;
+}
+
 /* ── State ─────────────────────────────────────────────────────────── */
 let state   = {
   auth: "hmac",
@@ -4932,7 +5079,8 @@ let state   = {
   market: "spot",
   lang: "python",
   docsRestPath: null,
-  docsRestMethod: null
+  docsRestMethod: null,
+  docsWsMethod: null
 };
 let extraParams = [];
 let paramIdSeed = 0;
@@ -4967,6 +5115,7 @@ function resolveRestUrl(ctx) {
 function clearDocsImport() {
   state.docsRestPath = null;
   state.docsRestMethod = null;
+  state.docsWsMethod = null;
   const bd = document.getElementById("docs-ep-note");
   if (bd) bd.style.display = "none";
 }
@@ -5387,7 +5536,7 @@ function normalizeDocMandatoryCell(s) {
 }
 
 function parseBinanceDocsPaste(text) {
-  const out = { method: null, path: null, rows: [] };
+  const out = { method: null, path: null, rows: [], wsRpcMethod: null };
   const norm = text.replace(/\r\n/g, "\n");
 
   const mVerb = norm.match(/\b(GET|POST|PUT|DELETE|PATCH)\s+(\/[^\s`'")\]]+)/i);
@@ -5410,7 +5559,7 @@ function parseBinanceDocsPaste(text) {
   }
 
   let paramBlock = norm;
-  const pIdx = norm.search(/\n(?:#+\s*)?(?:Request\s+)?Parameters\s*:?\s*\n/i);
+  const pIdx = norm.search(/(?:^|\n)(?:#+\s*)?(?:\*{0,2})?(?:Request\s+)?Parameters(?:\*{0,2})?\s*[:\s]/im);
   if (pIdx >= 0) paramBlock = norm.slice(pIdx);
 
   const lines = paramBlock.split("\n");
@@ -5437,7 +5586,7 @@ function parseBinanceDocsPaste(text) {
       if (!/^YES\b/.test(manCell) && !/^NO\b/.test(manCell)) continue;
       const mandatory = /^YES\b/.test(manCell);
       if (!/^[a-zA-Z_]\w*$/.test(name)) continue;
-      if (name === "timestamp" || name === "signature") continue;
+      if (name === "timestamp" || name === "signature" || name === "apiKey") continue;
       const typUp = type.toUpperCase();
       if (!/^(STRING|ENUM|DECIMAL|INT|LONG|BOOLEAN|DOUBLE|ARRAY|[A-Z][A-Z0-9_-]{1,31})$/.test(typUp)) continue;
       if (!seen.has(name)) {
@@ -5467,12 +5616,22 @@ function parseBinanceDocsPaste(text) {
     if (!name || /^Name$/i.test(name)) continue;
     if (!mandatory || (!/^YES\b/.test(mandatory) && !/^NO\b/.test(mandatory))) continue;
     const mandatoryBool = /^YES\b/.test(mandatory);
-    if (name === "timestamp" || name === "signature") continue;
+    if (name === "timestamp" || name === "signature" || name === "apiKey") continue;
     if (!seen.has(name)) {
       seen.add(name);
       out.rows.push({ name, type: typ, mandatory: mandatoryBool });
     }
   }
+
+  let wsRpcMethod = null;
+  let mHead = norm.match(/\n(?:#+\s*)Method\s*[:\s]*(?:\([^)]*\))?\s*\n\s*`([^`\r\n]+)`/im);
+  if (!mHead) mHead = norm.match(/(?:^|\n)(?:\*{2})?Method(?:\*{2})?\s*[:\s]*(?:\([^)]*\))?\s*\n\s*`([^`\r\n]+)`/im);
+  if (mHead) wsRpcMethod = mHead[1].trim().replace(/^`+|`+$/g, "");
+  if (!wsRpcMethod) {
+    const mj = norm.match(/"method"\s*:\s*"([a-zA-Z][a-zA-Z0-9_.]*)"/);
+    if (mj) wsRpcMethod = mj[1].trim();
+  }
+  out.wsRpcMethod = wsRpcMethod;
 
   return out;
 }
@@ -5553,8 +5712,8 @@ function addParamRowFilled(key, val, valuePlaceholder) {
 }
 
 function applyDocsImportFromText(rawText, alertEmpty, docPageUrl) {
-  if (state.apitype !== "rest") {
-    if (alertEmpty) window.alert("Select REST API to import from documentation.");
+  if (state.apitype !== "rest" && state.apitype !== "ws") {
+    if (alertEmpty) window.alert("Select REST API or WebSocket API to import from documentation.");
     return false;
   }
 
@@ -5576,21 +5735,34 @@ function applyDocsImportFromText(rawText, alertEmpty, docPageUrl) {
   }
 
   const parsed = parseBinanceDocsPaste(body);
-  const hasEp = !!parsed.path;
+  const hasRestPath = !!parsed.path;
   const hasRows = parsed.rows.length > 0;
-  if (!hasEp && !hasRows) {
-    if (alertEmpty)
-      window.alert(
-        "Could not parse an HTTP endpoint (e.g. POST /fapi/v1/order) or a Parameters / Request Parameters table (Name, Type, Mandatory)."
-      );
-    return false;
+  const hasWsRpc = !!(parsed.wsRpcMethod && /^[a-zA-Z][a-zA-Z0-9_.]*$/.test(parsed.wsRpcMethod));
+
+  if (state.apitype === "rest") {
+    if (!hasRestPath && !hasRows) {
+      if (alertEmpty)
+        window.alert(
+          "Could not parse an HTTP endpoint (e.g. POST /fapi/v1/order) or a Parameters / Request Parameters table (Name, Type, Mandatory)."
+        );
+      return false;
+    }
+  } else {
+    if (!hasWsRpc && !hasRows) {
+      if (alertEmpty)
+        window.alert(
+          'Could not parse WebSocket docs. Include either (1) a Method section (## Method followed by order.place in backticks) or JSON with "method":"order.place", and/or (2) a Parameters table — at least one is required.'
+        );
+      return false;
+    }
   }
 
-  const fromPath = hasEp ? inferMarketFromPath(parsed.path) : null;
+  const fromPath = hasRestPath ? inferMarketFromPath(parsed.path) : null;
   const fromUrl = inferMarketFromDocUrl(docUrlGuess);
   const inferred = inferMarketCombined(fromPath, fromUrl);
   syncMarketOptions();
-  const available = MARKET_AVAILABLE.rest[state.env] || [];
+  const availKey = state.apitype === "rest" ? "rest" : "ws";
+  const available = MARKET_AVAILABLE[availKey][state.env] || [];
   if (inferred && available.includes(inferred)) {
     state.market = inferred;
     const selM = document.getElementById("sel-market");
@@ -5598,11 +5770,22 @@ function applyDocsImportFromText(rawText, alertEmpty, docPageUrl) {
     syncMarketOptions();
   }
 
-  if (hasEp) {
-    state.docsRestPath = parsed.path.split("?")[0];
-    state.docsRestMethod = parsed.method;
-    const bd = document.getElementById("docs-ep-note");
-    if (bd) bd.style.display = "inline";
+  if (state.apitype === "rest") {
+    state.docsWsMethod = null;
+    if (hasRestPath) {
+      state.docsRestPath = parsed.path.split("?")[0];
+      state.docsRestMethod = parsed.method && /^(GET|POST|PUT|DELETE|PATCH)$/i.test(String(parsed.method)) ? parsed.method : null;
+    }
+  } else {
+    state.docsRestPath = null;
+    state.docsRestMethod = null;
+    if (hasWsRpc) state.docsWsMethod = parsed.wsRpcMethod;
+  }
+
+  const bd = document.getElementById("docs-ep-note");
+  if (bd) {
+    const show = (state.apitype === "rest" && state.docsRestPath) || (state.apitype === "ws" && state.docsWsMethod);
+    bd.style.display = show ? "inline" : "none";
   }
 
   if (hasRows) {
@@ -5636,8 +5819,8 @@ function flashCodeContainerAfterFetchSuccess() {
 }
 
 async function fetchDocUrlAndParse() {
-  if (state.apitype !== "rest") {
-    window.alert("Select REST API to fetch documentation.");
+  if (state.apitype !== "rest" && state.apitype !== "ws") {
+    window.alert("Select REST API or WebSocket API to fetch documentation.");
     return;
   }
   const input = document.getElementById("doc-url-input");
@@ -5698,13 +5881,13 @@ function syncMarketOptions() {
     selAuth.value = "hmac";
   }
 
-  // Params panel: hide for WS / UDS
+  // Params panel: hide for UDS only (REST + WebSocket use the same extra-param UI)
   const _pc = document.getElementById("params-container");
-  if (_pc) _pc.style.display = (state.apitype === "ws" || state.apitype === "uds") ? "none" : "";
+  if (_pc) _pc.style.display = state.apitype === "uds" ? "none" : "";
 
   const dip = document.getElementById("docs-import-panel");
-  if (dip) dip.style.display = state.apitype === "rest" ? "" : "none";
-  if (state.apitype !== "rest") clearDocsImport();
+  if (dip) dip.style.display = state.apitype === "rest" || state.apitype === "ws" ? "" : "none";
+  if (state.apitype !== "rest" && state.apitype !== "ws") clearDocsImport();
 }
 
 /* ── Render ────────────────────────────────────────────────────────── */
@@ -5722,7 +5905,8 @@ function render() {
   const ep           = isRest
     ? resolveRestUrl(state)
     : (epOtherMap ? (epOtherMap[state.market] || "") : "");
-  const method       = isWs ? (WS_METHODS[state.market] || "") : "";
+  const method =
+    isWs ? (state.docsWsMethod || WS_METHODS[state.market] || "") : "";
   const restEp     = isUdsFutures && UDS_REST_EP[state.market]
                      ? (UDS_REST_EP[state.market][state.env] || "") : "";
 
@@ -5746,7 +5930,10 @@ function render() {
     ? (UDS_LK_NOTES[state.lang] || "")
     : ((notesMap ? (notesMap[state.auth] || {}) : {})[state.lang] || "");
 
-  const code = (isWs || isUds) ? rawCode : injectExtraParams(rawCode, state.lang, extraParams);
+  const code =
+    isRest ? injectExtraParams(rawCode, state.lang, extraParams)
+      : isWs ? injectWsTradingParams(rawCode, state.lang, state.auth, extraParams)
+      : rawCode;
 
   const block = document.getElementById("code-block");
   block.className = "language-" + LANG_HL[state.lang];
@@ -5763,7 +5950,9 @@ function render() {
   envBadge.style.display = state.env === "testnet" ? "inline" : "none";
 
   const docNote = document.getElementById("docs-ep-note");
-  if (docNote) docNote.style.display = isRest && state.docsRestPath ? "inline" : "none";
+  const showDocImported =
+    (isRest && state.docsRestPath) || (isWs && state.docsWsMethod);
+  if (docNote) docNote.style.display = showDocImported ? "inline" : "none";
 
   const marketLabels = { spot:'Spot', usdm:'USD-M Futures', coinm:'COIN-M Futures', portfolio:'Portfolio Margin', options:'Options' };
   document.getElementById("print-meta").textContent =
