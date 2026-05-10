@@ -5768,22 +5768,45 @@ function extractMergedDocsPageUrl(docPageUrl, rawPasteText) {
   return extractJinaPasteSourceUrlLine(rawPasteText || "") || "";
 }
 
-/** Docs URL path decides API kind: Binance `/websocket-api/` vs `/rest-api/`. */
+/** If two URLs are pasted back-to-back, keep only the first `https://…` span. */
+function extractFirstHttpUrlFromMaybeGlued(raw) {
+  const t = String(raw || "").trim();
+  if (!t) return t;
+  const i = t.search(/https?:\/\//i);
+  if (i < 0) return t;
+  const tail = t.slice(i);
+  const lead = tail.match(/^https?:\/\//i);
+  if (!lead) return tail;
+  const rest = tail.slice(lead[0].length);
+  const j = rest.search(/https?:\/\//i);
+  return j < 0 ? tail : tail.slice(0, lead[0].length + j);
+}
+
+/** Docs URL path decides API kind: any path segment `websocket-api` vs `rest-api` (Spot, USD-M, COIN-M, …). */
 function inferApiTypeFromBinanceDocUrl(urlStr) {
   if (!urlStr || typeof urlStr !== "string") return null;
+  const single = extractFirstHttpUrlFromMaybeGlued(urlStr.trim());
   let rawPath = "";
   try {
-    rawPath = new URL(urlStr.trim()).pathname.toLowerCase();
+    rawPath = new URL(single).pathname.toLowerCase();
   } catch (_) {
     rawPath = "";
   }
   let blob = rawPath;
   if (!blob) {
-    const q = urlStr.toLowerCase().replace(/#.*/, "");
+    const q = single.toLowerCase().replace(/#.*/, "");
     const fm = /^[a-z][a-z0-9+.-]*:\/\/[^/?#]+(\/[^#?]*)?/i.exec(q);
     if (fm && fm[1]) blob = fm[1].toLowerCase();
   }
-  blob = blob || urlStr.toLowerCase();
+  blob = blob || single.toLowerCase();
+
+  let segs = [];
+  if (blob.indexOf("/") >= 0) segs = blob.split("/").filter(Boolean);
+
+  /* Exact segment names used by Binance Open Platform (e.g. …/trade/websocket-api vs …/websocket-api/…). */
+  if (segs.includes("websocket-api")) return "ws";
+  if (segs.includes("rest-api")) return "rest";
+
   if (/(?:\/|^)websocket-api(?:\/|$)/.test(blob)) return "ws";
   if (/(?:\/|^)rest-api(?:\/|$)/.test(blob)) return "rest";
   return null;
