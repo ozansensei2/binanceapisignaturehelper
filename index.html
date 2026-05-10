@@ -5844,7 +5844,8 @@ function narrowDocPasteByPlainHeadingSlug(fullNorm, slug) {
     }
   }
 
-  if (bestDv >= 880) return null;
+  /* WebSocket (& other) sections have no REST line; verbIndex stays ∞ — do not reject. */
+  if (Number.isFinite(bestDv) && bestDv >= 880) return null;
 
   let charStart = 0;
   for (let q = 0; q < startLineIx; q++) charStart += lines[q].length + 1;
