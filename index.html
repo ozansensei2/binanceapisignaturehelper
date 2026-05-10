@@ -4928,6 +4928,121 @@ function escapeAttr(s) {
     .replace(/</g, "&lt;");
 }
 
+/** Slug comparable to Binance docs URL hashes, e.g. #exchange-information */
+function slugifyDocHeading(title) {
+  return String(title)
+    .normalize("NFKD")
+    .replace(/[\u200b-\u200d\ufeff]/g, "")
+    .replace(/\[[^\]]*\]\([^)]*\)/g, " ")
+    .replace(/`/g, "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+/** Reads hash from full URL or naked fragment string */
+function extractDocUrlFragment(docPageUrl) {
+  if (!docPageUrl || typeof docPageUrl !== "string") return "";
+  let s = docPageUrl.trim();
+  try {
+    if (/^https?:\/\//i.test(s)) {
+      const u = new URL(s);
+      const h = (u.hash || "").replace(/^#/, "").trim();
+      if (h) return decodeURIComponent(h.replace(/\+/g, "%20"));
+    }
+  } catch (_) { /* fallback below */ }
+  const hash = s.indexOf("#");
+  if (hash >= 0) {
+    try {
+      return decodeURIComponent(s.slice(hash + 1).trim().replace(/\+/g, "%20"));
+    } catch (_) {
+      return s.slice(hash + 1).trim();
+    }
+  }
+  return "";
+}
+
+/**
+ * When a docs page bundles many endpoints under one fetched document, anchor to one section only.
+ * E.g. https://developers.binance.com/docs/.../general-endpoints#exchange-information — keep the
+ * "Exchange information" block until the next same-or-higher-level heading.
+ */
+
+/** Fallback when the fetched content uses HTML headings with id anchors (no Markdown `#` titles). */
+function narrowDocPasteByHtmlAnchorId(norm, slug) {
+  if (!slug || !norm) return null;
+  const esc = slug.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const openRe = new RegExp('<h([1-6])(?:\\s[^>]*)?\\s+id\\s*=\\s*["\']' + esc + '["\'][^>]*>', "i");
+  const m = openRe.exec(norm);
+  if (!m) return null;
+  const start = m.index;
+  const lvl = parseInt(m[1], 10);
+  let end = norm.length;
+  const nextHdr = /<h([1-6])(?:\s[^>]*)?[^>]*>/gi;
+  nextHdr.lastIndex = start + m[0].length;
+  let mh;
+  while ((mh = nextHdr.exec(norm)) !== null) {
+    const L = parseInt(mh[1], 10);
+    if (!Number.isFinite(L)) continue;
+    if (L <= lvl && mh.index > start) {
+      end = mh.index;
+      break;
+    }
+  }
+  const slice = norm.slice(start, end).trim();
+  return slice.length > 0 ? slice : null;
+}
+
+function narrowDocPasteByUrlFragment(fullText, fragment) {
+  if (!fragment || !fullText) return null;
+  const slug = slugifyDocHeading(fragment);
+  if (!slug) return null;
+
+  const norm = fullText.replace(/\r\n/g, "\n");
+
+  /** @type {{ index:number, level:number, titleSlug:string }[]} */
+  const headings = [];
+  const re = /^(#{1,6})\s+(.+?)\s*$/gm;
+  let mh;
+  while ((mh = re.exec(norm)) !== null) {
+    const level = mh[1].length;
+    let titleRaw = mh[2].trim().replace(/\s+#+\s*$/, "").trim();
+    titleRaw = titleRaw.replace(/[#*`]+$/g, "").trim();
+    const titleSlug = slugifyDocHeading(titleRaw);
+    headings.push({
+      index: mh.index,
+      level,
+      titleSlug
+    });
+  }
+
+  let matchIdx = -1;
+  for (let i = 0; i < headings.length; i++) {
+    const ts = headings[i].titleSlug;
+    if (ts && ts === slug) {
+      matchIdx = i;
+      break;
+    }
+  }
+
+  if (matchIdx >= 0) {
+    const start = headings[matchIdx].index;
+    const startLevel = headings[matchIdx].level;
+    let end = norm.length;
+    for (let j = matchIdx + 1; j < headings.length; j++) {
+      if (headings[j].level <= startLevel) {
+        end = headings[j].index;
+        break;
+      }
+    }
+    const slice = norm.slice(start, end).trim();
+    if (slice.length > 0) return slice;
+  }
+
+  return narrowDocPasteByHtmlAnchorId(norm, slug);
+}
+
 function parseBinanceDocsPaste(text) {
   const out = { method: null, path: null, rows: [] };
   const norm = text.replace(/\r\n/g, "\n");
@@ -5038,7 +5153,23 @@ function applyDocsImportFromText(rawText, alertEmpty, docPageUrl) {
     return false;
   }
 
-  const parsed = parseBinanceDocsPaste(rawText || "");
+  const frag = extractDocUrlFragment(docPageUrl || "");
+  let body = (rawText || "").replace(/\r\n/g, "\n");
+  if (frag) {
+    const narrowed = narrowDocPasteByUrlFragment(body, frag);
+    if (!narrowed) {
+      if (alertEmpty)
+        window.alert(
+          'Could not find a section heading for this URL anchor (#' +
+            frag +
+            "). The fetched page may omit heading anchors expected by Markdown, or spelling differs — try opening “Manually paste doc” and paste only from the right heading downward."
+        );
+      return false;
+    }
+    body = narrowed;
+  }
+
+  const parsed = parseBinanceDocsPaste(body);
   const hasEp = !!parsed.path;
   const hasRows = parsed.rows.length > 0;
   if (!hasEp && !hasRows) {
