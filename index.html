@@ -734,6 +734,31 @@
     .param-row.param-row--json-val .param-remove-btn {
       margin-top: 6px;
     }
+    .param-row.param-row--qnest-root {
+      grid-template-columns: 32px minmax(100px, 0.92fr) minmax(0, 1fr) auto;
+    }
+    .param-qnest-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+    }
+    .param-qnest-row {
+      display: grid;
+      grid-template-columns: 32px minmax(0, 1fr) minmax(0, 1fr);
+      gap: 6px;
+      align-items: center;
+    }
+    .param-qnest-row--collapsed {
+      grid-template-columns: 32px 1fr auto;
+    }
+    .param-qnest-key {
+      min-width: 0;
+      color: #79c0ff;
+    }
+    .param-qnest-row.param-qnest-row--rule-hidden {
+      display: none !important;
+    }
     textarea.param-val-input.param-val-json {
       min-height: 120px;
       max-height: 360px;
@@ -5926,6 +5951,363 @@ const TRAVEL_RULE_QUESTIONNAIRE_DOC_URL = {
   deposit: "https://developers.binance.com/docs/wallet/travel-rule/deposit-questionnaire",
 };
 
+/** Per-field visibility for questionnaire nests (keys = region select slugs: deposit UAE is `united-arab-emirates`, withdraw is `uae`). */
+const TRAVEL_EMBEDDED_FIELD_RULES = {
+  deposit: {
+    japan: {
+      country: { op: "eq", field: "depositOriginator", value: 1 },
+      region: { op: "in", field: "country", values: ["cn", "ua"] },
+      city: { op: "eq", field: "depositOriginator", value: 1 },
+      kanjiName: { op: "eq", field: "depositOriginator", value: 1 },
+      kanaName: { op: "eq", field: "depositOriginator", value: 1 },
+      latinName: { op: "eq", field: "depositOriginator", value: 1 },
+    },
+    kazakhstan: {
+      txnPurposeOthers: { op: "eq", field: "txnPurpose", value: "others" },
+    },
+    bahrain: {
+      orgType: { op: "eq", field: "depositOriginator", value: 2 },
+      orgFirstName: { op: "eq", field: "depositOriginator", value: 2 },
+      orgLastName: { op: "eq", field: "depositOriginator", value: 2 },
+      country: { op: "eq", field: "depositOriginator", value: 2 },
+      city: { op: "eq", field: "depositOriginator", value: 2 },
+      vasp: { op: "eq", field: "receiveFrom", value: 2 },
+      vaspName: {
+        op: "and",
+        rules: [
+          { op: "eq", field: "receiveFrom", value: 2 },
+          { op: "eq", field: "vasp", value: "others" },
+        ],
+      },
+    },
+    "united-arab-emirates": {
+      orgType: { op: "eq", field: "depositOriginator", value: 2 },
+      orgName: { op: "eq", field: "depositOriginator", value: 2 },
+      country: { op: "eq", field: "depositOriginator", value: 2 },
+      city: { op: "eq", field: "depositOriginator", value: 2 },
+      vasp: { op: "eq", field: "receiveFrom", value: 2 },
+      vaspName: {
+        op: "and",
+        rules: [
+          { op: "eq", field: "receiveFrom", value: 2 },
+          { op: "eq", field: "vasp", value: "others" },
+        ],
+      },
+    },
+    india: {
+      orgType: { op: "eq", field: "depositOriginator", value: 2 },
+      orgName: { op: "eq", field: "depositOriginator", value: 2 },
+      pan: { op: "eq", field: "depositOriginator", value: 2 },
+      country: { op: "eq", field: "depositOriginator", value: 2 },
+      state: { op: "eq", field: "depositOriginator", value: 2 },
+      city: { op: "eq", field: "depositOriginator", value: 2 },
+      pinCode: { op: "eq", field: "depositOriginator", value: 2 },
+      address: { op: "eq", field: "depositOriginator", value: 2 },
+      vasp: { op: "eq", field: "receiveFrom", value: 2 },
+      vaspName: {
+        op: "and",
+        rules: [
+          { op: "eq", field: "receiveFrom", value: 2 },
+          { op: "eq", field: "vasp", value: "others" },
+        ],
+      },
+    },
+    "eu-poland-france": {
+      orgType: { op: "eq", field: "depositOriginator", value: 2 },
+      orgFirstName: {
+        op: "and",
+        rules: [
+          { op: "eq", field: "depositOriginator", value: 2 },
+          { op: "eq", field: "orgType", value: 0 },
+        ],
+      },
+      orgLastName: {
+        op: "and",
+        rules: [
+          { op: "eq", field: "depositOriginator", value: 2 },
+          { op: "eq", field: "orgType", value: 0 },
+        ],
+      },
+      country: {
+        op: "and",
+        rules: [
+          { op: "eq", field: "depositOriginator", value: 2 },
+          { op: "eq", field: "orgType", value: 0 },
+        ],
+      },
+      corpName: {
+        op: "and",
+        rules: [
+          { op: "eq", field: "depositOriginator", value: 2 },
+          { op: "eq", field: "orgType", value: 1 },
+        ],
+      },
+      corpCountry: {
+        op: "and",
+        rules: [
+          { op: "eq", field: "depositOriginator", value: 2 },
+          { op: "eq", field: "orgType", value: 1 },
+        ],
+      },
+      vasp: { op: "eq", field: "receiveFrom", value: 2 },
+      vaspName: {
+        op: "and",
+        rules: [
+          { op: "eq", field: "receiveFrom", value: 2 },
+          { op: "eq", field: "vasp", value: "others" },
+        ],
+      },
+    },
+    "south-africa": {
+      orgType: { op: "eq", field: "depositOriginator", value: 2 },
+      orgName: {
+        op: "and",
+        rules: [
+          { op: "eq", field: "depositOriginator", value: 2 },
+          { op: "eq", field: "orgType", value: 0 },
+        ],
+      },
+      country: {
+        op: "and",
+        rules: [
+          { op: "eq", field: "depositOriginator", value: 2 },
+          { op: "eq", field: "orgType", value: 0 },
+        ],
+      },
+      corpName: {
+        op: "and",
+        rules: [
+          { op: "eq", field: "depositOriginator", value: 2 },
+          { op: "eq", field: "orgType", value: 1 },
+        ],
+      },
+      corpCountry: {
+        op: "and",
+        rules: [
+          { op: "eq", field: "depositOriginator", value: 2 },
+          { op: "eq", field: "orgType", value: 1 },
+        ],
+      },
+      vasp: { op: "eq", field: "receiveFrom", value: 2 },
+      vaspName: {
+        op: "and",
+        rules: [
+          { op: "eq", field: "receiveFrom", value: 2 },
+          { op: "eq", field: "vasp", value: "others" },
+        ],
+      },
+    },
+  },
+  withdraw: {
+    japan: {
+      bnfType: { op: "eq", field: "isAddressOwner", value: 2 },
+      kanjiName: { op: "eq", field: "isAddressOwner", value: 2 },
+      kanaName: { op: "eq", field: "isAddressOwner", value: 2 },
+      latinName: { op: "eq", field: "isAddressOwner", value: 2 },
+      vasp: { op: "eq", field: "sendTo", value: 1 },
+      vaspCountry: { op: "eq", field: "sendTo", value: 1 },
+      vaspRegion: { op: "in", field: "vaspCountry", values: ["cn", "ua"] },
+    },
+    kazakhstan: {
+      bnfType: { op: "eq", field: "isAddressOwner", value: false },
+      txnPurposeOthers: { op: "eq", field: "txnPurpose", value: "others" },
+      vasp: { op: "eq", field: "sendTo", value: 2 },
+      vaspName: {
+        op: "and",
+        rules: [
+          { op: "eq", field: "sendTo", value: 2 },
+          { op: "eq", field: "vasp", value: "others" },
+        ],
+      },
+    },
+    "new-zealand": {
+      bnfType: { op: "eq", field: "isAddressOwner", value: 2 },
+      bnfName: {
+        op: "and",
+        rules: [
+          { op: "eq", field: "isAddressOwner", value: 2 },
+          { op: "eq", field: "bnfType", value: 0 },
+        ],
+      },
+      country: {
+        op: "and",
+        rules: [
+          { op: "eq", field: "isAddressOwner", value: 2 },
+          { op: "eq", field: "bnfType", value: 0 },
+        ],
+      },
+      bnfCorpName: {
+        op: "and",
+        rules: [
+          { op: "eq", field: "isAddressOwner", value: 2 },
+          { op: "eq", field: "bnfType", value: 1 },
+        ],
+      },
+      bnfCorpCountry: {
+        op: "and",
+        rules: [
+          { op: "eq", field: "isAddressOwner", value: 2 },
+          { op: "eq", field: "bnfType", value: 1 },
+        ],
+      },
+      vasp: { op: "eq", field: "sendTo", value: 2 },
+      vaspName: {
+        op: "and",
+        rules: [
+          { op: "eq", field: "sendTo", value: 2 },
+          { op: "eq", field: "vasp", value: "others" },
+        ],
+      },
+    },
+    bahrain: {
+      bnfType: { op: "eq", field: "isAddressOwner", value: 2 },
+      country: { op: "eq", field: "isAddressOwner", value: 2 },
+      city: { op: "eq", field: "isAddressOwner", value: 2 },
+      bnfFirstName: {
+        op: "and",
+        rules: [
+          { op: "eq", field: "isAddressOwner", value: 2 },
+          { op: "eq", field: "bnfType", value: 0 },
+        ],
+      },
+      bnfLastName: {
+        op: "and",
+        rules: [
+          { op: "eq", field: "isAddressOwner", value: 2 },
+          { op: "eq", field: "bnfType", value: 0 },
+        ],
+      },
+      bnfName: {
+        op: "and",
+        rules: [
+          { op: "eq", field: "isAddressOwner", value: 2 },
+          { op: "eq", field: "bnfType", value: 1 },
+        ],
+      },
+      vasp: { op: "eq", field: "sendTo", value: 2 },
+      vaspName: {
+        op: "and",
+        rules: [
+          { op: "eq", field: "sendTo", value: 2 },
+          { op: "eq", field: "vasp", value: "others" },
+        ],
+      },
+    },
+    uae: {
+      bnfType: { op: "eq", field: "isAddressOwner", value: 2 },
+      bnfName: { op: "eq", field: "isAddressOwner", value: 2 },
+      country: { op: "eq", field: "isAddressOwner", value: 2 },
+      city: { op: "eq", field: "isAddressOwner", value: 2 },
+      vasp: { op: "eq", field: "sendTo", value: 2 },
+      vaspName: {
+        op: "and",
+        rules: [
+          { op: "eq", field: "sendTo", value: 2 },
+          { op: "eq", field: "vasp", value: "others" },
+        ],
+      },
+    },
+    india: {
+      bnfType: { op: "eq", field: "isAddressOwner", value: 2 },
+      bnfName: { op: "eq", field: "isAddressOwner", value: 2 },
+      country: { op: "eq", field: "isAddressOwner", value: 2 },
+      vasp: { op: "eq", field: "sendTo", value: 2 },
+      vaspName: {
+        op: "and",
+        rules: [
+          { op: "eq", field: "sendTo", value: 2 },
+          { op: "eq", field: "vasp", value: "others" },
+        ],
+      },
+    },
+    "eu-poland-france": {
+      bnfType: { op: "eq", field: "isAddressOwner", value: 2 },
+      bnfFirstName: {
+        op: "and",
+        rules: [
+          { op: "eq", field: "isAddressOwner", value: 2 },
+          { op: "eq", field: "bnfType", value: 0 },
+        ],
+      },
+      bnfLastName: {
+        op: "and",
+        rules: [
+          { op: "eq", field: "isAddressOwner", value: 2 },
+          { op: "eq", field: "bnfType", value: 0 },
+        ],
+      },
+      country: {
+        op: "and",
+        rules: [
+          { op: "eq", field: "isAddressOwner", value: 2 },
+          { op: "eq", field: "bnfType", value: 0 },
+        ],
+      },
+      bnfCorpName: {
+        op: "and",
+        rules: [
+          { op: "eq", field: "isAddressOwner", value: 2 },
+          { op: "eq", field: "bnfType", value: 1 },
+        ],
+      },
+      bnfCorpCountry: {
+        op: "and",
+        rules: [
+          { op: "eq", field: "isAddressOwner", value: 2 },
+          { op: "eq", field: "bnfType", value: 1 },
+        ],
+      },
+      vasp: { op: "eq", field: "sendTo", value: 2 },
+      vaspName: {
+        op: "and",
+        rules: [
+          { op: "eq", field: "sendTo", value: 2 },
+          { op: "eq", field: "vasp", value: "others" },
+        ],
+      },
+    },
+    "south-africa": {
+      bnfType: { op: "eq", field: "isAddressOwner", value: 2 },
+      bnfName: {
+        op: "and",
+        rules: [
+          { op: "eq", field: "isAddressOwner", value: 2 },
+          { op: "eq", field: "bnfType", value: 0 },
+        ],
+      },
+      country: {
+        op: "and",
+        rules: [
+          { op: "eq", field: "isAddressOwner", value: 2 },
+          { op: "eq", field: "bnfType", value: 0 },
+        ],
+      },
+      bnfCorpName: {
+        op: "and",
+        rules: [
+          { op: "eq", field: "isAddressOwner", value: 2 },
+          { op: "eq", field: "bnfType", value: 1 },
+        ],
+      },
+      bnfCorpCountry: {
+        op: "and",
+        rules: [
+          { op: "eq", field: "isAddressOwner", value: 2 },
+          { op: "eq", field: "bnfType", value: 1 },
+        ],
+      },
+      vasp: { op: "eq", field: "sendTo", value: 2 },
+      vaspName: {
+        op: "and",
+        rules: [
+          { op: "eq", field: "sendTo", value: 2 },
+          { op: "eq", field: "vasp", value: "others" },
+        ],
+      },
+    },
+  },
+};
+
 const TRAVEL_FETCH_SLUG_TO_LEGACY_CAMEL = {
   withdraw: { "new-zealand": "newZealand", "south-africa": "southAfrica", "eu-poland-france": "euPolandFrance" },
   deposit: {
@@ -5990,11 +6372,16 @@ function travelFallbackTemplate(kind, fetchSlug) {
   return o ? Object.assign({}, o) : {};
 }
 
+function mergeTravelFieldRules(base, overlay) {
+  return Object.assign({}, base || {}, overlay || {});
+}
+
 function travelStaticRegionsFull(kind) {
   return TRAVEL_QUESTIONNAIRE_STATIC_REGIONS[kind].map(r => ({
     key: r.key,
     label: r.label,
     template: travelFallbackTemplate(kind, r.key),
+    fieldRules: mergeTravelFieldRules(TRAVEL_EMBEDDED_FIELD_RULES[kind]?.[r.key] || {}, {}),
   }));
 }
 
@@ -6019,9 +6406,216 @@ function defaultTravelQuestionnaireFieldValue(fieldName, typeStr) {
   return "";
 }
 
+/** Drop MDX anchors, Markdown links and URLs from headings so dropdown labels stay clean. */
+function sanitizeTravelQuestionnaireRegionLabel(raw) {
+  let s = String(raw || "")
+    .replace(/[\u200b-\u200d\ufeff]/g, "")
+    .replace(/\{#[^}]+\}/g, "");
+  s = s.replace(/\!?\[([^\]]+)\]\([^)]*\)/g, (_, t) => t.trim());
+  s = s.replace(/https?:\/\/[^\s)>\]]+/gi, "");
+  s = s.replace(/\b(?:direct\s*)?link\b[:\uff1a]?\s*/gi, "");
+  return s.replace(/\s+/g, " ").trim();
+}
+
+function extractTravelMandatoryFootnoteRef(manRawCell) {
+  const m = /\*\s*(\d+)/.exec(String(manRawCell || ""));
+  return m ? +m[1] : null;
+}
+
+/** Aggregate blockquote numbered footnotes (`> 1.` …) under a region section into id → prose. */
+function extractTravelQuestionnaireFootnoteMap(sliceLines) {
+  /** @type Record<number, string> */
+  const map = {};
+  /** @type {number|null} */
+  let pend = null;
+  for (const rawLn of sliceLines) {
+    const t = rawLn.trim();
+    if (!t.includes(">")) {
+      pend = null;
+      continue;
+    }
+    if (/^\|.+\|/.test(t)) {
+      pend = null;
+      continue;
+    }
+    const u = t.replace(/^>\s*/, "").trim();
+    const mDot = /^(\d+)\.(?:[\s]*)?(.*?)$/.exec(u);
+    if (mDot) {
+      pend = +mDot[1];
+      const rest = (mDot[2] || "").trim();
+      map[pend] = map[pend] ? map[pend] + " " + rest : rest;
+      continue;
+    }
+    const mSticky = /^(\d+)\.[Rr]equired([\s\S]+)$/.exec(u);
+    if (mSticky) {
+      pend = +mSticky[1];
+      const rest = ("Required " + String(mSticky[2] || "")).trim();
+      map[pend] = map[pend] ? map[pend] + " " + rest : rest;
+      continue;
+    }
+    if (pend !== null && u.length) map[pend] = (map[pend] ? map[pend] + " " : "") + u;
+  }
+  return map;
+}
+
+function parseTravelQuestionnaireConditionFromFootnote(text) {
+  const blob = String(text || "").trim();
+  if (!blob) return null;
+  const m = /\b[Rr]equired\s+when\s+[`'"]?([a-zA-Z_]\w*)[`'"]?\s+is\s+/i.exec(blob);
+  if (!m) return null;
+  const field = m[1];
+  const after = blob.slice(blob.indexOf(m[0]) + m[0].length).trim();
+  let clause = after;
+  const cut = clause.search(/\.\s*(?:>\s*\d+\.|(?:If|when)\s+`|$|\d+\.\s*Required)/i);
+  if (cut > 12) clause = clause.slice(0, cut).trim();
+
+  clause = clause.replace(/\([^)]*\)/g, m => (/[\u4e00-\u9fff]/.test(m) ? "" : m));
+  if (/\bor\b/i.test(clause)) {
+    const vals = [];
+    for (const part of clause.split(/\s+or\s+/i)) {
+      const lm = /\b([a-z]{2})\b/i.exec(part.replace(/`/g, "").trim());
+      if (lm && !vals.includes(lm[1].toLowerCase())) vals.push(lm[1].toLowerCase());
+    }
+    return vals.length ? { op: "in", field, values: vals } : null;
+  }
+
+  let rhs = clause.replace(/^[`'"]+|[`'"]+$/g, "").trim();
+  rhs = rhs.split(/\s+/)[0].replace(/[,;:]+$/, "");
+
+  const num = /^-?\d+$/.exec(rhs);
+  if (num) return { op: "eq", field, value: +num[0] };
+
+  return { op: "eq", field, value: rhs.toLowerCase() };
+}
+
+function buildTravelFieldRulesFromPipeRows(pipeRows, footnoteMap) {
+  /** @type Record<string, unknown> */
+  const rules = {};
+  for (const pr of pipeRows) {
+    const ref = pr.mandatoryFootnoteRef;
+    if (ref == null || !footnoteMap[ref]) continue;
+    const c = parseTravelQuestionnaireConditionFromFootnote(footnoteMap[ref]);
+    if (c) rules[pr.name] = c;
+  }
+  return rules;
+}
+
+function travelNormRuleScalar(v) {
+  if (v === null || v === undefined) return "";
+  if (typeof v === "boolean") return v ? "true" : "false";
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  return String(v).trim().toLowerCase();
+}
+
+function travelRuleScalarEqual(a, b) {
+  if (a === b) return true;
+  if (typeof a === "number" && typeof b === "number") return a === b;
+  if (typeof b === "number" && /^-?\d+(?:\.\d+)?$/.test(String(a).trim())) return Number(a) === b;
+  return travelNormRuleScalar(a) === travelNormRuleScalar(b);
+}
+
+function travelRuleEvaluateCondition(cond, vals) {
+  if (!cond || typeof cond !== "object") return true;
+  if (/** @type any */ (cond).op === "always") return true;
+  const op = /** @type any */ (cond).op;
+  const field = /** @type any */ (cond).field;
+  const cur = field ? vals[field] : undefined;
+
+  if (op === "eq") return travelRuleScalarEqual(cur, /** @type any */ (cond).value);
+
+  if (op === "in") {
+    const list = /** @type any */ (cond).values;
+    if (!Array.isArray(list) || !list.length) return false;
+    const c = travelNormRuleScalar(cur);
+    return list.some(x => travelNormRuleScalar(x) === c || travelRuleScalarEqual(cur, x));
+  }
+
+  if (op === "and") {
+    const rules = /** @type any */ (cond).rules;
+    if (!Array.isArray(rules)) return false;
+    return rules.every(r => travelRuleEvaluateCondition(r, vals));
+  }
+
+  return false;
+}
+
+function travelReadQuestionnaireDepsValues(wrap) {
+  const vals = /** @type Record<string, unknown> */ ({});
+  if (!wrap) return vals;
+  wrap.querySelectorAll(".param-qnest-row").forEach(sub => {
+    if (sub.dataset.qnestCollapsed === "1") return;
+    const fk = (sub.dataset.qnestKey || "").trim();
+    const inp = sub.querySelector(".param-qnest-val-input");
+    if (!fk || !inp) return;
+    const raw = inp.value.trim();
+    vals[fk] = raw === "" ? "" : parseQuestionnaireFieldInput(raw);
+  });
+  return vals;
+}
+
+function travelDecodeQnestCondition(encoded) {
+  if (!encoded) return null;
+  try {
+    return JSON.parse(decodeURIComponent(String(encoded)));
+  } catch (_) {
+    try {
+      return JSON.parse(String(encoded));
+    } catch (__) {
+      return null;
+    }
+  }
+}
+
+function travelEncodeQnestCondition(cond) {
+  if (!cond) return "";
+  try {
+    return encodeURIComponent(JSON.stringify(cond));
+  } catch (_) {
+    return "";
+  }
+}
+
+function refreshTravelQuestionnaireConditionalRows(hostRow) {
+  const wrap = hostRow && hostRow.querySelector(".param-qnest-wrap");
+  if (!wrap) return;
+  for (let pass = 0; pass < 10; pass++) {
+    let changed = false;
+    const vals = travelReadQuestionnaireDepsValues(wrap);
+    wrap.querySelectorAll(".param-qnest-row").forEach(sub => {
+      const enc = sub.getAttribute("data-qnest-c");
+      const rule = enc ? travelDecodeQnestCondition(enc) : null;
+      if (!rule) {
+        if (sub.classList.contains("param-qnest-row--rule-hidden")) {
+          sub.classList.remove("param-qnest-row--rule-hidden");
+          changed = true;
+        }
+        return;
+      }
+      const show = travelRuleEvaluateCondition(rule, vals);
+      const hid = sub.classList.contains("param-qnest-row--rule-hidden");
+      if ((!show && !hid) || (show && hid)) {
+        sub.classList.toggle("param-qnest-row--rule-hidden", !show);
+        changed = true;
+      }
+    });
+    if (!changed) break;
+  }
+  collectParams();
+}
+
+function travelQuestionnaireBindConditionalInputs(hostRow) {
+  const wrap = hostRow && hostRow.querySelector(".param-qnest-wrap");
+  if (!wrap || wrap.dataset.tqCondBound === "1") return;
+  wrap.dataset.tqCondBound = "1";
+  const run = () => refreshTravelQuestionnaireConditionalRows(hostRow);
+  wrap.addEventListener("input", run);
+  wrap.addEventListener("change", run);
+  run();
+}
+
 /** Extract Binance markdown pipe rows (Name / Type / Mandatory) from an H2 subsection. */
 function extractTravelQuestionnairePipeRows(sliceLines) {
-  /** @type {{name:string,type:string,mandatory:string}[]} */
+  /** @type {{name:string,type:string,mandatory:string,mandatoryFootnoteRef:number|null}[]} */
   const out = [];
   for (let q = 0; q < sliceLines.length; q++) {
     const raw = sliceLines[q].trim();
@@ -6035,9 +6629,10 @@ function extractTravelQuestionnairePipeRows(sliceLines) {
     const typ = cells[1].replace(/`+/g, "").trim();
     const typUp = typ.toUpperCase().replace(/\s+/g, "");
     if (!/^(STRING|ENUM|DECIMAL|INT|LONG|BOOLEAN|DOUBLE|ARRAY|[A-Z][A-Z0-9_-]{1,31})$/.test(typUp)) continue;
+    const mfRef = extractTravelMandatoryFootnoteRef(cells[2]);
     const manCell = normalizeDocMandatoryCell(cells[2]);
     if (!/^YES\b/.test(manCell) && !/^NO\b/.test(manCell)) continue;
-    out.push({ name: nameCell, type: typ, mandatory: manCell });
+    out.push({ name: nameCell, type: typ, mandatory: manCell, mandatoryFootnoteRef: mfRef });
   }
   return out;
 }
@@ -6056,10 +6651,11 @@ function shouldSkipTravelRegionHeadingSlug(slug) {
 }
 
 /**
- * Parse https://developers.binance.com/docs/wallet/travel-rule/withdraw-questionnaire (or deposit) Jina/Markdown.
- * Returns [{ key, label, template }] in document order.
+ * Parse questionnaire doc Jina/Markdown (withdraw or deposit doc page).
+ * Returns [{ key, label, template, fieldRules }] — fieldRules merges embedded overrides with parsed footnotes.
  */
-function parseRegionalQuestionnairesFromMarkdown(rawText) {
+function parseRegionalQuestionnairesFromMarkdown(rawText, docKind) {
+  const kind = docKind === "withdraw" ? "withdraw" : "deposit";
   const norm = String(rawText || "").replace(/\r\n/g, "\n");
   const core = jinaMarkdownContentBody(norm);
   const lines = core.split("\n");
@@ -6068,12 +6664,12 @@ function parseRegionalQuestionnairesFromMarkdown(rawText) {
   for (let i = 0; i < lines.length; i++) {
     const m = /^\#{2}\s+(.+)$/.exec(lines[i]);
     if (!m) continue;
-    const titleClean = prepareMarkdownHeadingTitleForSlug(m[1]);
-    const slug = slugifyDocHeading(titleClean);
+    const label = sanitizeTravelQuestionnaireRegionLabel(m[1]);
+    const slug = slugifyDocHeading(prepareMarkdownHeadingTitleForSlug(label));
     if (shouldSkipTravelRegionHeadingSlug(slug)) continue;
-    heads.push({ i, slug, label: titleClean });
+    heads.push({ i, slug, label });
   }
-  /** @type {{key:string,label:string,template:Record<string,unknown>}[]} */
+  /** @type {{key:string,label:string,template:Record<string,unknown>,fieldRules:Record<string,unknown>}[]} */
   const regions = [];
   for (let h = 0; h < heads.length; h++) {
     const start = heads[h].i + 1;
@@ -6086,7 +6682,10 @@ function parseRegionalQuestionnairesFromMarkdown(rawText) {
     for (const pr of pipeRows) {
       template[pr.name] = defaultTravelQuestionnaireFieldValue(pr.name, pr.type);
     }
-    regions.push({ key: heads[h].slug, label: heads[h].label, template });
+    const footMap = extractTravelQuestionnaireFootnoteMap(slice);
+    const parsedRules = buildTravelFieldRulesFromPipeRows(pipeRows, footMap);
+    const fieldRules = mergeTravelFieldRules(TRAVEL_EMBEDDED_FIELD_RULES[kind]?.[heads[h].slug] || {}, parsedRules);
+    regions.push({ key: heads[h].slug, label: heads[h].label, template, fieldRules });
   }
   return regions;
 }
@@ -6098,7 +6697,7 @@ async function fetchTravelQuestionnaireRegionsFromBinance(kind) {
   const res = await fetch(proxied, { headers: { Accept: "text/plain" } });
   const text = await res.text();
   if (!text || text.length < 80) throw new Error("short body");
-  const parsed = parseRegionalQuestionnairesFromMarkdown(text);
+  const parsed = parseRegionalQuestionnairesFromMarkdown(text, kind);
   if (!parsed.length) throw new Error("no regions");
   return parsed;
 }
@@ -6129,6 +6728,14 @@ function getTravelQuestionnaireTemplate(kind, regionKey) {
   const hit = list.find(r => r.key === regionKey);
   if (hit && hit.template && Object.keys(hit.template).length) return Object.assign({}, hit.template);
   return travelFallbackTemplate(kind, regionKey);
+}
+
+/** Visibility rules keyed by questionnaire JSON field — static + fetched merge lives on region rows. */
+function getTravelQuestionnaireFieldRules(kind, regionKey) {
+  const hit = travelRegionsResolved(kind).find(r => r.key === regionKey);
+  if (hit && hit.fieldRules && Object.keys(hit.fieldRules).length) return /** @type Record<string, unknown> */ ({ ...hit.fieldRules });
+  const emb = TRAVEL_EMBEDDED_FIELD_RULES[kind]?.[regionKey];
+  return emb ? mergeTravelFieldRules({}, emb) : {};
 }
 
 let travelQuestionnaireUiKind = "";
@@ -6170,9 +6777,14 @@ function travelRuleQuestionnaireValueLooksEmpty() {
   for (let x = 0; x < rows.length; x++) {
     const row = rows[x];
     const ki = row.querySelector(".param-key-input");
+    if (!ki || !paramUsesJsonQuestionnaire(ki.value)) continue;
+    if (row.dataset.qnestRoot === "1") {
+      const wrap = row.querySelector(".param-qnest-wrap");
+      const obj = wrap ? collectQuestionnaireObjectFromQnestWrap(wrap) : {};
+      return Object.keys(obj).length === 0;
+    }
     const vi = row.querySelector(".param-val-input");
-    if (!ki || !vi) continue;
-    if (!paramUsesJsonQuestionnaire(ki.value)) continue;
+    if (!vi) return true;
     const t = vi.value.trim();
     return !t || t === "{}";
   }
@@ -6184,24 +6796,24 @@ function stringifyTravelRuleQuestionnaire(obj) {
   return JSON.stringify(obj);
 }
 
-function upsertQuestionnaireParamRow(jsonCompactStr) {
+function upsertQuestionnaireParamRow(jsonCompactStr, fieldRules) {
+  /** @type Record<string, unknown> */
+  const fr = Object.assign({}, fieldRules || {});
   const rows = document.querySelectorAll("#params-rows .param-row");
   for (let x = 0; x < rows.length; x++) {
     const row = rows[x];
     const ki = row.querySelector(".param-key-input");
-    const vi = row.querySelector(".param-val-input");
-    if (!ki || !vi) continue;
-    if (!paramUsesJsonQuestionnaire(ki.value)) continue;
-    ensureQuestionnaireValueIsJsonTextarea(row, jsonCompactStr);
+    if (!ki || !paramUsesJsonQuestionnaire(ki.value)) continue;
+    ensureQuestionnaireValueIsNest(row, jsonCompactStr, fr);
     return;
   }
-  addMandatoryParamRow("questionnaire", jsonCompactStr, "Travel rule questionnaire JSON ({ … })");
+  addMandatoryParamRow("questionnaire", jsonCompactStr, "", fr);
 }
 
 function applyTravelRuleQuestionnairePreset(kind, regionKey) {
   const obj = getTravelQuestionnaireTemplate(kind, regionKey);
   if (!obj || !Object.keys(obj).length) return;
-  upsertQuestionnaireParamRow(stringifyTravelRuleQuestionnaire(obj));
+  upsertQuestionnaireParamRow(stringifyTravelRuleQuestionnaire(obj), getTravelQuestionnaireFieldRules(kind, regionKey));
 }
 
 function refillTravelRegionSelect(kind, selEl, previousValue) {
@@ -6701,45 +7313,220 @@ function escapeHtml(s) {
   return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
 }
 
-/** Wallet travel-rule `questionnaire` param is JSON; render as multiline editor. */
+/** Wallet travel-rule `questionnaire` param is JSON; render fields as rows with per-field eye (include in JSON). */
 function paramUsesJsonQuestionnaire(nameOrKey) {
   return String(nameOrKey || "").trim().toLowerCase() === "questionnaire";
 }
 
-/** Replace questionnaire value widget with monospace JSON textarea (.param-val-input kept for collectors). */
-function ensureQuestionnaireValueIsJsonTextarea(row, valueStr) {
+function parseQuestionnaireJsonToObject(valueStr) {
+  const t = String(valueStr || "").trim();
+  if (!t) return {};
+  try {
+    const o = JSON.parse(t);
+    return o !== null && typeof o === "object" && !Array.isArray(o) ? o : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+function questionnaireValueToInputString(v) {
+  if (v === null || v === undefined) return "";
+  if (typeof v === "object") return JSON.stringify(v);
+  return String(v);
+}
+
+function parseQuestionnaireFieldInput(raw) {
+  const t = String(raw ?? "").trim();
+  if (!t) return "";
+  if (t === "true") return true;
+  if (t === "false") return false;
+  if (/^-?\d+(\.\d+)?([eE][+-]?\d+)?$/.test(t) && !/^0\d/.test(t)) {
+    const n = Number(t);
+    if (Number.isFinite(n)) return n;
+  }
+  try {
+    return JSON.parse(t);
+  } catch (_) {
+    return raw;
+  }
+}
+
+function collectQuestionnaireObjectFromQnestWrap(wrapEl) {
+  const out = /** @type Record<string, unknown> */ ({});
+  if (!wrapEl) return out;
+  wrapEl.querySelectorAll(".param-qnest-row").forEach(r => {
+    if (r.dataset.qnestCollapsed === "1") return;
+    if (r.classList.contains("param-qnest-row--rule-hidden")) return;
+    const k = (r.dataset.qnestKey || "").trim();
+    if (!k) return;
+    const vi = r.querySelector(".param-qnest-val-input");
+    const valStr = vi ? vi.value.trim() : "";
+    out[k] = parseQuestionnaireFieldInput(valStr);
+  });
+  return out;
+}
+
+function buildQnestRowsHtml(rootPid, obj, fieldRulesObj) {
+  /** @type Record<string, unknown> */
+  const rulesMap = Object.assign({}, fieldRulesObj || {});
+  const keys = Object.keys(obj || {});
+  if (!keys.length) {
+    return '<div class="param-qnest-empty-hint" style="font-size:12px;color:#484f58;padding:4px 2px">No fields — pick a Travel Rule region above or paste JSON keys.</div>';
+  }
+  return keys
+    .map((key, ix) =>
+      buildQuestionnaireSubRowExpandedHtml(
+        rootPid,
+        ix,
+        key,
+        questionnaireValueToInputString(obj[key]),
+        travelEncodeQnestCondition(/** @type any */ (rulesMap[key]))
+      )
+    )
+    .join("");
+}
+
+function buildQuestionnaireSubRowExpandedHtml(rootPid, subIx, fieldKey, valueStr, condEncAttr) {
+  const dac =
+    condEncAttr && String(condEncAttr).length
+      ? ' data-qnest-c="' + escapeAttr(String(condEncAttr)) + '"'
+      : "";
+  return (
+    '<div class="param-qnest-row"' +
+    dac +
+    ' data-qnest-sub="' +
+    escapeAttr(String(subIx)) +
+    '" data-qnest-key="' +
+    escapeAttr(fieldKey) +
+    '" data-qnest-collapsed="0">' +
+    '<button type="button" class="param-eye-btn" title="Exclude from questionnaire JSON" onclick="toggleQuestionnaireSubRow(' +
+    rootPid +
+    "," +
+    subIx +
+    ')">' +
+    PARAM_EYE_ON +
+    '</button>' +
+    '<input class="param-input param-qnest-key" readonly tabindex="-1" value="' +
+    escapeAttr(fieldKey) +
+    '" title="Questionnaire JSON key">' +
+    '<input class="param-input param-qnest-val-input" placeholder="value" value="' +
+    escapeAttr(valueStr) +
+    '" oninput="travelQuestionnaireQnestInput(' +
+    rootPid +
+    ')">' +
+    "</div>"
+  );
+}
+
+function buildQuestionnaireSubRowCollapsedHtml(rootPid, subIx, fieldKey, heldVal, condEncAttr) {
+  const ph = questionnaireValueToInputString(heldVal);
+  const dac =
+    condEncAttr && String(condEncAttr).length
+      ? ' data-qnest-c="' + escapeAttr(String(condEncAttr)) + '"'
+      : "";
+  return (
+    '<div class="param-qnest-row param-qnest-row--collapsed"' +
+    dac +
+    ' data-qnest-sub="' +
+    escapeAttr(String(subIx)) +
+    '" data-qnest-key="' +
+    escapeAttr(fieldKey) +
+    "\" data-qnest-collapsed=\"1\" data-qnest-held-val=\"" +
+    escapeAttr(ph) +
+    '">' +
+    '<button type="button" class="param-eye-btn param-eye-btn--inactive" title="Include in questionnaire JSON" onclick="toggleQuestionnaireSubRow(' +
+    rootPid +
+    "," +
+    subIx +
+    ')">' +
+    PARAM_EYE_OFF +
+    "</button>" +
+    '<span class="param-opt-key">' +
+    escapeHtml(fieldKey) +
+    "</span>" +
+    '<span class="param-opt-hint">excluded · tap eye</span>' +
+    "</div>"
+  );
+}
+
+function toggleQuestionnaireSubRow(rootPid, subIx) {
+  const row = document.querySelector(
+    '#params-rows .param-row[data-pid="' + rootPid + '"] .param-qnest-row[data-qnest-sub="' + subIx + '"]'
+  );
+  if (!row) return;
+  const fk = row.dataset.qnestKey || "";
+  const encHold = row.getAttribute("data-qnest-c") || "";
+  if (row.dataset.qnestCollapsed === "1") {
+    const heldRaw = row.dataset.qnestHeldVal !== undefined ? row.dataset.qnestHeldVal : "";
+    row.outerHTML = buildQuestionnaireSubRowExpandedHtml(rootPid, subIx, fk, heldRaw, encHold);
+  } else {
+    const vi = row.querySelector(".param-qnest-val-input");
+    const held = vi ? vi.value : row.dataset.qnestHeldVal || "";
+    row.outerHTML = buildQuestionnaireSubRowCollapsedHtml(rootPid, subIx, fk, held, encHold);
+  }
+  const hr = document.querySelector('#params-rows .param-row[data-pid="' + rootPid + '"]');
+  if (hr && hr.dataset.qnestRoot === "1") refreshTravelQuestionnaireConditionalRows(hr);
+  else collectParams();
+}
+
+/** Thin wrapper so nesting does not recurse collectParam stack on each keystroke. */
+function travelQuestionnaireQnestInput(rootPidStr) {
+  const hr = document.querySelector('#params-rows .param-row[data-pid="' + rootPidStr + '"]');
+  if (hr && hr.dataset.qnestRoot === "1") refreshTravelQuestionnaireConditionalRows(hr);
+  else collectParams();
+}
+
+/** Parse / replace questionnaire value area with per-key rows (eye = include in signed JSON). */
+function ensureQuestionnaireValueIsNest(row, valueStr, nestFieldRules) {
   if (!row) return;
   const ki = row.querySelector(".param-key-input");
   if (!paramUsesJsonQuestionnaire(ki ? ki.value : "") && !paramUsesJsonQuestionnaire(row.dataset.docKey)) return;
-  row.classList.add("param-row--json-val");
-  let vi = row.querySelector(".param-val-input");
-  if (!vi) return;
-  if (vi.tagName !== "TEXTAREA") {
-    const ta = document.createElement("textarea");
-    ta.className = "param-input param-val-input param-val-json";
-    ta.rows = 8;
-    ta.spellcheck = false;
-    ta.setAttribute("aria-label", "questionnaire JSON");
-    ta.placeholder = vi.placeholder || "Travel rule questionnaire JSON ({ … })";
-    ta.addEventListener("input", collectParams);
-    vi.replaceWith(ta);
-    vi = ta;
+  row.classList.add("param-row--json-val", "param-row--qnest-root");
+  row.dataset.qnestRoot = "1";
+  const obj = typeof valueStr === "string" ? parseQuestionnaireJsonToObject(valueStr) : valueStr || {};
+  const rulesSaved =
+    nestFieldRules && typeof nestFieldRules === "object" ? Object.assign({}, nestFieldRules) : {};
+  row.dataset.qnestFieldRules = JSON.stringify(rulesSaved);
+  const pid = row.dataset.pid;
+  const vi = row.querySelector(".param-val-input");
+  if (vi) vi.remove();
+  let wrap = row.querySelector(".param-qnest-wrap");
+  if (!wrap) {
+    wrap = document.createElement("div");
+    wrap.className = "param-qnest-wrap";
+    const rm = row.querySelector(".param-remove-btn");
+    if (rm) row.insertBefore(wrap, rm);
+    else row.appendChild(wrap);
   }
-  vi.value = valueStr != null ? String(valueStr) : "";
+  if (!pid) return;
+  delete wrap.dataset.tqCondBound;
+  wrap.innerHTML = buildQnestRowsHtml(pid, obj, rulesSaved);
+  travelQuestionnaireBindConditionalInputs(row);
 }
 
 function collapseDocOptionalRow(row) {
   const pid = row.dataset.pid;
   const ki = row.querySelector(".param-key-input");
-  const vi = row.querySelector(".param-val-input");
-  if (!ki || !vi || !pid) return;
+  if (!ki || !pid) return;
   row.dataset.docHeldKey = ki.value.trim();
-  row.dataset.docHeldVal = vi.value;
-  const phAttr = vi.getAttribute("placeholder");
-  if (phAttr) row.dataset.docPh = phAttr;
+
+  if (row.dataset.qnestRoot === "1") {
+    const wrap = row.querySelector(".param-qnest-wrap");
+    row.dataset.docHeldVal = stringifyTravelRuleQuestionnaire(collectQuestionnaireObjectFromQnestWrap(wrap));
+    row.dataset.docQnestFieldRules = row.dataset.qnestFieldRules || "{}";
+  } else {
+    const vi = row.querySelector(".param-val-input");
+    if (!vi) return;
+    row.dataset.docHeldVal = vi.value;
+    const phAttr = vi.getAttribute("placeholder");
+    if (phAttr) row.dataset.docPh = phAttr;
+    else delete row.dataset.docPh;
+  }
+
+  delete row.dataset.qnestRoot;
   row.dataset.docOptCollapsed = "1";
 
-  row.classList.remove("param-row--json-val");
+  row.classList.remove("param-row--json-val", "param-row--qnest-root");
 
   row.innerHTML =
     '<button type="button" class="param-eye-btn param-eye-btn--inactive" title="Include in signed request" onclick="toggleDocOptionalParam(' +
@@ -6770,20 +7557,45 @@ function expandDocOptionalRow(row) {
   row.dataset.docOptCollapsed = "0";
 
   const jq = paramUsesJsonQuestionnaire(key);
-  if (jq) row.classList.add("param-row--json-val");
-  else row.classList.remove("param-row--json-val");
 
-  const valBlock = jq
-    ? '<textarea class="param-input param-val-input param-val-json" rows="8" spellcheck="false" aria-label="questionnaire JSON"' +
-      valPhAttr +
-      ' oninput="collectParams()">' +
-      escapeHtml(valRaw) +
-      "</textarea>"
-    : '<input class="param-input param-val-input"' +
-      valPhAttr +
-      ' value="' +
-      escapeAttr(valRaw) +
-      '" oninput="collectParams()">';
+  if (jq) {
+    row.classList.add("param-row--json-val", "param-row--qnest-root");
+    row.dataset.qnestRoot = "1";
+    row.innerHTML =
+      '<button type="button" class="param-eye-btn" title="Exclude from signed request" onclick="toggleDocOptionalParam(' +
+      pid +
+      ')">' +
+      PARAM_EYE_ON +
+      '</button>' +
+      '<input class="param-input param-key-input" placeholder="key" value="' +
+      escapeAttr(key) +
+      '" oninput="collectParams()" readonly tabindex="-1" title="From documentation">' +
+      '<div class="param-qnest-wrap"></div>' +
+      '<button type="button" class="param-remove-btn" onclick="removeParam(' +
+      pid +
+      ')">×</button>';
+    let qr = {};
+    try {
+      qr = JSON.parse(row.dataset.docQnestFieldRules || "{}");
+    } catch (_) {
+      qr = {};
+    }
+    ensureQuestionnaireValueIsNest(row, valRaw || "{}", qr);
+    collectParams();
+    return;
+  }
+
+  delete row.dataset.docQnestFieldRules;
+  row.classList.remove("param-row--qnest-root");
+  delete row.dataset.qnestRoot;
+  row.classList.remove("param-row--json-val");
+
+  const valBlock =
+    '<input class="param-input param-val-input"' +
+    valPhAttr +
+    ' value="' +
+    escapeAttr(valRaw) +
+    '" oninput="collectParams()">';
 
   row.innerHTML =
     '<button type="button" class="param-eye-btn" title="Exclude from signed request" onclick="toggleDocOptionalParam(' +
@@ -6987,28 +7799,28 @@ function parseBinanceDocsPaste(text) {
   return out;
 }
 
-function addMandatoryParamRow(key, val, valuePlaceholder) {
+function addMandatoryParamRow(key, val, valuePlaceholder, nestFieldRules) {
   const id = ++paramIdSeed;
   const row = document.createElement("div");
   const jq = paramUsesJsonQuestionnaire(key);
-  row.className = "param-row" + (jq ? " param-row--json-val" : "");
+  row.className = "param-row" + (jq ? " param-row--json-val param-row--qnest-root" : "");
   row.dataset.pid = String(id);
-  const phShown =
-    jq ? valuePlaceholder || "Travel rule questionnaire JSON ({ … })"
-    : valuePlaceholder ? valuePlaceholder
-    : "value";
-  const valPhAttr = ' placeholder="' + escapeAttr(phShown) + '"';
+  if (jq) row.dataset.qnestRoot = "1";
+
   const valBlock = jq
-    ? '<textarea class="param-input param-val-input param-val-json" rows="8" spellcheck="false" aria-label="questionnaire JSON"' +
-      valPhAttr +
-      ' oninput="collectParams()">' +
-      escapeHtml(val) +
-      "</textarea>"
-    : '<input class="param-input param-val-input"' +
-      valPhAttr +
-      ' value="' +
-      escapeAttr(val) +
-      '" oninput="collectParams()">';
+    ? '<div class="param-qnest-wrap"></div>'
+    : (() => {
+        const phShown = valuePlaceholder ? valuePlaceholder : "value";
+        return (
+          '<input class="param-input param-val-input"' +
+          ' placeholder="' +
+          escapeAttr(phShown) +
+          '" value="' +
+          escapeAttr(val) +
+          '" oninput="collectParams()">'
+        );
+      })();
+
   row.innerHTML =
     '<span class="param-eye-spacer" aria-hidden="true"></span>' +
     '<input class="param-input param-key-input" placeholder="key" value="' +
@@ -7019,6 +7831,7 @@ function addMandatoryParamRow(key, val, valuePlaceholder) {
     id +
     ')">×</button>';
   document.getElementById("params-rows").appendChild(row);
+  if (jq) ensureQuestionnaireValueIsNest(row, val, nestFieldRules || {});
 }
 
 /** Doc import: mandatory row is always in the signed request; optional starts with eye closed until toggled. */
@@ -7033,23 +7846,21 @@ function addImportedDocParamRow(r) {
 
   if (r.mandatory) {
     const jq = paramUsesJsonQuestionnaire(r.name);
-    if (jq) row.classList.add("param-row--json-val");
-    const valPhAttr = jq
-      ? ' placeholder="' + escapeAttr("Travel rule questionnaire JSON ({ … })") + '"'
-      : d.ph
-      ? ' placeholder="' + escapeAttr(d.ph) + '"'
-      : ' placeholder="value"';
+    if (jq) row.classList.add("param-row--json-val", "param-row--qnest-root");
     const valBody = jq
-      ? '<textarea class="param-input param-val-input param-val-json" rows="8" spellcheck="false" aria-label="questionnaire JSON"' +
-        valPhAttr +
-        ' oninput="collectParams()">' +
-        escapeHtml(d.val) +
-        "</textarea>"
-      : '<input class="param-input param-val-input"' +
-        valPhAttr +
-        ' value="' +
-        escapeAttr(d.val) +
-        '" oninput="collectParams()">';
+      ? '<div class="param-qnest-wrap"></div>'
+      : (() => {
+          const valPhAttr = d.ph
+            ? ' placeholder="' + escapeAttr(d.ph) + '"'
+            : ' placeholder="value"';
+          return (
+            '<input class="param-input param-val-input"' +
+            valPhAttr +
+            ' value="' +
+            escapeAttr(d.val) +
+            '" oninput="collectParams()">'
+          );
+        })();
     row.innerHTML =
       '<span class="param-eye-spacer" aria-hidden="true"></span>' +
       '<input class="param-input param-key-input" placeholder="key" value="' +
@@ -7060,6 +7871,10 @@ function addImportedDocParamRow(r) {
       id +
       ')">×</button>';
     document.getElementById("params-rows").appendChild(row);
+    if (jq) {
+      row.dataset.qnestRoot = "1";
+      ensureQuestionnaireValueIsNest(row, d.val, {});
+    }
     return;
   }
 
@@ -7354,11 +8169,21 @@ function syncExtraParamsFromParamRows() {
   document.querySelectorAll('#params-rows .param-row').forEach(row => {
     if (row.dataset.docOptional === "1" && row.dataset.docOptCollapsed === "1") return;
     const ki = row.querySelector(".param-key-input");
-    const vi = row.querySelector(".param-val-input");
-    if (!ki || !vi) return;
+    if (!ki) return;
     const k = ki.value.trim();
+    if (!k) return;
+
+    if (row.dataset.qnestRoot === "1") {
+      const wrap = row.querySelector(".param-qnest-wrap");
+      const obj = collectQuestionnaireObjectFromQnestWrap(wrap);
+      extraParams.push({ key: k, val: stringifyTravelRuleQuestionnaire(obj) });
+      return;
+    }
+
+    const vi = row.querySelector(".param-val-input");
+    if (!vi) return;
     const v = vi.value.trim();
-    if (k) extraParams.push({ key: k, val: v });
+    extraParams.push({ key: k, val: v });
   });
 }
 
