@@ -4963,24 +4963,119 @@ function extractDocUrlFragment(docPageUrl) {
   return "";
 }
 
-/** Hash from docs URL bar, or Jina’s first line `Source URL: …#anchor` when pasted text omits URL field. */
+/** Hash from docs URL bar or Jina header (`Source URL:` / `URL Source:`). */
 function extractMergedDocsFragment(docPageUrl, rawPasteText) {
   const fromBar = extractDocUrlFragment(docPageUrl || "");
   if (fromBar) return fromBar;
-  const n = (rawPasteText || "").replace(/\r\n/g, "\n");
-  const ml = /^Source URL:\s*(.+)\s*$/mi.exec(n);
-  if (!ml) return "";
-  return extractDocUrlFragment(ml[1].trim());
+  const line = extractJinaPasteSourceUrlLine(rawPasteText || "");
+  return line ? extractDocUrlFragment(line) : "";
 }
 
-/** Full docs URL when URL bar empty but pasted Jina text has `Source URL: …`. */
+/** Full docs URL from bar or pasted Jina headers. */
 function extractMergedDocsPageUrl(docPageUrl, rawPasteText) {
   const u = (docPageUrl || "").trim();
   if (u) return u;
-  const n = (rawPasteText || "").replace(/\r\n/g, "\n");
-  const ml = /^Source URL:\s*(.+)\s*$/mi.exec(n);
-  return ml ? ml[1].trim() : "";
+  return extractJinaPasteSourceUrlLine(rawPasteText || "") || "";
 }
+
+/** First ~40 lines: `Source URL:` or `URL Source:` (reader variants). */
+function extractJinaPasteSourceUrlLine(rawPasteText) {
+  const n = (rawPasteText || "").replace(/\r\n/g, "\n");
+  const rows = n.split("\n").slice(0, 42);
+  for (let x = 0; x < rows.length; x++) {
+    const m = rows[x].trim().match(/^(?:Source URL|URL Source)\s*:\s*(.+)$/i);
+    if (m && m[1]) return m[1].trim();
+  }
+  return "";
+}
+
+/** Strip Jina preamble so section titles (`Markdown Content:`) are located correctly. */
+function jinaMarkdownContentBody(normIn) {
+  const norm = (normIn || "").replace(/\r\n/g, "\n");
+  const mc = /(?:^|\n)Markdown Content\s*:/im.exec(norm);
+  if (!mc) return norm;
+  return norm.slice(mc.index + mc[0].length).replace(/^\s*\n/, "");
+}
+
+function looksLikePlainBinanceDocsSectionTitle(raw) {
+  const t = prepareMarkdownHeadingTitleForSlug(raw || "");
+  if (t.length < 3 || t.length > 130) return false;
+  if (/^(GET|POST|PUT|DELETE|PATCH)\b/i.test(t)) return false;
+  if (/^#{1,6}\s|^[\s>*|-]|^\||^`/.test(t)) return false;
+  if (/\t/.test(t)) return false;
+  if (
+    /^(parameters|notes|note|examples?|similar|depending|conditional|mandatory|request\b|response|weight\b|published|copyright|title|products|english|changelog|faq|previous|next|general api|spot trading|\d)/i.test(
+      t
+    )
+  ) {
+    return false;
+  }
+  if (/\.$/.test(t)) return false;
+  if (/\(TRADE\)\s*$/.test(t)) return true;
+  if (/^Order lists\b/i.test(t) && t.length < 42) return true;
+  if (/^SOR\b/i.test(t)) return true;
+  if (
+    /^[A-Z][^\n]{0,100}$/.test(raw.trim()) &&
+    raw.trim().split(/\s+/).length <= 14 &&
+    !/^Send |^This |^Either |^When |^If |^The |^An |^A |^For |^All |^After |^These |^Response |^Request |^Test connectivity/i.test(raw.trim())
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function narrowDocPasteByPlainHeadingSlug(fullNorm, slug) {
+  if (!slug || !fullNorm) return null;
+  const work = jinaMarkdownContentBody(fullNorm);
+  const lines = work.split("\n");
+  /** @type {number[]} */
+  const cand = [];
+  for (let idx = 0; idx < lines.length; idx++) {
+    const sl = slugifyDocHeading(prepareMarkdownHeadingTitleForSlug(lines[idx]));
+    if (sl === slug) cand.push(idx);
+  }
+  if (!cand.length) return null;
+
+  function verbIndexFrom(ix) {
+    const chunk = lines.slice(ix).join("\n").slice(0, 5200);
+    const vm = /\b(GET|POST|PUT|DELETE|PATCH)\s+(\/(?:api|fapi|dapi|papi|eapi|sapi)\/[^\s`'")\]\r\n]+)/im.exec(
+      chunk
+    );
+    return vm ? vm.index : Number.POSITIVE_INFINITY;
+  }
+
+  let startLineIx = cand[0];
+  let bestDv = verbIndexFrom(cand[0]);
+  for (let c = 1; c < cand.length; c++) {
+    const d = verbIndexFrom(cand[c]);
+    if (d < bestDv) {
+      bestDv = d;
+      startLineIx = cand[c];
+    }
+  }
+
+  if (bestDv >= 880) return null;
+
+  let charStart = 0;
+  for (let q = 0; q < startLineIx; q++) charStart += lines[q].length + 1;
+
+  let charEnd = work.length;
+  for (let j = startLineIx + 1; j < lines.length; j++) {
+    const ln = lines[j];
+    if (!ln.trim()) continue;
+    const s2 = slugifyDocHeading(prepareMarkdownHeadingTitleForSlug(ln));
+    if (s2 && s2 !== slug && looksLikePlainBinanceDocsSectionTitle(ln)) {
+      let y = 0;
+      for (let q = 0; q < j; q++) y += lines[q].length + 1;
+      charEnd = y;
+      break;
+    }
+  }
+
+  const slice = work.slice(charStart, charEnd).trim();
+  return slice.length > 0 ? slice : null;
+}
+
 
 /** Invisible chars + MDX-style `{#anchor}` so `#new-order-trade` ↔ `New order (TRADE){#…}`. */
 function prepareMarkdownHeadingTitleForSlug(raw) {
@@ -5099,6 +5194,9 @@ function narrowDocPasteByUrlFragment(fullText, fragment) {
   const norm = fullText.replace(/\r\n/g, "\n");
 
   let narrowed = narrowMarkdownBySlugHeadings(norm, slug, false);
+  if (narrowed) return narrowed;
+
+  narrowed = narrowDocPasteByPlainHeadingSlug(norm, slug);
   if (narrowed) return narrowed;
 
   narrowed = narrowDocPasteByHtmlAnchorId(norm, slug);
