@@ -2377,6 +2377,8 @@ import javax.crypto.spec.SecretKeySpec;
 import java.net.URI;
 import java.net.http.*;
 import java.time.Instant;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
 
 public class BinanceWsHmac {
@@ -2385,14 +2387,55 @@ public class BinanceWsHmac {
     static final String BASE_URL   = "{{EP}}";
     static final String METHOD     = "{{METHOD}}";
 
+    static String jesc(String s) {
+        if (s == null) return "";
+        StringBuilder b = new StringBuilder();
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == 92) {
+                b.append((char) 92).append((char) 92);
+            } else if (c == 34) {
+                b.append((char) 92).append((char) 34);
+            } else {
+                b.append(c);
+            }
+        }
+        return b.toString();
+    }
+
     public static void main(String[] args) throws Exception {
-        long   ts  = Instant.now().toEpochMilli();
-        String qs  = "apiKey=" + API_KEY + "&timestamp=" + ts;
+        long ts = Instant.now().toEpochMilli();
+        TreeMap<String, String> qp = new TreeMap<>();
+        qp.put("apiKey", API_KEY);
+        qp.put("timestamp", Long.toString(ts));
+
+        StringBuilder qsb = new StringBuilder();
+        for (Map.Entry<String, String> e : qp.entrySet()) {
+            if (qsb.length() > 0) qsb.append('&');
+            qsb.append(e.getKey()).append('=').append(e.getValue());
+        }
+        String qs = qsb.toString();
         String sig = hmacSha256(API_SECRET, qs);
 
+        int Q = 34;
+        StringBuilder pj = new StringBuilder();
+        pj.append((char) 123);
+        boolean fk = true;
+        for (Map.Entry<String, String> e : qp.entrySet()) {
+            if (!fk) pj.append(',');
+            fk = false;
+            pj.append((char) Q).append(jesc(e.getKey())).append((char) Q).append(':');
+            if ("timestamp".equals(e.getKey())) pj.append(e.getValue());
+            else pj.append((char) Q).append(jesc(e.getValue())).append((char) Q);
+        }
+        pj.append(',').append((char) Q).append("signature").append((char) Q).append(':')
+          .append((char) Q).append(jesc(sig)).append((char) Q);
+        pj.append((char) 125);
+
         String req = String.format(
-            "{\\"id\\":\\"1\\",\\"method\\":\\"%s\\",\\"params\\":{\\"apiKey\\":\\"%s\\",\\"signature\\":\\"%s\\",\\"timestamp\\":%d}}",
-            METHOD, API_KEY, sig, ts);
+            "{\\"id\\":\\"1\\",\\"method\\":\\"%s\\",\\"params\\":%s}",
+            jesc(METHOD),
+            pj.toString());
 
         CountDownLatch latch = new CountDownLatch(1);
         HttpClient.newHttpClient().newWebSocketBuilder()
@@ -2631,10 +2674,23 @@ T_ws.hmac.rust = `// Cargo.toml:
 
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
+use std::collections::BTreeMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tungstenite::connect;
 
 type HmacSha256 = Hmac<Sha256>;
+
+fn jesc(s: &str) -> String {
+    let mut out = String::new();
+    for c in s.chars() {
+        match c {
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            _ => out.push(c),
+        }
+    }
+    out
+}
 
 fn main() {
     let api_key    = "YOUR_API_KEY";
@@ -2643,19 +2699,50 @@ fn main() {
     let method     = "{{METHOD}}";
 
     let ts  = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
-    let qs  = format!("apiKey={}&timestamp={}", api_key, ts);
+    let mut qp: BTreeMap<String, String> = BTreeMap::new();
+    qp.insert("apiKey".into(), api_key.into());
+    qp.insert("timestamp".into(), ts.to_string());
+
+    let qs: String = qp
+        .iter()
+        .map(|(k, v)| format!("{}={}", k, v))
+        .collect::<Vec<_>>()
+        .join("&");
+
     let mut mac = HmacSha256::new_from_slice(api_secret.as_bytes()).unwrap();
     mac.update(qs.as_bytes());
     let sig = hex::encode(mac.finalize().into_bytes());
 
-    let req = format!(
-        r#"{{"id":"1","method":"{}","params":{{"apiKey":"{}","signature":"{}","timestamp":{}}}}}"#,
-        method, api_key, sig, ts
-    );
+    let mut pj = String::from("{");
+    let mut fk = true;
+    for (k, v) in &qp {
+        if !fk {
+            pj.push(',');
+        }
+        fk = false;
+        pj.push('"');
+        pj.push_str(&jesc(k));
+        pj.push('"');
+        pj.push(':');
+        if k == "timestamp" {
+            pj.push_str(v);
+        } else {
+            pj.push('"');
+            pj.push_str(&jesc(v));
+            pj.push('"');
+        }
+    }
+    pj.push_str(",\"signature\":\"");
+    pj.push_str(&jesc(&sig));
+    pj.push('"');
+    pj.push('}');
+
+    let prefix = format!(r#"{{"id":"1","method":"{}","params":"#, jesc(method));
+    let req = prefix + &pj + "}";
 
     let (mut ws, _) = connect(base_url).unwrap();
     println!("{}", req);
-    ws.send(tungstenite::Message::Text(req)).unwrap();
+    ws.send(tungstenite::Message::Text(req.clone())).unwrap();
     println!("{}", ws.read().unwrap());
     ws.close(None).unwrap();
 }`;
@@ -2664,16 +2751,33 @@ T_ws.hmac.cpp = `// Install IXWebSocket: https://github.com/machinezone/IXWebSoc
 // Compile: g++ -std=c++17 main.cpp -lixwebsocket -lssl -lcrypto -lpthread
 #include <ixwebsocket/IXWebSocket.h>
 #include <openssl/hmac.h>
+#include <openssl/evp.h>
 #include <iostream>
+#include <map>
 #include <sstream>
 #include <iomanip>
 #include <chrono>
+#include <string>
 #include <thread>
+
+static std::string jesc(std::string s) {
+    std::string o;
+    for (char cx : s) {
+        unsigned char c = static_cast<unsigned char>(cx);
+        if (c == 92u)
+            o += "\\\\";
+        else if (c == 34u)
+            o += "\\\"";
+        else
+            o += cx;
+    }
+    return o;
+}
 
 std::string hmacSha256(const std::string& key, const std::string& msg) {
     unsigned char md[EVP_MAX_MD_SIZE]; unsigned int len = 0;
-    HMAC(EVP_sha256(), key.data(), key.size(),
-         reinterpret_cast<const unsigned char*>(msg.data()), msg.size(), md, &len);
+    HMAC(EVP_sha256(), key.data(), static_cast<int>(key.size()),
+         reinterpret_cast<const unsigned char*>(msg.data()), static_cast<int>(msg.size()), md, &len);
     std::ostringstream ss;
     for (unsigned i = 0; i < len; ++i)
         ss << std::hex << std::setw(2) << std::setfill('0') << (int)md[i];
@@ -2688,11 +2792,33 @@ int main() {
 
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                   std::chrono::system_clock::now().time_since_epoch()).count();
-    std::string qs  = "apiKey=" + apiKey + "&timestamp=" + std::to_string(ms);
+
+    std::map<std::string, std::string> qp;
+    qp["apiKey"] = apiKey;
+    qp["timestamp"] = std::to_string(ms);
+
+    std::string qs;
+    for (const auto& kv : qp) {
+        if (!qs.empty()) qs += '&';
+        qs += kv.first + "=" + kv.second;
+    }
     std::string sig = hmacSha256(apiSecret, qs);
 
-    std::string req = R"({"id":"1","method":")" + method + R"(","params":{"apiKey":")" +
-                      apiKey + R"(","signature":")" + sig + R"(","timestamp":)" + std::to_string(ms) + "}}";
+    std::string pj("{");
+    bool fk = true;
+    for (const auto& kv : qp) {
+        if (!fk) pj += ',';
+        fk = false;
+        pj += '"' + jesc(kv.first) + '"' + ':';
+        if (kv.first == "timestamp") pj += kv.second;
+        else pj += '"' + jesc(kv.second) + '"';
+    }
+    pj += ','; pj += "\\\"signature\\\":\\\"";
+    pj += jesc(sig);
+    pj.push_back((char)34);
+    pj.push_back((char)125);
+
+    std::string req = "{\"id\":\"1\",\"method\":\"" + jesc(method) + "\",\"params\":" + pj + "}";
 
     ix::WebSocket ws;
     ws.setUrl(baseUrl);
@@ -2706,17 +2832,36 @@ int main() {
 }`;
 
 T_ws.hmac.bash = `#!/bin/bash
-# Requires: websocat (https://github.com/vi/websocat) + openssl
+# Requires: websocat + python3
 API_KEY="YOUR_API_KEY"
 API_SECRET="YOUR_API_SECRET"
 BASE_URL="{{EP}}"
 METHOD="{{METHOD}}"
+WS_TRADE_EXTRA_JSON='{}'
 
 TIMESTAMP=$(date +%s%3N)
-QS="apiKey=\${API_KEY}&timestamp=\${TIMESTAMP}"
-SIGNATURE=$(echo -n "\$QS" | openssl dgst -sha256 -hmac "\$API_SECRET" | awk '{print \$2}')
+REQUEST=$(METHOD="\${METHOD}" API_KEY="\${API_KEY}" API_SECRET="\${API_SECRET}" TIMESTAMP="\${TIMESTAMP}" WS_TRADE_EXTRA_JSON="\${WS_TRADE_EXTRA_JSON}" python3 << 'PYWS'
+import hmac, hashlib, json, os
+method = os.environ["METHOD"]
+api_key = os.environ["API_KEY"]
+secret = os.environ["API_SECRET"].encode()
+ts_ms = os.environ["TIMESTAMP"]
+extra = json.loads(os.environ.get("WS_TRADE_EXTRA_JSON") or "{}")
 
-REQUEST='{"id":"1","method":"'\${METHOD}'","params":{"apiKey":"'\${API_KEY}'","signature":"'\${SIGNATURE}'","timestamp":'\${TIMESTAMP}'}}'
+qp = {str(k): str(v) for k, v in sorted(extra.items(), key=lambda kv: str(kv[0]))}
+qp["apiKey"] = api_key
+qp["timestamp"] = ts_ms
+
+qs_keys = sorted(qp.keys())
+qs = "&".join(key + "=" + qp[key] for key in qs_keys)
+sig = hmac.new(secret, qs.encode(), hashlib.sha256).hexdigest()
+
+params_out = dict(qp)
+params_out["signature"] = sig
+params_out["timestamp"] = int(ts_ms)
+print(json.dumps({"id": "1", "method": method, "params": params_out}, separators=(",", ":")))
+PYWS
+)
 
 echo "Request: \$REQUEST"
 echo "\$REQUEST" | websocat "\$BASE_URL"`;
@@ -2787,7 +2932,6 @@ ws.on("message", (data) => { console.log(JSON.parse(data.toString())); ws.close(
 ws.on("error",   (err)  => console.error(err));`;
 
 T_ws.rsa.java = `import java.net.URI;
-import java.net.URLEncoder;
 import java.net.http.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -2796,6 +2940,8 @@ import java.security.*;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
 
 public class BinanceWsRsa {
@@ -2803,17 +2949,58 @@ public class BinanceWsRsa {
     static final String BASE_URL = "{{EP}}";
     static final String METHOD   = "{{METHOD}}";
 
+    static String jesc(String s) {
+        if (s == null) return "";
+        StringBuilder b = new StringBuilder();
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == 92) {
+                b.append((char) 92).append((char) 92);
+            } else if (c == 34) {
+                b.append((char) 92).append((char) 34);
+            } else {
+                b.append(c);
+            }
+        }
+        return b.toString();
+    }
+
     public static void main(String[] args) throws Exception {
         byte[]     keyBytes   = Files.readAllBytes(Paths.get("private_key.der"));
         PrivateKey privateKey = KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(keyBytes));
 
-        long   ts  = Instant.now().toEpochMilli();
-        String qs  = "apiKey=" + API_KEY + "&timestamp=" + ts;
+        long ts = Instant.now().toEpochMilli();
+        TreeMap<String, String> qp = new TreeMap<>();
+        qp.put("apiKey", API_KEY);
+        qp.put("timestamp", Long.toString(ts));
+
+        StringBuilder qsb = new StringBuilder();
+        for (Map.Entry<String, String> e : qp.entrySet()) {
+            if (qsb.length() > 0) qsb.append('&');
+            qsb.append(e.getKey()).append('=').append(e.getValue());
+        }
+        String qs  = qsb.toString();
         String sig = sign(privateKey, qs);
 
+        int Q = 34;
+        StringBuilder pj = new StringBuilder();
+        pj.append((char) 123);
+        boolean fk = true;
+        for (Map.Entry<String, String> e : qp.entrySet()) {
+            if (!fk) pj.append(',');
+            fk = false;
+            pj.append((char) Q).append(jesc(e.getKey())).append((char) Q).append(':');
+            if ("timestamp".equals(e.getKey())) pj.append(e.getValue());
+            else pj.append((char) Q).append(jesc(e.getValue())).append((char) Q);
+        }
+        pj.append(',').append((char) Q).append("signature").append((char) Q).append(':')
+          .append((char) Q).append(jesc(sig)).append((char) Q);
+        pj.append((char) 125);
+
         String req = String.format(
-            "{\\"id\\":\\"1\\",\\"method\\":\\"%s\\",\\"params\\":{\\"apiKey\\":\\"%s\\",\\"signature\\":\\"%s\\",\\"timestamp\\":%d}}",
-            METHOD, API_KEY, sig, ts);
+            "{\\"id\\":\\"1\\",\\"method\\":\\"%s\\",\\"params\\":%s}",
+            jesc(METHOD),
+            pj.toString());
 
         CountDownLatch latch = new CountDownLatch(1);
         HttpClient.newHttpClient().newWebSocketBuilder()
@@ -2827,10 +3014,10 @@ public class BinanceWsRsa {
     }
 
     static String sign(PrivateKey key, String data) throws Exception {
-        Signature sig = Signature.getInstance("SHA256withRSA");
-        sig.initSign(key);
-        sig.update(data.getBytes(StandardCharsets.UTF_8));
-        return Base64.getEncoder().encodeToString(sig.sign());
+        Signature s = Signature.getInstance("SHA256withRSA");
+        s.initSign(key);
+        s.update(data.getBytes(StandardCharsets.UTF_8));
+        return Base64.getEncoder().encodeToString(s.sign());
     }
 }`;
 
@@ -3060,8 +3247,21 @@ T_ws.rsa.rust = `// Cargo.toml:
 
 use base64::{engine::general_purpose, Engine as _};
 use openssl::{hash::MessageDigest, pkey::PKey, sign::Signer};
+use std::collections::BTreeMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tungstenite::connect;
+
+fn jesc(s: &str) -> String {
+    let mut out = String::new();
+    for c in s.chars() {
+        match c {
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            _ => out.push(c),
+        }
+    }
+    out
+}
 
 fn main() {
     let api_key  = "YOUR_API_KEY";
@@ -3072,19 +3272,50 @@ fn main() {
     let pkey = PKey::private_key_from_pem(&pem).unwrap();
 
     let ts  = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
-    let qs  = format!("apiKey={}&timestamp={}", api_key, ts);
+    let mut qp: BTreeMap<String, String> = BTreeMap::new();
+    qp.insert("apiKey".into(), api_key.into());
+    qp.insert("timestamp".into(), ts.to_string());
+
+    let qs: String = qp
+        .iter()
+        .map(|(k, v)| format!("{}={}", k, v))
+        .collect::<Vec<_>>()
+        .join("&");
+
     let mut signer = Signer::new(MessageDigest::sha256(), &pkey).unwrap();
     signer.update(qs.as_bytes()).unwrap();
     let sig = general_purpose::STANDARD.encode(signer.sign_to_vec().unwrap());
 
-    let req = format!(
-        r#"{{"id":"1","method":"{}","params":{{"apiKey":"{}","signature":"{}","timestamp":{}}}}}"#,
-        method, api_key, sig, ts
-    );
+    let mut pj = String::from("{");
+    let mut fk = true;
+    for (k, v) in &qp {
+        if !fk {
+            pj.push(',');
+        }
+        fk = false;
+        pj.push('"');
+        pj.push_str(&jesc(k));
+        pj.push('"');
+        pj.push(':');
+        if k == "timestamp" {
+            pj.push_str(v);
+        } else {
+            pj.push('"');
+            pj.push_str(&jesc(v));
+            pj.push('"');
+        }
+    }
+    pj.push_str(",\"signature\":\"");
+    pj.push_str(&jesc(&sig));
+    pj.push('"');
+    pj.push('}');
+
+    let prefix = format!(r#"{{"id":"1","method":"{}","params":"#, jesc(method));
+    let req = prefix + &pj + "}";
 
     let (mut ws, _) = connect(base_url).unwrap();
     println!("{}", req);
-    ws.send(tungstenite::Message::Text(req)).unwrap();
+    ws.send(tungstenite::Message::Text(req.clone())).unwrap();
     println!("{}", ws.read().unwrap());
     ws.close(None).unwrap();
 }`;
@@ -3096,9 +3327,25 @@ T_ws.rsa.cpp = `// Install IXWebSocket + OpenSSL
 #include <openssl/pem.h>
 #include <openssl/bio.h>
 #include <iostream>
+#include <map>
 #include <vector>
 #include <chrono>
+#include <string>
 #include <thread>
+
+static std::string jesc(std::string s) {
+    std::string o;
+    for (char cx : s) {
+        unsigned char c = static_cast<unsigned char>(cx);
+        if (c == 92u)
+            o += "\\\\";
+        else if (c == 34u)
+            o += "\\\"";
+        else
+            o += cx;
+    }
+    return o;
+}
 
 std::string signRsaBase64(const std::string& data) {
     FILE* fp = fopen("private_key.pem", "r");
@@ -3121,15 +3368,40 @@ std::string signRsaBase64(const std::string& data) {
 }
 
 int main() {
-    const std::string apiKey  = "YOUR_API_KEY";
+    const std::string apiKey   = "YOUR_API_KEY";
     const std::string baseUrl = "{{EP}}";
     const std::string method  = "{{METHOD}}";
+
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                   std::chrono::system_clock::now().time_since_epoch()).count();
-    std::string qs  = "apiKey=" + apiKey + "&timestamp=" + std::to_string(ms);
+
+    std::map<std::string, std::string> qp;
+    qp["apiKey"] = apiKey;
+    qp["timestamp"] = std::to_string(ms);
+
+    std::string qs;
+    for (const auto& kv : qp) {
+        if (!qs.empty()) qs += '&';
+        qs += kv.first + "=" + kv.second;
+    }
     std::string sig = signRsaBase64(qs);
-    std::string req = R"({"id":"1","method":")" + method + R"(","params":{"apiKey":")" +
-                      apiKey + R"(","signature":")" + sig + R"(","timestamp":)" + std::to_string(ms) + "}}";
+
+    std::string pj("{");
+    bool fk = true;
+    for (const auto& kv : qp) {
+        if (!fk) pj += ',';
+        fk = false;
+        pj += '"' + jesc(kv.first) + '"' + ':';
+        if (kv.first == "timestamp") pj += kv.second;
+        else pj += '"' + jesc(kv.second) + '"';
+    }
+    pj += ','; pj += "\\\"signature\\\":\\\"";
+    pj += jesc(sig);
+    pj.push_back((char)34);
+    pj.push_back((char)125);
+
+    std::string req = "{\"id\":\"1\",\"method\":\"" + jesc(method) + "\",\"params\":" + pj + "}";
+
     ix::WebSocket ws;
     ws.setUrl(baseUrl);
     ws.setOnMessageCallback([&](const ix::WebSocketMessagePtr& m) {
@@ -3142,18 +3414,40 @@ int main() {
 }`;
 
 T_ws.rsa.bash = `#!/bin/bash
-# Requires: websocat, openssl, python3
+# Requires: websocat + openssl + python3 (stdlib only)
 API_KEY="YOUR_API_KEY"
 BASE_URL="{{EP}}"
 METHOD="{{METHOD}}"
 PRIVATE_KEY="private_key.pem"
+WS_TRADE_EXTRA_JSON='{}'
 
 TIMESTAMP=$(date +%s%3N)
-QS="apiKey=\${API_KEY}&timestamp=\${TIMESTAMP}"
-RAW_SIG=$(echo -n "\$QS" | openssl dgst -sha256 -sign "\$PRIVATE_KEY" | openssl base64 -A)
-SIGNATURE=$(python3 -c "import sys; print(sys.argv[1])" "\$RAW_SIG")
+REQUEST=$(METHOD="\${METHOD}" API_KEY="\${API_KEY}" TIMESTAMP="\${TIMESTAMP}" PRIVATE_KEY="\${PRIVATE_KEY}" WS_TRADE_EXTRA_JSON="\${WS_TRADE_EXTRA_JSON}" python3 << 'PYRS'
+import base64, json, os, subprocess
+method = os.environ["METHOD"]
+api_key = os.environ["API_KEY"]
+ts_ms = os.environ["TIMESTAMP"]
+pem_path = os.environ["PRIVATE_KEY"]
+extra = json.loads(os.environ.get("WS_TRADE_EXTRA_JSON") or "{}")
 
-REQUEST='{"id":"1","method":"'\${METHOD}'","params":{"apiKey":"'\${API_KEY}'","signature":"'\${SIGNATURE}'","timestamp":'\${TIMESTAMP}'}}'
+qp = {str(k): str(v) for k, v in sorted(extra.items(), key=lambda kv: str(kv[0]))}
+qp["apiKey"] = api_key
+qp["timestamp"] = ts_ms
+
+qs_keys = sorted(qp.keys())
+qs = "&".join(key + "=" + qp[key] for key in qs_keys)
+
+sig_bin = subprocess.check_output(
+    ["openssl", "dgst", "-sha256", "-sign", pem_path], input=qs.encode()
+)
+signature = base64.b64encode(sig_bin).decode()
+
+params_out = dict(qp)
+params_out["signature"] = signature
+params_out["timestamp"] = int(ts_ms)
+print(json.dumps({"id": "1", "method": method, "params": params_out}, separators=(",", ":")))
+PYRS
+)
 
 echo "Request: \$REQUEST"
 echo "\$REQUEST" | websocat "\$BASE_URL"`;
@@ -5073,6 +5367,10 @@ function wsPhpSingleQuoted(val) {
   return String(val).replace(/\\/g, "\\\\").replace(/'/g, "'\\''");
 }
 
+function wsWrapBashSingle(val) {
+  return "'" + String(val).replace(/'/g, "'" + '"' + "'" + '"' + "'") + "'";
+}
+
 function wsCsharpAnonymousPairs(params, escJs) {
   return params.map(p => wsSanitizeCSharpId(p.key) + ' = "' + escJs(p.val) + '"').join(", ");
 }
@@ -5259,6 +5557,60 @@ function injectWsTradingParams(code, lang, auth, params) {
         'sign_params = { "apiKey" => API_KEY, "timestamp" => ts, ' + rbExtra + " }"
       );
     }
+    return code;
+  }
+
+  if ((auth === "hmac" || auth === "rsa") && lang === "java") {
+    const escJ = s =>
+      String(s)
+        .replace(/\\/g, "\\\\")
+        .replace(/"/g, '\\"');
+    const extraJn = [...params]
+      .sort((a, b) => String(a.key).localeCompare(String(b.key)))
+      .map(p => '        qp.put("' + escJ(p.key) + '", "' + escJ(String(p.val)) + '");\n')
+      .join("");
+    if (extraJn)
+      code = code.replace(
+        '        qp.put("timestamp", Long.toString(ts));\n',
+        '        qp.put("timestamp", Long.toString(ts));\n' + extraJn
+      );
+    return code;
+  }
+
+  if ((auth === "hmac" || auth === "rsa") && lang === "rust") {
+    const extraRs = [...params]
+      .sort((a, b) => String(a.key).localeCompare(String(b.key)))
+      .map(p => '    qp.insert("' + escPy(p.key) + '".into(), "' + escPy(String(p.val)) + '".into());\n')
+      .join("");
+    if (extraRs)
+      code = code.replace(
+        /    qp.insert\("timestamp"\.into\(\), ts.to_string\(\)\);\s*\n/,
+        '    qp.insert("timestamp".into(), ts.to_string());\n' + extraRs
+      );
+    return code;
+  }
+
+  if ((auth === "hmac" || auth === "rsa") && lang === "cpp") {
+    const escCp = s =>
+      String(s)
+        .replace(/\\/g, "\\\\")
+        .replace(/"/g, '\\"');
+    const extraCp = [...params]
+      .sort((a, b) => String(a.key).localeCompare(String(b.key)))
+      .map(p => '    qp["' + escCp(p.key) + '"] = "' + escCp(String(p.val)) + '";\n')
+      .join("");
+    if (extraCp)
+      code = code.replace(
+        /    qp\["timestamp"\] = std::to_string\(ms\);\s*\n/,
+        '    qp["timestamp"] = std::to_string(ms);\n' + extraCp
+      );
+    return code;
+  }
+
+  if ((auth === "hmac" || auth === "rsa") && lang === "bash") {
+    const tradeJson = wsSortedJsonObjectString(params);
+    if (tradeJson && tradeJson !== "{}")
+      code = code.replace(/WS_TRADE_EXTRA_JSON='\{\}'/, () => `WS_TRADE_EXTRA_JSON=${wsWrapBashSingle(tradeJson)}`);
     return code;
   }
 
