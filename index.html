@@ -106,7 +106,120 @@
       display: flex;
       align-items: center;
       gap: 10px;
+      flex-wrap: wrap;
     }
+
+    .endpoint-bar-actions {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .docs-toggle-btn {
+      background: #21262d;
+      border: 1px solid #30363d;
+      color: #8b949e;
+      border-radius: 6px;
+      padding: 5px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .docs-toggle-btn:hover {
+      border-color: #58a6ff;
+      color: #58a6ff;
+      background: rgba(88,166,255,0.06);
+    }
+    .docs-toggle-btn.open {
+      border-color: #58a6ff;
+      color: #58a6ff;
+      background: rgba(88,166,255,0.1);
+    }
+
+    .docs-paste-panel {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 10px 14px;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .docs-paste-panel.visible { display: block; }
+
+    .docs-paste-panel textarea {
+      width: 100%;
+      min-height: 120px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+      font-size: 12px;
+      color: #e6edf3;
+      resize: vertical;
+      outline: none;
+      line-height: 1.45;
+    }
+    .docs-paste-panel textarea:focus {
+      border-color: #58a6ff;
+    }
+
+    .docs-paste-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+
+    .docs-parse-btn {
+      background: #238636;
+      border: 1px solid #2ea043;
+      color: #fff;
+      border-radius: 6px;
+      padding: 6px 14px;
+      font-size: 13px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.15s;
+    }
+    .docs-parse-btn:hover { background: #2ea043; }
+
+    .docs-reset-btn {
+      background: none;
+      border: none;
+      color: #58a6ff;
+      font-size: 12px;
+      cursor: pointer;
+      text-decoration: underline;
+      padding: 4px 0;
+    }
+    .docs-reset-btn:hover { color: #79c0ff; }
+
+    .docs-parse-hint {
+      font-size: 12px;
+      color: #484f58;
+      margin-top: 8px;
+      line-height: 1.5;
+    }
+
+    .endpoint-from-docs-badge {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #3fb950;
+      background: rgba(46,160,67,0.12);
+      border: 1px solid rgba(46,160,67,0.35);
+      padding: 2px 7px;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+
+    #env-badge.docs-shift { margin-left: 0; }
 
     .endpoint-label {
       font-size: 11px;
@@ -419,7 +532,20 @@
   <div class="endpoint-bar">
     <span class="endpoint-label">Endpoint</span>
     <span class="endpoint-url" id="endpoint-display">https://api.binance.com/api/v3/account</span>
-    <span id="env-badge" style="display:none; font-size:11px; font-weight:700; color:#f0b90b; background:rgba(240,185,11,0.13); border:1px solid rgba(240,185,11,0.35); padding:2px 8px; border-radius:4px; margin-left:auto; white-space:nowrap; letter-spacing:0.05em;">TESTNET</span>
+    <span id="docs-ep-note" class="endpoint-from-docs-badge" style="display:none;">Docs path</span>
+    <span class="endpoint-bar-actions">
+      <button type="button" class="docs-toggle-btn" id="docs-toggle-btn" title="Paste a Binance API doc excerpt">Paste from docs</button>
+      <span id="env-badge" style="display:none; font-size:11px; font-weight:700; color:#f0b90b; background:rgba(240,185,11,0.13); border:1px solid rgba(240,185,11,0.35); padding:2px 8px; border-radius:4px; white-space:nowrap; letter-spacing:0.05em;">TESTNET</span>
+    </span>
+  </div>
+
+  <div class="docs-paste-panel" id="docs-paste-panel">
+    <textarea id="docs-paste-text" placeholder='Paste excerpt: line like POST /api/v3/order and the Parameters table (Name / Type / Mandatory). Mandatory fields become rows — STRING &amp; ENUM get "" placeholders, numeric types get 0. Timestamp is omitted (already auto).' spellcheck="false"></textarea>
+    <div class="docs-paste-actions">
+      <button type="button" class="docs-parse-btn" id="docs-parse-btn">Parse &amp; fill</button>
+      <button type="button" class="docs-reset-btn" id="docs-reset-override-btn">Restore default endpoint</button>
+    </div>
+    <p class="docs-parse-hint">Works with Binance REST docs copied as plain text or markdown tables (<code>Name | Type | Mandatory</code>).</p>
   </div>
 
   <div class="params-container" id="params-container">
@@ -4522,9 +4648,179 @@ function injectExtraParams(code, lang, params) {
 }
 
 /* ── State ─────────────────────────────────────────────────────────── */
-let state   = { auth: "hmac", env: "mainnet", apitype: "rest", market: "spot", lang: "python" };
+let state   = {
+  auth: "hmac", env: "mainnet", apitype: "rest", market: "spot", lang: "python",
+  docsRestPath: null,
+  docsRestMethod: null
+};
 let extraParams = [];
 let paramIdSeed = 0;
+
+function getRestOriginForMarket() {
+  const row = ENDPOINTS.rest[state.env];
+  const base = row ? row[state.market] : "";
+  if (!base) return "https://api.binance.com";
+  try { return new URL(base).origin; } catch (_) { return "https://api.binance.com"; }
+}
+
+function mergedDisplayEp(isRest) {
+  if (isRest && state.docsRestPath) {
+    try {
+      const u = state.docsRestPath.startsWith("http")
+        ? new URL(state.docsRestPath)
+        : new URL(getRestOriginForMarket() + state.docsRestPath);
+      return u.href.replace(/\/$/, "");
+    } catch (_) {
+      return getRestOriginForMarket() + state.docsRestPath;
+    }
+  }
+  const epMap = ENDPOINTS[state.apitype] ? ENDPOINTS[state.apitype][state.env] : null;
+  return epMap ? (epMap[state.market] || "") : "";
+}
+
+function clearDocsEndpointOverride() {
+  state.docsRestPath = null;
+  state.docsRestMethod = null;
+  const badge = document.getElementById("docs-ep-note");
+  if (badge) badge.style.display = "none";
+}
+
+function defaultParamValueAndPlaceholder(type) {
+  const t = (type || "").toUpperCase().replace(/\s+/g, "");
+  if (t === "STRING" || t === "ENUM") return { val: "", ph: "\"\"" };
+  if (t === "BOOLEAN") return { val: "false", ph: "" };
+  return { val: "0", ph: "" };
+}
+
+function escapeAttr(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;");
+}
+
+function parseBinanceDocsPaste(text) {
+  const out = { method: null, path: null, rows: [] };
+  const norm = text.replace(/\r\n/g, "\n");
+
+  const mVerb = norm.match(/\b(GET|POST|PUT|DELETE|PATCH)\s+(\/[^\s`'")\]]+)/i);
+  if (mVerb) {
+    out.method = mVerb[1].toUpperCase();
+    out.path = mVerb[2].replace(/[.,;:]+$/, "");
+  } else {
+    const onlyPath = norm.match(/(?:^|\n)\s*(\/(?:api|fapi|dapi|papi|eapi|sapi)\/[^\s`'")\]]+)/i);
+    if (onlyPath) out.path = onlyPath[1].replace(/[.,;:]+$/, "");
+  }
+
+  let paramBlock = norm;
+  const pIdx = norm.search(/\nParameters\s*:?\s*\n/i);
+  if (pIdx >= 0) paramBlock = norm.slice(pIdx);
+
+  const lines = paramBlock.split("\n");
+  const seen = new Set();
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const raw = line.trim();
+    let name, typ, mandatory;
+    if (!raw) continue;
+    if (/^parameters?:?\s*$/i.test(raw)) continue;
+    if (/^Name\s+Type\s+Mandatory/i.test(raw)) continue;
+    if (/^\|?\s*Name\s*\|/i.test(raw)) continue;
+    if (/^[-|:\s]+$/.test(raw)) continue;
+
+    if (raw.includes("|")) {
+      const cells = raw.split("|").map(c => c.trim()).filter(c => c.length > 0);
+      if (cells.length < 3) continue;
+      const name = cells[0].replace(/^`+|`+$/g, "");
+      if (/^Name$/i.test(name)) continue;
+      if (/^---+$/i.test(name)) continue;
+      const type = cells[1].replace(/`+/g, "").trim();
+      const manCell = cells[2].replace(/`/g, "").trim().toUpperCase();
+      if (!/^YES\b/.test(manCell)) continue;
+      if (!/^[a-zA-Z_]\w*$/.test(name)) continue;
+      if (name === "timestamp" || name === "signature") continue;
+      const typUp = type.toUpperCase();
+      if (!/^(STRING|ENUM|DECIMAL|INT|LONG|BOOLEAN|DOUBLE|ARRAY|[A-Z][A-Z0-9_-]{1,31})$/.test(typUp)) continue;
+      if (!seen.has(name)) {
+        seen.add(name);
+        out.rows.push({ name, type: type });
+      }
+      continue;
+    }
+
+    if (raw.includes("\t")) {
+      const p = raw.split("\t").map(x => x.trim()).filter(Boolean);
+      if (p.length >= 3) {
+        name = p[0];
+        typ = p[1];
+        mandatory = p[2].toUpperCase();
+      }
+    } else {
+      const wx = raw.match(
+        /^([a-zA-Z_]\w*)\s+(STRING|ENUM|DECIMAL|INT|LONG|BOOLEAN|DOUBLE|ARRAY|[A-Z][A-Za-z0-9_-]{2,})\s+(YES|NO)\b(.*)$/i
+      );
+      if (wx) {
+        name = wx[1];
+        typ = wx[2];
+        mandatory = wx[3].toUpperCase();
+      }
+    }
+    if (!name || /^Name$/i.test(name)) continue;
+    if (!/^YES\b/.test(mandatory)) continue;
+    if (name === "timestamp" || name === "signature") continue;
+    if (!seen.has(name)) {
+      seen.add(name);
+      out.rows.push({ name, type: typ });
+    }
+  }
+
+  return out;
+}
+
+function addParamRowFilled(key, val, valuePlaceholder) {
+  const id  = ++paramIdSeed;
+  const row = document.createElement("div");
+  row.className   = "param-row";
+  row.dataset.pid = id;
+  const valPhAttr = valuePlaceholder
+    ? " placeholder=\"" + escapeAttr(valuePlaceholder) + "\""
+    : " placeholder=\"value\"";
+  row.innerHTML   =
+    '<input class="param-input param-key-input" placeholder="key" value="' + escapeAttr(key) + '" oninput="collectParams()">' +
+    '<input class="param-input param-val-input"' + valPhAttr + ' value="' + escapeAttr(val) + '" oninput="collectParams()">' +
+    '<button class="param-remove-btn" onclick="removeParam(' + id + ')">×</button>';
+  document.getElementById("params-rows").appendChild(row);
+}
+
+function applyDocsPaste() {
+  const ta = document.getElementById("docs-paste-text");
+  if (!ta || state.apitype !== "rest") return;
+
+  const parsed = parseBinanceDocsPaste(ta.value);
+  const hasEp   = !!parsed.path;
+  const hasRows = parsed.rows.length > 0;
+  if (!hasEp && !hasRows) {
+    window.alert("Could not parse an endpoint (e.g. POST /api/v3/order) nor mandatory parameters from the Parameters table.");
+    return;
+  }
+
+  if (hasEp) {
+    state.docsRestPath = parsed.path.split("?")[0];
+    state.docsRestMethod = parsed.method;
+  }
+
+  if (hasRows) {
+    document.querySelectorAll("#params-rows .param-row").forEach(row => row.remove());
+    for (const r of parsed.rows) {
+      const d = defaultParamValueAndPlaceholder(r.type);
+      addParamRowFilled(r.name, d.val, d.ph);
+    }
+  }
+
+  collectParams();
+}
+
 
 /* ── Sync market options based on apitype + env ────────────────────── */
 function syncMarketOptions() {
@@ -4555,6 +4851,17 @@ function syncMarketOptions() {
   // Params panel: hide for WS / UDS
   const _pc = document.getElementById("params-container");
   if (_pc) _pc.style.display = (state.apitype === "ws" || state.apitype === "uds") ? "none" : "";
+
+  const docTog = document.getElementById("docs-toggle-btn");
+  const docPan = document.getElementById("docs-paste-panel");
+  const isRest = state.apitype === "rest";
+  if (!isRest) {
+    if (state.docsRestPath) clearDocsEndpointOverride();
+    if (docPan) docPan.classList.remove("visible");
+    if (docTog) docTog.classList.remove("open");
+  }
+  if (docTog) docTog.style.display = isRest ? "" : "none";
+  if (!isRest && docPan) docPan.classList.remove("visible");
 }
 
 /* ── Render ────────────────────────────────────────────────────────── */
@@ -4567,9 +4874,12 @@ function render() {
   const isWs       = state.apitype === "ws";
   const isUds      = state.apitype === "uds";
   const isUdsFutures = isUds && state.market !== "spot";
-  const epMap      = ENDPOINTS[state.apitype] ? ENDPOINTS[state.apitype][state.env] : null;
-  const ep         = epMap ? (epMap[state.market] || "") : "";
-  const method     = isWs ? (WS_METHODS[state.market] || "") : "";
+  const isRest       = state.apitype === "rest";
+  const epOtherMap   = !isRest && ENDPOINTS[state.apitype] ? ENDPOINTS[state.apitype][state.env] : null;
+  const ep           = isRest
+    ? mergedDisplayEp(true)
+    : (epOtherMap ? (epOtherMap[state.market] || "") : "");
+  const method       = isWs ? (WS_METHODS[state.market] || "") : "";
   const restEp     = isUdsFutures && UDS_REST_EP[state.market]
                      ? (UDS_REST_EP[state.market][state.env] || "") : "";
 
@@ -4605,6 +4915,9 @@ function render() {
   document.getElementById("auth-badge").textContent       = AUTH_NAMES[state.auth];
   document.getElementById("endpoint-display").textContent = ep || "N/A";
   document.getElementById("note-box").innerHTML           = noteStr;
+
+  const docBadge = document.getElementById("docs-ep-note");
+  if (docBadge) docBadge.style.display = (isRest && state.docsRestPath) ? "inline" : "none";
 
   const envBadge = document.getElementById("env-badge");
   envBadge.style.display = state.env === "testnet" ? "inline" : "none";
@@ -4653,6 +4966,20 @@ document.getElementById("sel-market").addEventListener("change",  e => { state.m
 document.getElementById("sel-auth").addEventListener("change",    e => { state.auth    = e.target.value; render(); });
 document.getElementById("sel-lang").addEventListener("change",    e => { state.lang    = e.target.value; render(); });
 document.getElementById("add-param-btn").addEventListener("click", addParamRow);
+
+document.getElementById("docs-toggle-btn").addEventListener("click", () => {
+  const panel = document.getElementById("docs-paste-panel");
+  const btn = document.getElementById("docs-toggle-btn");
+  if (!panel || !btn || state.apitype !== "rest") return;
+  const open = panel.classList.toggle("visible");
+  btn.classList.toggle("open", open);
+});
+document.getElementById("docs-parse-btn").addEventListener("click", applyDocsPaste);
+document.getElementById("docs-reset-override-btn").addEventListener("click", () => {
+  clearDocsEndpointOverride();
+  render();
+});
+
 document.getElementById("pdf-btn").addEventListener("click", async () => {
   const btn = document.getElementById("pdf-btn");
   btn.classList.add("loading");
