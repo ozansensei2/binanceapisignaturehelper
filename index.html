@@ -5768,6 +5768,36 @@ function extractMergedDocsPageUrl(docPageUrl, rawPasteText) {
   return extractJinaPasteSourceUrlLine(rawPasteText || "") || "";
 }
 
+/** Docs URL path decides API kind: Binance `/websocket-api/` vs `/rest-api/`. */
+function inferApiTypeFromBinanceDocUrl(urlStr) {
+  if (!urlStr || typeof urlStr !== "string") return null;
+  let rawPath = "";
+  try {
+    rawPath = new URL(urlStr.trim()).pathname.toLowerCase();
+  } catch (_) {
+    rawPath = "";
+  }
+  let blob = rawPath;
+  if (!blob) {
+    const q = urlStr.toLowerCase().replace(/#.*/, "");
+    const fm = /^[a-z][a-z0-9+.-]*:\/\/[^/?#]+(\/[^#?]*)?/i.exec(q);
+    if (fm && fm[1]) blob = fm[1].toLowerCase();
+  }
+  blob = blob || urlStr.toLowerCase();
+  if (/(?:\/|^)websocket-api(?:\/|$)/.test(blob)) return "ws";
+  if (/(?:\/|^)rest-api(?:\/|$)/.test(blob)) return "rest";
+  return null;
+}
+
+function applyDocUrlInferredApiType(docPageUrl, rawPasteText) {
+  const merged = extractMergedDocsPageUrl(docPageUrl || "", rawPasteText || "");
+  const t = inferApiTypeFromBinanceDocUrl(merged);
+  if (!t) return;
+  state.apitype = t;
+  const sel = document.getElementById("sel-apitype");
+  if (sel) sel.value = t;
+}
+
 /** First ~40 lines: `Source URL:` or `URL Source:` (reader variants). */
 function extractJinaPasteSourceUrlLine(rawPasteText) {
   const n = (rawPasteText || "").replace(/\r\n/g, "\n");
@@ -6259,10 +6289,12 @@ function addParamRowFilled(key, val, valuePlaceholder) {
 }
 
 function applyDocsImportFromText(rawText, alertEmpty, docPageUrl) {
+  applyDocUrlInferredApiType(docPageUrl || "", rawText || "");
   if (state.apitype !== "rest" && state.apitype !== "ws") {
     if (alertEmpty) window.alert("Select REST API or WebSocket API to import from documentation.");
     return false;
   }
+  render();
 
   const frag = extractMergedDocsFragment(docPageUrl || "", rawText || "");
   const docUrlGuess = extractMergedDocsPageUrl(docPageUrl || "", rawText || "");
@@ -6366,10 +6398,6 @@ function flashCodeContainerAfterFetchSuccess() {
 }
 
 async function fetchDocUrlAndParse() {
-  if (state.apitype !== "rest" && state.apitype !== "ws") {
-    window.alert("Select REST API or WebSocket API to fetch documentation.");
-    return;
-  }
   const input = document.getElementById("doc-url-input");
   const btn = document.getElementById("doc-fetch-btn");
   const url = input && input.value.trim();
@@ -6377,6 +6405,12 @@ async function fetchDocUrlAndParse() {
     window.alert("Enter a documentation URL.");
     return;
   }
+  applyDocUrlInferredApiType(url, "");
+  if (state.apitype !== "rest" && state.apitype !== "ws") {
+    window.alert("Select REST API or WebSocket API to fetch documentation.");
+    return;
+  }
+  render();
   if (btn) {
     btn.disabled = true;
   }
@@ -6488,6 +6522,7 @@ function render() {
   delete block.dataset.highlighted;
   hljs.highlightElement(block);
 
+  document.getElementById("sel-apitype").value = state.apitype;
   document.getElementById("sel-lang").value = state.lang;
   document.getElementById("sel-auth").value = state.auth;
   document.getElementById("endpoint-display").textContent = ep || "N/A";
