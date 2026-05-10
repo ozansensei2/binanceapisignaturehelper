@@ -158,6 +158,44 @@
       cursor: not-allowed;
     }
 
+    .doc-fetch-hint {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #8b949e;
+      line-height: 1.45;
+    }
+
+    .doc-fetch-loading {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      margin-top: 10px;
+      padding: 8px 10px;
+      background: rgba(88, 166, 255, 0.06);
+      border: 1px solid rgba(88, 166, 255, 0.22);
+      border-radius: 6px;
+      font-size: 12px;
+      color: #8b949e;
+    }
+
+    .doc-fetch-loading.visible {
+      display: flex;
+    }
+
+    .doc-fetch-spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid #30363d;
+      border-top-color: #58a6ff;
+      border-radius: 50%;
+      animation: doc-fetch-spin 0.65s linear infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes doc-fetch-spin {
+      to { transform: rotate(360deg); }
+    }
+
     .doc-paste-box {
       margin-top: 4px;
     }
@@ -669,7 +707,11 @@
             <input type="url" class="doc-url-input" id="doc-url-input" placeholder="https://developers.binance.com/docs/..." autocomplete="off" spellcheck="false">
             <button type="button" class="doc-fetch-btn" id="doc-fetch-btn">Fetch</button>
           </div>
-          <p class="docs-parse-hint" style="margin-top:6px;">Fetches via <code>r.jina.ai</code> (read-only text). If blocked or slow, paste the page content under it.</p>
+          <p class="doc-fetch-hint">This step can take a while (often 30–90 seconds through the proxy). If it fails, paste the doc text below and use Parse.</p>
+          <div id="doc-fetch-loading" class="doc-fetch-loading" role="status" aria-live="polite" aria-busy="false">
+            <span class="doc-fetch-spinner" aria-hidden="true"></span>
+            <span>Fetching documentation… still working.</span>
+          </div>
         </div>
 
         <div class="doc-paste-box">
@@ -5159,6 +5201,13 @@ function applyDocPanelParseFromText(rawText, alertEmpty) {
   return true;
 }
 
+function setDocFetchLoading(on) {
+  const wrap = document.getElementById("doc-fetch-loading");
+  if (!wrap) return;
+  wrap.classList.toggle("visible", on);
+  wrap.setAttribute("aria-busy", on ? "true" : "false");
+}
+
 async function fetchDocUrlAndParse() {
   const input = document.getElementById("doc-url-input");
   const btn = document.getElementById("doc-fetch-btn");
@@ -5169,8 +5218,8 @@ async function fetchDocUrlAndParse() {
   }
   if (btn) {
     btn.disabled = true;
-    btn.textContent = "…";
   }
+  setDocFetchLoading(true);
   try {
     const proxied = "https://r.jina.ai/" + encodeURIComponent(url);
     const res = await fetch(proxied, { headers: { Accept: "text/plain" } });
@@ -5183,9 +5232,9 @@ async function fetchDocUrlAndParse() {
     console.error(err);
     window.alert("Fetch failed (network, proxy, or CORS). Paste the doc page text manually and tap Parse.");
   } finally {
+    setDocFetchLoading(false);
     if (btn) {
       btn.disabled = false;
-      btn.textContent = "Fetch";
     }
   }
 }
