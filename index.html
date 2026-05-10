@@ -262,7 +262,7 @@
 
     .selectors {
       display: grid;
-      grid-template-columns: repeat(5, 1fr);
+      grid-template-columns: repeat(3, 1fr);
       gap: 14px;
       margin-bottom: 20px;
     }
@@ -441,31 +441,51 @@
     .header-left {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 14px;
+      flex-wrap: wrap;
     }
 
-    .lang-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: #58a6ff;
+    .code-toolbar-pickers {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
     }
 
-    .lang-badge {
-      font-size: 13px;
-      font-weight: 500;
+    .code-toolbar-picker {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .code-toolbar-picker label {
+      font-size: 9px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: #8b949e;
+    }
+
+    .code-toolbar-picker select {
+      min-width: 128px;
+      max-width: 200px;
+      background: #0d1117;
       color: #e6edf3;
+      border: 1px solid #30363d;
+      border-radius: 5px;
+      padding: 5px 22px 5px 8px;
+      font-size: 12px;
+      cursor: pointer;
+      outline: none;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%238b949e' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 7px center;
+      transition: border-color 0.15s;
     }
 
-    .auth-badge {
-      font-size: 11px;
-      font-weight: 500;
-      color: #f0b90b;
-      background: rgba(240,185,11,0.12);
-      border: 1px solid rgba(240,185,11,0.25);
-      padding: 2px 8px;
-      border-radius: 4px;
-    }
+    .code-toolbar-picker select:hover { border-color: #58a6ff; }
+    .code-toolbar-picker select:focus { border-color: #58a6ff; box-shadow: 0 0 0 2px rgba(88,166,255,0.12); }
 
     .btn-group { display: flex; gap: 8px; }
 
@@ -746,31 +766,6 @@
       </select>
     </div>
 
-    <div class="select-group">
-      <label>Auth Type</label>
-      <select id="sel-auth">
-        <option value="hmac">HMAC-SHA256</option>
-        <option value="rsa">RSA</option>
-        <option value="ed25519">Ed25519</option>
-      </select>
-    </div>
-
-    <div class="select-group">
-      <label>Language</label>
-      <select id="sel-lang">
-        <option value="python">Python</option>
-        <option value="javascript">Node.js</option>
-        <option value="java">Java</option>
-        <option value="go">Go</option>
-        <option value="csharp">C#</option>
-        <option value="php">PHP</option>
-        <option value="ruby">Ruby</option>
-        <option value="typescript">TypeScript</option>
-        <option value="rust">Rust</option>
-        <option value="cpp">C++</option>
-        <option value="bash">Bash</option>
-      </select>
-    </div>
   </div>
 
   <div class="params-container" id="docs-import-panel">
@@ -841,13 +836,36 @@
 
     <div class="main-split-right">
       <div class="code-container" id="code-container">
-    <div class="code-header">
-      <div class="header-left">
-        <div class="lang-dot"></div>
-        <span class="lang-badge" id="lang-badge">Python</span>
-        <span class="auth-badge" id="auth-badge">HMAC-SHA256</span>
-      </div>
-      <div class="btn-group">
+      <div class="code-header">
+        <div class="header-left">
+          <div class="code-toolbar-pickers">
+            <div class="code-toolbar-picker">
+              <label for="sel-lang">Language</label>
+              <select id="sel-lang">
+                <option value="python">Python</option>
+                <option value="javascript">Node.js</option>
+                <option value="java">Java</option>
+                <option value="go">Go</option>
+                <option value="csharp">C#</option>
+                <option value="php">PHP</option>
+                <option value="ruby">Ruby</option>
+                <option value="typescript">TypeScript</option>
+                <option value="rust">Rust</option>
+                <option value="cpp">C++</option>
+                <option value="bash">Bash</option>
+              </select>
+            </div>
+            <div class="code-toolbar-picker">
+              <label for="sel-auth">Auth type</label>
+              <select id="sel-auth">
+                <option value="hmac">HMAC-SHA256</option>
+                <option value="rsa">RSA</option>
+                <option value="ed25519">Ed25519</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="btn-group">
       <button class="edit-btn" id="edit-btn">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
           <path d="M11.013 1.427a1.75 1.75 0 012.474 0l1.086 1.086a1.75 1.75 0 010 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 01-.927-.928l.929-3.25c.081-.286.235-.547.445-.758l8.61-8.61zm.176 4.823L9.75 4.81l-6.286 6.287a.253.253 0 00-.064.108l-.558 1.953 1.953-.558a.253.253 0 00.108-.064zm1.238-3.763a.25.25 0 00-.354 0L10.811 3.75l1.439 1.44 1.263-1.263a.25.25 0 000-.354z"/>
@@ -868,10 +886,10 @@
         </svg>
         PDF
       </button>
+        </div>
       </div>
-    </div>
       <pre><code id="code-block" class="language-python"></code></pre>
-      </div>
+    </div>
 
       <div class="note-box" id="note-box">
         Replace <code>YOUR_API_KEY</code> and <code>YOUR_API_SECRET</code> with your actual credentials.
@@ -6117,8 +6135,8 @@ function render() {
   delete block.dataset.highlighted;
   hljs.highlightElement(block);
 
-  document.getElementById("lang-badge").textContent       = LANG_NAMES[state.lang];
-  document.getElementById("auth-badge").textContent       = AUTH_NAMES[state.auth];
+  document.getElementById("sel-lang").value = state.lang;
+  document.getElementById("sel-auth").value = state.auth;
   document.getElementById("endpoint-display").textContent = ep || "N/A";
   document.getElementById("note-box").innerHTML           = noteStr;
 
