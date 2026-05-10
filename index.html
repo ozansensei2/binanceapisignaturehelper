@@ -505,11 +505,56 @@
 
     .params-rows { padding: 6px 8px; display: flex; flex-direction: column; gap: 4px; }
 
-    .param-row {
+    .param-row,
+    .param-fixed-row {
       display: grid;
-      grid-template-columns: 1fr 1fr auto;
+      grid-template-columns: 32px 1fr 1fr auto;
       gap: 6px;
       align-items: center;
+    }
+
+    .param-eye-spacer {
+      width: 32px;
+      height: 32px;
+      flex-shrink: 0;
+    }
+
+    .param-eye-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      background: #161b22;
+      color: #8b949e;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: color 0.12s, border-color 0.12s, background 0.12s;
+    }
+    .param-eye-btn:hover {
+      color: #58a6ff;
+      border-color: #58a6ff;
+      background: rgba(88,166,255,0.06);
+    }
+    .param-eye-btn--inactive { opacity: 0.55; }
+
+    .param-opt-key {
+      font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+      font-size: 13px;
+      color: #79c0ff;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .param-opt-hint {
+      font-size: 12px;
+      color: #484f58;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .param-input {
@@ -527,12 +572,6 @@
     .param-input:focus { border-color: #58a6ff; }
     .param-input::placeholder { color: #484f58; }
 
-    .param-fixed-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr auto;
-      gap: 6px;
-      align-items: center;
-    }
     .param-fixed-key, .param-fixed-val {
       font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
       font-size: 13px;
@@ -736,6 +775,7 @@
         </div>
         <div class="params-rows" id="params-rows">
           <div class="param-fixed-row">
+            <span class="param-eye-spacer" aria-hidden="true"></span>
             <span class="param-fixed-key">timestamp</span>
             <span class="param-fixed-val">(auto)</span>
             <span style="width:28px;"></span>
@@ -5205,6 +5245,92 @@ function narrowDocPasteByUrlFragment(fullText, fragment) {
   return narrowDocPasteByBareHtmlId(norm, slug);
 }
 
+const PARAM_EYE_ON =
+  '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>';
+const PARAM_EYE_OFF =
+  '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.06 10.06 0 0112 20c-7 0-11-8-11-8a21.71 21.71 0 015.06-7.94M9.9 4.24A10.06 10.06 0 0112 4c7 0 11 8 11 8a21.64 21.64 0 01-5.06 7.94M1 1l22 22"/><circle cx="12" cy="12" r="3"/></svg>';
+
+function escapeHtml(s) {
+  return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+}
+
+function collapseDocOptionalRow(row) {
+  const pid = row.dataset.pid;
+  const ki = row.querySelector(".param-key-input");
+  const vi = row.querySelector(".param-val-input");
+  if (!ki || !vi || !pid) return;
+  row.dataset.docHeldKey = ki.value.trim();
+  row.dataset.docHeldVal = vi.value;
+  const phAttr = vi.getAttribute("placeholder");
+  if (phAttr) row.dataset.docPh = phAttr;
+  row.dataset.docOptCollapsed = "1";
+
+  row.innerHTML =
+    '<button type="button" class="param-eye-btn param-eye-btn--inactive" title="Include in signed request" onclick="toggleDocOptionalParam(' +
+    pid +
+    ')">' +
+    PARAM_EYE_OFF +
+    '</button>' +
+    '<span class="param-opt-key">' +
+    escapeHtml(row.dataset.docHeldKey || row.dataset.docKey || "") +
+    "</span>" +
+    '<span class="param-opt-hint">optional · tap eye</span>' +
+    '<button type="button" class="param-remove-btn" onclick="removeParam(' +
+    pid +
+    ')">×</button>';
+
+  collectParams();
+}
+
+function expandDocOptionalRow(row) {
+  const pid = row.dataset.pid;
+  if (!pid) return;
+  const key = row.dataset.docHeldKey || row.dataset.docKey || "";
+  const phStored = row.dataset.docPh || "";
+  const valPhAttr = phStored ? ' placeholder="' + escapeAttr(phStored) + '"' : ' placeholder="value"';
+  const valRaw =
+    row.dataset.docHeldVal !== undefined ? row.dataset.docHeldVal : row.dataset.docDefaultVal !== undefined ? row.dataset.docDefaultVal : "";
+
+  row.dataset.docOptCollapsed = "0";
+
+  row.innerHTML =
+    '<button type="button" class="param-eye-btn" title="Exclude from signed request" onclick="toggleDocOptionalParam(' +
+    pid +
+    ')">' +
+    PARAM_EYE_ON +
+    '</button>' +
+    '<input class="param-input param-key-input" placeholder="key" value="' +
+    escapeAttr(key) +
+    '" oninput="collectParams()" readonly tabindex="-1" title="From documentation">' +
+    '<input class="param-input param-val-input"' +
+    valPhAttr +
+    ' value="' +
+    escapeAttr(valRaw) +
+    '" oninput="collectParams()">' +
+    '<button type="button" class="param-remove-btn" onclick="removeParam(' +
+    pid +
+    ')">×</button>';
+
+  collectParams();
+}
+
+function toggleDocOptionalParam(pid) {
+  const row = document.querySelector('#params-rows .param-row[data-pid="' + pid + '"]');
+  if (!row || row.dataset.docOptional !== "1") return;
+  if (row.dataset.docOptCollapsed === "1") expandDocOptionalRow(row);
+  else collapseDocOptionalRow(row);
+}
+
+/** Normalizes Mandatory column text from pasted docs (backticks, bold, whitespace). */
+function normalizeDocMandatoryCell(s) {
+  return String(s || "")
+    .replace(/`/g, "")
+    .replace(/\*{2}/g, "")
+    .replace(/\u00a0/g, " ")
+    .trim()
+    .toUpperCase();
+}
+
 function parseBinanceDocsPaste(text) {
   const out = { method: null, path: null, rows: [] };
   const norm = text.replace(/\r\n/g, "\n");
@@ -5252,15 +5378,16 @@ function parseBinanceDocsPaste(text) {
       if (/^Name$/i.test(name)) continue;
       if (/^---+$/i.test(name)) continue;
       const type = cells[1].replace(/`+/g, "").trim();
-      const manCell = cells[2].replace(/`/g, "").trim().replace(/\*{2}/g, "").trim().toUpperCase();
-      if (!/^YES\b/.test(manCell)) continue;
+      const manCell = normalizeDocMandatoryCell(cells[2]);
+      if (!/^YES\b/.test(manCell) && !/^NO\b/.test(manCell)) continue;
+      const mandatory = /^YES\b/.test(manCell);
       if (!/^[a-zA-Z_]\w*$/.test(name)) continue;
       if (name === "timestamp" || name === "signature") continue;
       const typUp = type.toUpperCase();
       if (!/^(STRING|ENUM|DECIMAL|INT|LONG|BOOLEAN|DOUBLE|ARRAY|[A-Z][A-Z0-9_-]{1,31})$/.test(typUp)) continue;
       if (!seen.has(name)) {
         seen.add(name);
-        out.rows.push({ name, type: type });
+        out.rows.push({ name, type: type, mandatory });
       }
       continue;
     }
@@ -5268,45 +5395,106 @@ function parseBinanceDocsPaste(text) {
     if (raw.includes("\t")) {
       const p = raw.split("\t").map(x => x.trim()).filter(Boolean);
       if (p.length >= 3) {
-        name = p[0];
-        typ = p[1];
-        mandatory = p[2].toUpperCase();
+        name = p[0].replace(/^`+|`+$/g, "").trim();
+        typ = p[1].replace(/`+/g, "").trim();
+        mandatory = normalizeDocMandatoryCell(p[2]);
       }
     } else {
       const wx = raw.match(
-        /^([a-zA-Z_]\w*)\s+(STRING|ENUM|DECIMAL|INT|LONG|BOOLEAN|DOUBLE|ARRAY|[A-Z][A-Za-z0-9_-]{2,})\s+(YES|NO)\b(.*)$/i
+        /^(?:`+([a-zA-Z_]\w*)`+|([a-zA-Z_]\w*))\s+(STRING|ENUM|DECIMAL|INT|LONG|BOOLEAN|DOUBLE|ARRAY|[A-Z][A-Za-z0-9_-]{2,})\s+(.+?)\s*$/i
       );
       if (wx) {
-        name = wx[1];
-        typ = wx[2];
-        mandatory = wx[3].toUpperCase();
+        name = (wx[1] || wx[2] || "").trim();
+        typ = wx[3].replace(/`+/g, "").trim();
+        mandatory = normalizeDocMandatoryCell(wx[4]);
       }
     }
     if (!name || /^Name$/i.test(name)) continue;
-    if (!/^YES\b/.test(mandatory)) continue;
+    if (!mandatory || (!/^YES\b/.test(mandatory) && !/^NO\b/.test(mandatory))) continue;
+    const mandatoryBool = /^YES\b/.test(mandatory);
     if (name === "timestamp" || name === "signature") continue;
     if (!seen.has(name)) {
       seen.add(name);
-      out.rows.push({ name, type: typ });
+      out.rows.push({ name, type: typ, mandatory: mandatoryBool });
     }
   }
 
   return out;
 }
 
-function addParamRowFilled(key, val, valuePlaceholder) {
-  const id  = ++paramIdSeed;
+function addMandatoryParamRow(key, val, valuePlaceholder) {
+  const id = ++paramIdSeed;
   const row = document.createElement("div");
-  row.className   = "param-row";
-  row.dataset.pid = id;
-  const valPhAttr = valuePlaceholder
-    ? " placeholder=\"" + escapeAttr(valuePlaceholder) + "\""
-    : " placeholder=\"value\"";
-  row.innerHTML   =
-    '<input class="param-input param-key-input" placeholder="key" value="' + escapeAttr(key) + '" oninput="collectParams()">' +
-    '<input class="param-input param-val-input"' + valPhAttr + ' value="' + escapeAttr(val) + '" oninput="collectParams()">' +
-    '<button class="param-remove-btn" onclick="removeParam(' + id + ')">×</button>';
+  row.className = "param-row";
+  row.dataset.pid = String(id);
+  const valPhAttr = valuePlaceholder ? ' placeholder="' + escapeAttr(valuePlaceholder) + '"' : ' placeholder="value"';
+  row.innerHTML =
+    '<span class="param-eye-spacer" aria-hidden="true"></span>' +
+    '<input class="param-input param-key-input" placeholder="key" value="' +
+    escapeAttr(key) +
+    '" oninput="collectParams()">' +
+    '<input class="param-input param-val-input"' +
+    valPhAttr +
+    ' value="' +
+    escapeAttr(val) +
+    '" oninput="collectParams()">' +
+    '<button type="button" class="param-remove-btn" onclick="removeParam(' +
+    id +
+    ')">×</button>';
   document.getElementById("params-rows").appendChild(row);
+}
+
+/** Doc import: mandatory row is always in the signed request; optional starts with eye closed until toggled. */
+function addImportedDocParamRow(r) {
+  const id = ++paramIdSeed;
+  const d = defaultParamValueAndPlaceholder(r.type);
+  const pid = String(id);
+  const row = document.createElement("div");
+  row.className = "param-row";
+  row.dataset.pid = pid;
+  row.dataset.docKey = r.name;
+
+  if (r.mandatory) {
+    const valPhAttr = d.ph ? ' placeholder="' + escapeAttr(d.ph) + '"' : ' placeholder="value"';
+    row.innerHTML =
+      '<span class="param-eye-spacer" aria-hidden="true"></span>' +
+      '<input class="param-input param-key-input" placeholder="key" value="' +
+      escapeAttr(r.name) +
+      '" oninput="collectParams()" readonly tabindex="-1" title="From documentation">' +
+      '<input class="param-input param-val-input"' +
+      valPhAttr +
+      ' value="' +
+      escapeAttr(d.val) +
+      '" oninput="collectParams()">' +
+      '<button type="button" class="param-remove-btn" onclick="removeParam(' +
+      id +
+      ')">×</button>';
+    document.getElementById("params-rows").appendChild(row);
+    return;
+  }
+
+  row.dataset.docOptional = "1";
+  row.dataset.docOptCollapsed = "1";
+  row.dataset.docDefaultVal = d.val;
+  if (d.ph) row.dataset.docPh = d.ph;
+  row.innerHTML =
+    '<button type="button" class="param-eye-btn param-eye-btn--inactive" title="Include in signed request" onclick="toggleDocOptionalParam(' +
+    id +
+    ')">' +
+    PARAM_EYE_OFF +
+    '</button>' +
+    '<span class="param-opt-key">' +
+    escapeHtml(r.name) +
+    "</span>" +
+    '<span class="param-opt-hint">optional · tap eye</span>' +
+    '<button type="button" class="param-remove-btn" onclick="removeParam(' +
+    id +
+    ')">×</button>';
+  document.getElementById("params-rows").appendChild(row);
+}
+
+function addParamRowFilled(key, val, valuePlaceholder) {
+  addMandatoryParamRow(key, val, valuePlaceholder);
 }
 
 function applyDocsImportFromText(rawText, alertEmpty, docPageUrl) {
@@ -5336,7 +5524,10 @@ function applyDocsImportFromText(rawText, alertEmpty, docPageUrl) {
   const hasEp = !!parsed.path;
   const hasRows = parsed.rows.length > 0;
   if (!hasEp && !hasRows) {
-    if (alertEmpty) window.alert("Could not parse an HTTP endpoint (e.g. POST /fapi/v1/order) or mandatory parameters from Parameters / Request Parameters tables.");
+    if (alertEmpty)
+      window.alert(
+        "Could not parse an HTTP endpoint (e.g. POST /fapi/v1/order) or a Parameters / Request Parameters table (Name, Type, Mandatory)."
+      );
     return false;
   }
 
@@ -5362,8 +5553,7 @@ function applyDocsImportFromText(rawText, alertEmpty, docPageUrl) {
   if (hasRows) {
     document.querySelectorAll("#params-rows .param-row").forEach(row => row.remove());
     for (const r of parsed.rows) {
-      const d = defaultParamValueAndPlaceholder(r.type);
-      addParamRowFilled(r.name, d.val, d.ph);
+      addImportedDocParamRow(r);
     }
   }
 
@@ -5518,8 +5708,12 @@ function render() {
 function collectParams() {
   extraParams = [];
   document.querySelectorAll('#params-rows .param-row').forEach(row => {
-    const k = row.querySelector('.param-key-input').value.trim();
-    const v = row.querySelector('.param-val-input').value.trim();
+    if (row.dataset.docOptional === "1" && row.dataset.docOptCollapsed === "1") return;
+    const ki = row.querySelector(".param-key-input");
+    const vi = row.querySelector(".param-val-input");
+    if (!ki || !vi) return;
+    const k = ki.value.trim();
+    const v = vi.value.trim();
     if (k) extraParams.push({ key: k, val: v });
   });
   render();
@@ -5529,11 +5723,12 @@ function addParamRow() {
   const id  = ++paramIdSeed;
   const row = document.createElement('div');
   row.className   = 'param-row';
-  row.dataset.pid = id;
+  row.dataset.pid = String(id);
   row.innerHTML   =
-    '<input class="param-input param-key-input" placeholder="key"   oninput="collectParams()">' +
+    '<span class="param-eye-spacer" aria-hidden="true"></span>' +
+    '<input class="param-input param-key-input" placeholder="key" oninput="collectParams()">' +
     '<input class="param-input param-val-input" placeholder="value" oninput="collectParams()">' +
-    '<button class="param-remove-btn" onclick="removeParam(' + id + ')">×</button>';
+    '<button type="button" class="param-remove-btn" onclick="removeParam(' + id + ')">×</button>';
   document.getElementById('params-rows').appendChild(row);
   row.querySelector('.param-key-input').focus();
 }
