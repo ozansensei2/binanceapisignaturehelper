@@ -691,6 +691,28 @@
     .param-input:focus { border-color: #58a6ff; }
     .param-input::placeholder { color: #484f58; }
 
+    .param-row.param-row--json-val {
+      align-items: start;
+    }
+    .param-row.param-row--json-val .param-eye-spacer {
+      margin-top: 8px;
+    }
+    .param-row.param-row--json-val .param-key-input:not([readonly]),
+    .param-row.param-row--json-val input.param-key-input[readonly] {
+      margin-top: 7px;
+    }
+    .param-row.param-row--json-val .param-remove-btn {
+      margin-top: 6px;
+    }
+    textarea.param-val-input.param-val-json {
+      min-height: 120px;
+      max-height: 360px;
+      resize: vertical;
+      line-height: 1.5;
+      font-size: 12.5px;
+      overflow-y: auto;
+    }
+
     .param-fixed-key, .param-fixed-val {
       font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
       font-size: 13px;
@@ -5927,7 +5949,7 @@ function travelRuleQuestionnaireValueLooksEmpty() {
     const ki = row.querySelector(".param-key-input");
     const vi = row.querySelector(".param-val-input");
     if (!ki || !vi) continue;
-    if (ki.value.trim() !== "questionnaire") continue;
+    if (!paramUsesJsonQuestionnaire(ki.value)) continue;
     const t = vi.value.trim();
     return !t || t === "{}";
   }
@@ -5946,12 +5968,11 @@ function upsertQuestionnaireParamRow(jsonCompactStr) {
     const ki = row.querySelector(".param-key-input");
     const vi = row.querySelector(".param-val-input");
     if (!ki || !vi) continue;
-    if (ki.value.trim() === "questionnaire") {
-      vi.value = jsonCompactStr;
-      return;
-    }
+    if (!paramUsesJsonQuestionnaire(ki.value)) continue;
+    ensureQuestionnaireValueIsJsonTextarea(row, jsonCompactStr);
+    return;
   }
-  addMandatoryParamRow("questionnaire", jsonCompactStr, "{\"…\": …} compact JSON");
+  addMandatoryParamRow("questionnaire", jsonCompactStr, "Travel rule questionnaire JSON ({ … })");
 }
 
 function applyTravelRuleQuestionnairePreset(kind, regionKey) {
@@ -6440,6 +6461,33 @@ function escapeHtml(s) {
   return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
 }
 
+/** Wallet travel-rule `questionnaire` param is JSON; render as multiline editor. */
+function paramUsesJsonQuestionnaire(nameOrKey) {
+  return String(nameOrKey || "").trim().toLowerCase() === "questionnaire";
+}
+
+/** Replace questionnaire value widget with monospace JSON textarea (.param-val-input kept for collectors). */
+function ensureQuestionnaireValueIsJsonTextarea(row, valueStr) {
+  if (!row) return;
+  const ki = row.querySelector(".param-key-input");
+  if (!paramUsesJsonQuestionnaire(ki ? ki.value : "") && !paramUsesJsonQuestionnaire(row.dataset.docKey)) return;
+  row.classList.add("param-row--json-val");
+  let vi = row.querySelector(".param-val-input");
+  if (!vi) return;
+  if (vi.tagName !== "TEXTAREA") {
+    const ta = document.createElement("textarea");
+    ta.className = "param-input param-val-input param-val-json";
+    ta.rows = 8;
+    ta.spellcheck = false;
+    ta.setAttribute("aria-label", "questionnaire JSON");
+    ta.placeholder = vi.placeholder || "Travel rule questionnaire JSON ({ … })";
+    ta.addEventListener("input", collectParams);
+    vi.replaceWith(ta);
+    vi = ta;
+  }
+  vi.value = valueStr != null ? String(valueStr) : "";
+}
+
 function collapseDocOptionalRow(row) {
   const pid = row.dataset.pid;
   const ki = row.querySelector(".param-key-input");
@@ -6450,6 +6498,8 @@ function collapseDocOptionalRow(row) {
   const phAttr = vi.getAttribute("placeholder");
   if (phAttr) row.dataset.docPh = phAttr;
   row.dataset.docOptCollapsed = "1";
+
+  row.classList.remove("param-row--json-val");
 
   row.innerHTML =
     '<button type="button" class="param-eye-btn param-eye-btn--inactive" title="Include in signed request" onclick="toggleDocOptionalParam(' +
@@ -6479,6 +6529,22 @@ function expandDocOptionalRow(row) {
 
   row.dataset.docOptCollapsed = "0";
 
+  const jq = paramUsesJsonQuestionnaire(key);
+  if (jq) row.classList.add("param-row--json-val");
+  else row.classList.remove("param-row--json-val");
+
+  const valBlock = jq
+    ? '<textarea class="param-input param-val-input param-val-json" rows="8" spellcheck="false" aria-label="questionnaire JSON"' +
+      valPhAttr +
+      ' oninput="collectParams()">' +
+      escapeHtml(valRaw) +
+      "</textarea>"
+    : '<input class="param-input param-val-input"' +
+      valPhAttr +
+      ' value="' +
+      escapeAttr(valRaw) +
+      '" oninput="collectParams()">';
+
   row.innerHTML =
     '<button type="button" class="param-eye-btn" title="Exclude from signed request" onclick="toggleDocOptionalParam(' +
     pid +
@@ -6488,11 +6554,7 @@ function expandDocOptionalRow(row) {
     '<input class="param-input param-key-input" placeholder="key" value="' +
     escapeAttr(key) +
     '" oninput="collectParams()" readonly tabindex="-1" title="From documentation">' +
-    '<input class="param-input param-val-input"' +
-    valPhAttr +
-    ' value="' +
-    escapeAttr(valRaw) +
-    '" oninput="collectParams()">' +
+    valBlock +
     '<button type="button" class="param-remove-btn" onclick="removeParam(' +
     pid +
     ')">×</button>';
@@ -6688,19 +6750,31 @@ function parseBinanceDocsPaste(text) {
 function addMandatoryParamRow(key, val, valuePlaceholder) {
   const id = ++paramIdSeed;
   const row = document.createElement("div");
-  row.className = "param-row";
+  const jq = paramUsesJsonQuestionnaire(key);
+  row.className = "param-row" + (jq ? " param-row--json-val" : "");
   row.dataset.pid = String(id);
-  const valPhAttr = valuePlaceholder ? ' placeholder="' + escapeAttr(valuePlaceholder) + '"' : ' placeholder="value"';
+  const phShown =
+    jq ? valuePlaceholder || "Travel rule questionnaire JSON ({ … })"
+    : valuePlaceholder ? valuePlaceholder
+    : "value";
+  const valPhAttr = ' placeholder="' + escapeAttr(phShown) + '"';
+  const valBlock = jq
+    ? '<textarea class="param-input param-val-input param-val-json" rows="8" spellcheck="false" aria-label="questionnaire JSON"' +
+      valPhAttr +
+      ' oninput="collectParams()">' +
+      escapeHtml(val) +
+      "</textarea>"
+    : '<input class="param-input param-val-input"' +
+      valPhAttr +
+      ' value="' +
+      escapeAttr(val) +
+      '" oninput="collectParams()">';
   row.innerHTML =
     '<span class="param-eye-spacer" aria-hidden="true"></span>' +
     '<input class="param-input param-key-input" placeholder="key" value="' +
     escapeAttr(key) +
     '" oninput="collectParams()">' +
-    '<input class="param-input param-val-input"' +
-    valPhAttr +
-    ' value="' +
-    escapeAttr(val) +
-    '" oninput="collectParams()">' +
+    valBlock +
     '<button type="button" class="param-remove-btn" onclick="removeParam(' +
     id +
     ')">×</button>';
@@ -6718,17 +6792,30 @@ function addImportedDocParamRow(r) {
   row.dataset.docKey = r.name;
 
   if (r.mandatory) {
-    const valPhAttr = d.ph ? ' placeholder="' + escapeAttr(d.ph) + '"' : ' placeholder="value"';
+    const jq = paramUsesJsonQuestionnaire(r.name);
+    if (jq) row.classList.add("param-row--json-val");
+    const valPhAttr = jq
+      ? ' placeholder="' + escapeAttr("Travel rule questionnaire JSON ({ … })") + '"'
+      : d.ph
+      ? ' placeholder="' + escapeAttr(d.ph) + '"'
+      : ' placeholder="value"';
+    const valBody = jq
+      ? '<textarea class="param-input param-val-input param-val-json" rows="8" spellcheck="false" aria-label="questionnaire JSON"' +
+        valPhAttr +
+        ' oninput="collectParams()">' +
+        escapeHtml(d.val) +
+        "</textarea>"
+      : '<input class="param-input param-val-input"' +
+        valPhAttr +
+        ' value="' +
+        escapeAttr(d.val) +
+        '" oninput="collectParams()">';
     row.innerHTML =
       '<span class="param-eye-spacer" aria-hidden="true"></span>' +
       '<input class="param-input param-key-input" placeholder="key" value="' +
       escapeAttr(r.name) +
       '" oninput="collectParams()" readonly tabindex="-1" title="From documentation">' +
-      '<input class="param-input param-val-input"' +
-      valPhAttr +
-      ' value="' +
-      escapeAttr(d.val) +
-      '" oninput="collectParams()">' +
+      valBody +
       '<button type="button" class="param-remove-btn" onclick="removeParam(' +
       id +
       ')">×</button>';
