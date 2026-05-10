@@ -5891,9 +5891,21 @@ function regionLabel(kind, key) {
 
 function getActiveTravelRuleRestPathNorm() {
   try {
+    if (state.apitype === "rest" && state.docsRestPath) {
+      let s = String(state.docsRestPath).trim().split("?")[0];
+      if (/^https?:\/\//i.test(s)) {
+        try {
+          s = new URL(s).pathname;
+        } catch (_) {
+          /* keep s */
+        }
+      }
+      s = (s.startsWith("/") ? s : "/" + s).replace(/\/+$/, "");
+      return s.toLowerCase() || "";
+    }
     const t = (document.getElementById("endpoint-display") || {}).textContent.trim();
     if (!t || t === "N/A") return "";
-    const pth = new URL(t).pathname.replace(/\/+$/, "");
+    const pth = new URL(t).pathname.replace(/\/+$/, "").toLowerCase();
     return pth || "";
   } catch (_) {
     return "";
@@ -5992,7 +6004,7 @@ function refreshTravelRuleQuestionnaireDock() {
     travelQuestionnaireUiKind = kind;
     refillTravelRegionSelect(kind, sel);
     travelQuestionnaireUiPath = "";
-  }
+  } else if (sel.options.length === 0) refillTravelRegionSelect(kind, sel);
 
   if (travelQuestionnaireUiPath !== fingerprint) {
     travelQuestionnaireUiPath = fingerprint;
@@ -6814,6 +6826,9 @@ function applyDocsImportFromText(rawText, alertEmpty, docPageUrl) {
     if (hasRestPath) {
       state.docsRestPath = parsed.path.split("?")[0];
       state.docsRestMethod = parsed.method && /^(GET|POST|PUT|DELETE|PATCH)$/i.test(String(parsed.method)) ? parsed.method : null;
+    } else {
+      state.docsRestPath = null;
+      state.docsRestMethod = null;
     }
   } else {
     state.docsRestPath = null;
