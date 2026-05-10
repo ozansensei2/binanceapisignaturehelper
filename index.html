@@ -390,6 +390,45 @@
       overflow: hidden;
     }
 
+    .code-container.code-fetch-flash-active {
+      animation: code-fetch-green-flash 1.45s ease-in-out forwards;
+    }
+
+    @keyframes code-fetch-green-flash {
+      0%, 100% {
+        border-color: #30363d;
+        background: #161b22;
+        box-shadow: inset 0 0 0 0 transparent;
+      }
+      35% {
+        border-color: #2ea043;
+        background: #132818;
+        box-shadow:
+          inset 0 0 100px rgba(35, 134, 54, 0.22),
+          0 0 28px rgba(46, 160, 67, 0.28);
+      }
+      50% {
+        border-color: #30363d;
+        background: #161b22;
+        box-shadow: inset 0 0 0 0 transparent;
+      }
+      85% {
+        border-color: #238636;
+        background: #132818;
+        box-shadow:
+          inset 0 0 72px rgba(35, 134, 54, 0.18),
+          0 0 20px rgba(46, 160, 67, 0.22);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .code-container.code-fetch-flash-active {
+        animation: none;
+        border-color: #238636;
+        box-shadow: 0 0 0 1px rgba(46, 160, 67, 0.35);
+      }
+    }
+
     .code-header {
       display: flex;
       align-items: center;
@@ -801,7 +840,7 @@
     </div>
 
     <div class="main-split-right">
-      <div class="code-container">
+      <div class="code-container" id="code-container">
     <div class="code-header">
       <div class="header-left">
         <div class="lang-dot"></div>
@@ -5584,6 +5623,18 @@ function setDocFetchLoading(on) {
   wrap.setAttribute("aria-busy", on ? "true" : "false");
 }
 
+/** Brief dark-green pulse on the code pane after a successful Fetch + parse. */
+function flashCodeContainerAfterFetchSuccess() {
+  const el = document.getElementById("code-container");
+  if (!el) return;
+  el.classList.remove("code-fetch-flash-active");
+  void el.offsetWidth;
+  el.classList.add("code-fetch-flash-active");
+  window.setTimeout(() => {
+    el.classList.remove("code-fetch-flash-active");
+  }, 1500);
+}
+
 async function fetchDocUrlAndParse() {
   if (state.apitype !== "rest") {
     window.alert("Select REST API to fetch documentation.");
@@ -5607,7 +5658,8 @@ async function fetchDocUrlAndParse() {
     if (!text || text.length < 40) throw new Error("Empty or short response");
     const ta = document.getElementById("doc-paste-text");
     if (ta) ta.value = text;
-    applyDocsImportFromText(text, true, url);
+    const imported = applyDocsImportFromText(text, true, url);
+    if (imported) flashCodeContainerAfterFetchSuccess();
   } catch (err) {
     console.error(err);
     window.alert("Fetch failed (network, proxy, or CORS). Tap Manually paste doc, paste the page text there, then tap Parse.");
