@@ -741,6 +741,10 @@
     }
     .param-input:focus { border-color: #58a6ff; }
     .param-input::placeholder { color: #484f58; }
+    select.param-input.param-qnest-val-select {
+      cursor: pointer;
+      min-height: 30px;
+    }
 
     .param-row.param-row--json-val {
       align-items: start;
@@ -6821,7 +6825,393 @@ function stringifyTravelRuleQuestionnaire(obj) {
   return JSON.stringify(obj);
 }
 
-function upsertQuestionnaireParamRow(jsonCompactStr, fieldRules) {
+/**
+ * Enumerated questionnaire fields → `<option>` lists from Binance tables
+ * ([deposit questionnaire](https://developers.binance.com/docs/wallet/travel-rule/deposit-questionnaire),
+ * [withdraw questionnaire](https://developers.binance.com/docs/wallet/travel-rule/withdraw-questionnaire)).
+ * Japan deposit differs: `depositOriginator` uses 2:Myself, 1:Not myself (others use 1/2 swapped).
+ */
+const TRAVEL_QUESTIONNAIRE_SELECT_OPTS = {
+  deposit: {
+    japan: {
+      depositOriginator: [
+        { value: 2, label: "2 — Myself" },
+        { value: 1, label: "1 — Not myself" },
+      ],
+      bnfType: [
+        { value: 0, label: "0 — Individual" },
+        { value: 1, label: "1 — Corporate / entity" },
+      ],
+      isAttested: [
+        { value: true, label: "true" },
+        { value: false, label: "false" },
+      ],
+    },
+    kazakhstan: {
+      txnPurpose: [
+        { value: "service", label: "service" },
+        { value: "goods", label: "goods" },
+        { value: "p2p", label: "p2p" },
+        { value: "charity", label: "charity" },
+        { value: "others", label: "others" },
+      ],
+    },
+    bahrain: {
+      depositOriginator: [
+        { value: 1, label: "1 — Myself" },
+        { value: 2, label: "2 — Not myself" },
+      ],
+      orgType: [
+        { value: 0, label: "0 — Individual" },
+        { value: 1, label: "1 — Corporate / entity" },
+      ],
+      receiveFrom: [
+        { value: 1, label: "1 — Private wallet" },
+        { value: 2, label: "2 — Another VASP" },
+      ],
+    },
+    "united-arab-emirates": {
+      depositOriginator: [
+        { value: 1, label: "1 — Myself" },
+        { value: 2, label: "2 — Not myself" },
+      ],
+      orgType: [
+        { value: 0, label: "0 — Individual" },
+        { value: 1, label: "1 — Corporate / entity" },
+      ],
+      receiveFrom: [
+        { value: 1, label: "1 — Private wallet" },
+        { value: 2, label: "2 — Another VASP" },
+      ],
+    },
+    india: {
+      depositOriginator: [
+        { value: 1, label: "1 — Myself" },
+        { value: 2, label: "2 — Not myself" },
+      ],
+      orgType: [
+        { value: 0, label: "0 — Individual" },
+        { value: 1, label: "1 — Corporate / entity" },
+      ],
+      receiveFrom: [
+        { value: 1, label: "1 — Private wallet" },
+        { value: 2, label: "2 — Another VASP" },
+      ],
+    },
+    "eu-poland-france": {
+      depositOriginator: [
+        { value: 1, label: "1 — Myself" },
+        { value: 2, label: "2 — Not myself" },
+      ],
+      orgType: [
+        { value: 0, label: "0 — Individual" },
+        { value: 1, label: "1 — Corporate / entity" },
+      ],
+      receiveFrom: [
+        { value: 1, label: "1 — Private wallet" },
+        { value: 2, label: "2 — Another VASP" },
+      ],
+      declaration: [
+        { value: true, label: "true" },
+        { value: false, label: "false" },
+      ],
+    },
+    "south-africa": {
+      depositOriginator: [
+        { value: 1, label: "1 — Myself" },
+        { value: 2, label: "2 — Not myself" },
+      ],
+      orgType: [
+        { value: 0, label: "0 — Individual" },
+        { value: 1, label: "1 — Corporate / entity" },
+      ],
+      receiveFrom: [
+        { value: 1, label: "1 — Private wallet" },
+        { value: 2, label: "2 — Another VASP" },
+      ],
+      declaration: [
+        { value: true, label: "true" },
+        { value: false, label: "false" },
+      ],
+    },
+  },
+  withdraw: {
+    japan: {
+      isAddressOwner: [
+        { value: 1, label: "1 — Send to myself" },
+        { value: 2, label: "2 — Send to another beneficiary" },
+      ],
+      bnfType: [
+        { value: 0, label: "0 — Individual" },
+        { value: 1, label: "1 — Corporate/Entity" },
+      ],
+      sendTo: [
+        { value: 1, label: "1 — Crypto-asset services provider" },
+        { value: 2, label: "2 — Unhosted Wallet" },
+      ],
+      txnPurpose: [
+        { value: 1, label: "1 — Purchase of goods within Japan" },
+        { value: 2, label: "2 — Inheritance, gift or living expenses" },
+        { value: 3, label: "3 — Cross border trade" },
+        { value: 4, label: "4 — Investment" },
+        {
+          value: 5,
+          label: "5 — Use of services provided by the beneficiary VASP",
+        },
+        { value: 6, label: "6 — Loan repayment" },
+        { value: 7, label: "7 — Gifts & Donations" },
+      ],
+      vaspRegion: [
+        {
+          value: "notNortheasternProvinces",
+          label: "notNortheasternProvinces (CN only, per appendix)",
+        },
+        { value: "other", label: "other" },
+      ],
+      isAttested: [
+        { value: true, label: "true" },
+        { value: false, label: "false" },
+      ],
+    },
+    kazakhstan: {
+      isAddressOwner: [
+        { value: true, label: "true — address owned by user" },
+        { value: false, label: "false — address not owned by user" },
+      ],
+      bnfType: [
+        { value: 0, label: "0 — Individual" },
+        { value: 1, label: "1 — Corporate/Entity" },
+      ],
+      txnPurpose: [
+        { value: "service", label: "service" },
+        { value: "goods", label: "goods" },
+        { value: "p2p", label: "p2p" },
+        { value: "charity", label: "charity" },
+        { value: "others", label: "others" },
+      ],
+      sendTo: [
+        { value: 2, label: "2 — Exchange" },
+        { value: 1, label: "1 — Unhosted Wallet" },
+      ],
+      isAttested: [
+        { value: true, label: "true" },
+        { value: false, label: "false" },
+      ],
+    },
+    "new-zealand": {
+      isAddressOwner: [
+        { value: 1, label: "1 — Send to myself" },
+        { value: 2, label: "2 — Send to another beneficiary" },
+      ],
+      bnfType: [
+        { value: 0, label: "0 — Individual" },
+        { value: 1, label: "1 — Corporate/Entity" },
+      ],
+      sendTo: [
+        { value: 1, label: "1 — Private Wallet" },
+        { value: 2, label: "2 — Another VASP" },
+      ],
+      declaration: [
+        { value: true, label: "true" },
+        { value: false, label: "false" },
+      ],
+    },
+    bahrain: {
+      isAddressOwner: [
+        { value: 1, label: "1 — Send to myself" },
+        { value: 2, label: "2 — Send to another beneficiary" },
+      ],
+      bnfType: [
+        { value: 0, label: "0 — Individual" },
+        { value: 1, label: "1 — Corporate/Entity" },
+      ],
+      sendTo: [
+        { value: 1, label: "1 — Private Wallet" },
+        { value: 2, label: "2 — Another VASP" },
+      ],
+    },
+    uae: {
+      isAddressOwner: [
+        { value: 1, label: "1 — Send to myself" },
+        { value: 2, label: "2 — Send to another beneficiary" },
+      ],
+      bnfType: [
+        { value: 0, label: "0 — Individual" },
+        { value: 1, label: "1 — Corporate/Entity" },
+      ],
+      sendTo: [
+        { value: 1, label: "1 — Private Wallet" },
+        { value: 2, label: "2 — Another VASP" },
+      ],
+    },
+    india: {
+      isAddressOwner: [
+        { value: 1, label: "1 — Send to myself" },
+        { value: 2, label: "2 — Send to another beneficiary" },
+      ],
+      bnfType: [
+        { value: 0, label: "0 — Individual" },
+        { value: 1, label: "1 — Corporate/Entity" },
+      ],
+      sendTo: [
+        { value: 1, label: "1 — Private Wallet" },
+        { value: 2, label: "2 — Another VASP" },
+      ],
+    },
+    "eu-poland-france": {
+      isAddressOwner: [
+        { value: 1, label: "1 — Send to myself" },
+        { value: 2, label: "2 — Send to another beneficiary" },
+      ],
+      bnfType: [
+        { value: 0, label: "0 — Individual" },
+        { value: 1, label: "1 — Corporate/Entity" },
+      ],
+      sendTo: [
+        { value: 1, label: "1 — Private Wallet" },
+        { value: 2, label: "2 — Another VASP" },
+      ],
+      declaration: [
+        { value: true, label: "true" },
+        { value: false, label: "false" },
+      ],
+    },
+    "south-africa": {
+      isAddressOwner: [
+        { value: 1, label: "1 — Send to myself" },
+        { value: 2, label: "2 — Send to another beneficiary" },
+      ],
+      bnfType: [
+        { value: 0, label: "0 — Individual" },
+        { value: 1, label: "1 — Corporate/Entity" },
+      ],
+      sendTo: [
+        { value: 1, label: "1 — Private Wallet" },
+        { value: 2, label: "2 — Another VASP" },
+      ],
+      declaration: [
+        { value: true, label: "true" },
+        { value: false, label: "false" },
+      ],
+    },
+  },
+};
+
+function inferTravelQuestionnaireContextForNestRow() {
+  const kindRaw = travelRuleQuestionnaireKindForRestPath(getActiveTravelRuleRestPathNorm());
+  const sel = document.getElementById("travel-rule-q-region");
+  const panel = document.getElementById("travel-rule-q-panel");
+  if (!kindRaw || !sel || !panel || panel.hidden) return { kind: "", region: "" };
+  const region = String(sel.value || "").trim().toLowerCase();
+  const kind = kindRaw === "withdraw" ? "withdraw" : kindRaw === "deposit" ? "deposit" : "";
+  return { kind, region };
+}
+
+function resolveQuestionnaireTravelCtx(row, travelCtxPassed) {
+  let kind =
+    travelCtxPassed && travelCtxPassed.kind
+      ? String(travelCtxPassed.kind).trim()
+      : row && row.dataset.qnestTravelKind
+      ? row.dataset.qnestTravelKind.trim()
+      : "";
+  let region =
+    travelCtxPassed && travelCtxPassed.region != null && String(travelCtxPassed.region).length
+      ? String(travelCtxPassed.region).trim().toLowerCase()
+      : row && row.dataset.qnestTravelRegion
+      ? row.dataset.qnestTravelRegion.trim().toLowerCase()
+      : "";
+
+  const inf = inferTravelQuestionnaireContextForNestRow();
+  if (!kind && inf.kind) kind = inf.kind;
+  if (!region && inf.region) region = inf.region;
+
+  if (kind !== "deposit" && kind !== "withdraw") kind = "";
+
+  if (row) {
+    if (kind) row.dataset.qnestTravelKind = kind;
+    else delete row.dataset.qnestTravelKind;
+    if (region) row.dataset.qnestTravelRegion = region;
+    else delete row.dataset.qnestTravelRegion;
+  }
+
+  return { kind, region };
+}
+
+function getTravelQuestionnaireSelectOpts(kind, regionSlug, fieldName) {
+  const k = String(kind || "").trim();
+  const reg = String(regionSlug || "").trim().toLowerCase();
+  const fn = String(fieldName || "").trim();
+  if (!k || !reg || !fn) return null;
+  const layer = TRAVEL_QUESTIONNAIRE_SELECT_OPTS[k];
+  if (!layer) return null;
+  const perReg = layer[reg];
+  if (!perReg) return null;
+  const list = /** @type {{value: unknown, label: string}[]} */ perReg[fn];
+  return Array.isArray(list) && list.length ? list : null;
+}
+
+function questionnaireSelectValueAttr(optValue) {
+  if (optValue === true) return "true";
+  if (optValue === false) return "false";
+  if (typeof optValue === "number" && Number.isFinite(optValue)) return String(optValue);
+  return String(optValue ?? "");
+}
+
+function questionnaireSelectStoredMatchesOption(valueDisplayStr, optValue) {
+  const t = String(valueDisplayStr ?? "").trim();
+  if (!t.length) return false;
+  const parsed = parseQuestionnaireFieldInput(t);
+  return travelRuleScalarEqual(parsed, optValue);
+}
+
+function buildQuestionnaireValueControlHtml(rootPid, fieldKey, valueDisplayStr, travelKind, travelRegion) {
+  const optsList = getTravelQuestionnaireSelectOpts(travelKind, travelRegion, fieldKey);
+  if (!optsList) {
+    return (
+      '<input class="param-input param-qnest-val-input" placeholder="value" value="' +
+      escapeAttr(valueDisplayStr) +
+      '" oninput="travelQuestionnaireQnestInput(' +
+      rootPid +
+      ')">'
+    );
+  }
+
+  const t = String(valueDisplayStr ?? "").trim();
+  let selIx = optsList.findIndex(o => questionnaireSelectStoredMatchesOption(t, o.value));
+  if (selIx < 0 && t !== "") {
+    return (
+      '<input class="param-input param-qnest-val-input" placeholder="value" value="' +
+      escapeAttr(valueDisplayStr) +
+      '" oninput="travelQuestionnaireQnestInput(' +
+      rootPid +
+      ')">'
+    );
+  }
+  if (selIx < 0) selIx = 0;
+
+  let optMarkup = "";
+  for (let oi = 0; oi < optsList.length; oi++) {
+    const o = optsList[oi];
+    optMarkup +=
+      '<option value="' +
+      escapeAttr(questionnaireSelectValueAttr(o.value)) +
+      '"' +
+      (oi === selIx ? " selected" : "") +
+      ">" +
+      escapeHtml(o.label) +
+      "</option>";
+  }
+
+  return (
+    '<select class="param-input param-qnest-val-input param-qnest-val-select" title="Value from questionnaire doc enumeration" onchange="travelQuestionnaireQnestInput(' +
+    rootPid +
+    ')">' +
+    optMarkup +
+    "</select>"
+  );
+}
+
+function upsertQuestionnaireParamRow(jsonCompactStr, fieldRules, travelCtx) {
   /** @type Record<string, unknown> */
   const fr = Object.assign({}, fieldRules || {});
   const rows = document.querySelectorAll("#params-rows .param-row");
@@ -6829,16 +7219,19 @@ function upsertQuestionnaireParamRow(jsonCompactStr, fieldRules) {
     const row = rows[x];
     const ki = row.querySelector(".param-key-input");
     if (!ki || !paramUsesJsonQuestionnaire(ki.value)) continue;
-    ensureQuestionnaireValueIsNest(row, jsonCompactStr, fr);
+    ensureQuestionnaireValueIsNest(row, jsonCompactStr, fr, travelCtx);
     return;
   }
-  addMandatoryParamRow("questionnaire", jsonCompactStr, "", fr);
+  addMandatoryParamRow("questionnaire", jsonCompactStr, "", fr, travelCtx);
 }
 
 function applyTravelRuleQuestionnairePreset(kind, regionKey) {
   const obj = getTravelQuestionnaireTemplate(kind, regionKey);
   if (!obj || !Object.keys(obj).length) return;
-  upsertQuestionnaireParamRow(stringifyTravelRuleQuestionnaire(obj), getTravelQuestionnaireFieldRules(kind, regionKey));
+  upsertQuestionnaireParamRow(stringifyTravelRuleQuestionnaire(obj), getTravelQuestionnaireFieldRules(kind, regionKey), {
+    kind,
+    region: regionKey,
+  });
 }
 
 function refillTravelRegionSelect(kind, selEl, previousValue) {
@@ -7391,13 +7784,15 @@ function collectQuestionnaireObjectFromQnestWrap(wrapEl) {
   return out;
 }
 
-function buildQnestRowsHtml(rootPid, obj, fieldRulesObj) {
+function buildQnestRowsHtml(rootPid, obj, fieldRulesObj, travelKind, travelRegion) {
   /** @type Record<string, unknown> */
   const rulesMap = Object.assign({}, fieldRulesObj || {});
   const keys = Object.keys(obj || {});
   if (!keys.length) {
     return '<div class="param-qnest-empty-hint" style="font-size:12px;color:#484f58;padding:4px 2px">No fields — pick a Travel Rule region above or paste JSON keys.</div>';
   }
+  const tk = String(travelKind || "");
+  const tr = String(travelRegion || "");
   return keys
     .map((key, ix) =>
       buildQuestionnaireSubRowExpandedHtml(
@@ -7405,17 +7800,26 @@ function buildQnestRowsHtml(rootPid, obj, fieldRulesObj) {
         ix,
         key,
         questionnaireValueToInputString(obj[key]),
-        travelEncodeQnestCondition(/** @type any */ (rulesMap[key]))
+        travelEncodeQnestCondition(/** @type any */ (rulesMap[key])),
+        tk,
+        tr
       )
     )
     .join("");
 }
 
-function buildQuestionnaireSubRowExpandedHtml(rootPid, subIx, fieldKey, valueStr, condEncAttr) {
+function buildQuestionnaireSubRowExpandedHtml(rootPid, subIx, fieldKey, valueStr, condEncAttr, travelKind, travelRegion) {
   const dac =
     condEncAttr && String(condEncAttr).length
       ? ' data-qnest-c="' + escapeAttr(String(condEncAttr)) + '"'
       : "";
+  const valCtl = buildQuestionnaireValueControlHtml(
+    rootPid,
+    fieldKey,
+    valueStr,
+    travelKind,
+    travelRegion
+  );
   return (
     '<div class="param-qnest-row"' +
     dac +
@@ -7434,11 +7838,7 @@ function buildQuestionnaireSubRowExpandedHtml(rootPid, subIx, fieldKey, valueStr
     '<input class="param-input param-qnest-key" readonly tabindex="-1" value="' +
     escapeAttr(fieldKey) +
     '" title="Questionnaire JSON key">' +
-    '<input class="param-input param-qnest-val-input" placeholder="value" value="' +
-    escapeAttr(valueStr) +
-    '" oninput="travelQuestionnaireQnestInput(' +
-    rootPid +
-    ')">' +
+    valCtl +
     "</div>"
   );
 }
@@ -7478,12 +7878,22 @@ function toggleQuestionnaireSubRow(rootPid, subIx) {
   const row = document.querySelector(
     '#params-rows .param-row[data-pid="' + rootPid + '"] .param-qnest-row[data-qnest-sub="' + subIx + '"]'
   );
+  const hostRow = document.querySelector('#params-rows .param-row[data-pid="' + rootPid + '"]');
   if (!row) return;
   const fk = row.dataset.qnestKey || "";
   const encHold = row.getAttribute("data-qnest-c") || "";
+  const tcx = resolveQuestionnaireTravelCtx(hostRow || null, null);
   if (row.dataset.qnestCollapsed === "1") {
     const heldRaw = row.dataset.qnestHeldVal !== undefined ? row.dataset.qnestHeldVal : "";
-    row.outerHTML = buildQuestionnaireSubRowExpandedHtml(rootPid, subIx, fk, heldRaw, encHold);
+    row.outerHTML = buildQuestionnaireSubRowExpandedHtml(
+      rootPid,
+      subIx,
+      fk,
+      heldRaw,
+      encHold,
+      tcx.kind,
+      tcx.region
+    );
   } else {
     const vi = row.querySelector(".param-qnest-val-input");
     const held = vi ? vi.value : row.dataset.qnestHeldVal || "";
@@ -7502,10 +7912,11 @@ function travelQuestionnaireQnestInput(rootPidStr) {
 }
 
 /** Parse / replace questionnaire value area with per-key rows (eye = include in signed JSON). */
-function ensureQuestionnaireValueIsNest(row, valueStr, nestFieldRules) {
+function ensureQuestionnaireValueIsNest(row, valueStr, nestFieldRules, travelCtx) {
   if (!row) return;
   const ki = row.querySelector(".param-key-input");
   if (!paramUsesJsonQuestionnaire(ki ? ki.value : "") && !paramUsesJsonQuestionnaire(row.dataset.docKey)) return;
+  resolveQuestionnaireTravelCtx(row, travelCtx || null);
   row.classList.add("param-row--json-val", "param-row--qnest-root");
   row.dataset.qnestRoot = "1";
   const obj = typeof valueStr === "string" ? parseQuestionnaireJsonToObject(valueStr) : valueStr || {};
@@ -7525,7 +7936,8 @@ function ensureQuestionnaireValueIsNest(row, valueStr, nestFieldRules) {
   }
   if (!pid) return;
   delete wrap.dataset.tqCondBound;
-  wrap.innerHTML = buildQnestRowsHtml(pid, obj, rulesSaved);
+  const tcx2 = resolveQuestionnaireTravelCtx(row, null);
+  wrap.innerHTML = buildQnestRowsHtml(pid, obj, rulesSaved, tcx2.kind, tcx2.region);
   travelQuestionnaireBindConditionalInputs(row);
 }
 
@@ -7539,6 +7951,8 @@ function collapseDocOptionalRow(row) {
     const wrap = row.querySelector(".param-qnest-wrap");
     row.dataset.docHeldVal = stringifyTravelRuleQuestionnaire(collectQuestionnaireObjectFromQnestWrap(wrap));
     row.dataset.docQnestFieldRules = row.dataset.qnestFieldRules || "{}";
+    row.dataset.docQnestTravelKind = row.dataset.qnestTravelKind ?? "";
+    row.dataset.docQnestTravelRegion = row.dataset.qnestTravelRegion ?? "";
   } else {
     const vi = row.querySelector(".param-val-input");
     if (!vi) return;
@@ -7605,12 +8019,25 @@ function expandDocOptionalRow(row) {
     } catch (_) {
       qr = {};
     }
-    ensureQuestionnaireValueIsNest(row, valRaw || "{}", qr);
+    if ("docQnestTravelKind" in row.dataset) {
+      row.dataset.qnestTravelKind = row.dataset.docQnestTravelKind;
+      delete row.dataset.docQnestTravelKind;
+    }
+    if ("docQnestTravelRegion" in row.dataset) {
+      row.dataset.qnestTravelRegion = row.dataset.docQnestTravelRegion;
+      delete row.dataset.docQnestTravelRegion;
+    }
+    ensureQuestionnaireValueIsNest(row, valRaw || "{}", qr, {
+      kind: row.dataset.qnestTravelKind || "",
+      region: row.dataset.qnestTravelRegion || "",
+    });
     collectParams();
     return;
   }
 
   delete row.dataset.docQnestFieldRules;
+  delete row.dataset.docQnestTravelKind;
+  delete row.dataset.docQnestTravelRegion;
   row.classList.remove("param-row--qnest-root");
   delete row.dataset.qnestRoot;
   row.classList.remove("param-row--json-val");
@@ -7824,7 +8251,7 @@ function parseBinanceDocsPaste(text) {
   return out;
 }
 
-function addMandatoryParamRow(key, val, valuePlaceholder, nestFieldRules) {
+function addMandatoryParamRow(key, val, valuePlaceholder, nestFieldRules, travelCtx) {
   const id = ++paramIdSeed;
   const row = document.createElement("div");
   const jq = paramUsesJsonQuestionnaire(key);
@@ -7856,7 +8283,7 @@ function addMandatoryParamRow(key, val, valuePlaceholder, nestFieldRules) {
     id +
     ')">×</button>';
   document.getElementById("params-rows").appendChild(row);
-  if (jq) ensureQuestionnaireValueIsNest(row, val, nestFieldRules || {});
+  if (jq) ensureQuestionnaireValueIsNest(row, val, nestFieldRules || {}, travelCtx);
 }
 
 /** Doc import: mandatory row is always in the signed request; optional starts with eye closed until toggled. */
@@ -7898,7 +8325,7 @@ function addImportedDocParamRow(r) {
     document.getElementById("params-rows").appendChild(row);
     if (jq) {
       row.dataset.qnestRoot = "1";
-      ensureQuestionnaireValueIsNest(row, d.val, {});
+      ensureQuestionnaireValueIsNest(row, d.val, {}, inferTravelQuestionnaireContextForNestRow());
     }
     return;
   }
