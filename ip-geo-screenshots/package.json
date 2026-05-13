@@ -1,0 +1,13 @@
+{
+  "name": "ip-geo-screenshots",
+  "private": true,
+  "type": "module",
+  "description": "Low-volume Playwright captures for MaxMind demo, db-ip, IP2Location demo",
+  "scripts": {
+    "capture": "node capture.mjs",
+    "install-browser": "playwright install chromium"
+  },
+  "devDependencies": {
+    "playwright": "^1.50.0"
+  }
+}
