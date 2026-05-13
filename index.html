@@ -387,44 +387,6 @@
       white-space: nowrap;
     }
 
-    .rest-security-toolbar {
-      display: none;
-      flex-direction: row;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 10px 14px;
-      width: 100%;
-    }
-
-    .rest-security-toolbar.rest-security-toolbar--visible {
-      display: flex;
-    }
-
-    .rest-security-toolbar-title {
-      font-size: 10px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: #8b949e;
-      flex-shrink: 0;
-      margin-right: 4px;
-    }
-
-    .rest-sec-label {
-      font-size: 12px;
-      color: #c9d1d9;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      cursor: pointer;
-      user-select: none;
-      white-space: nowrap;
-    }
-
-    .rest-sec-label input {
-      cursor: pointer;
-    }
-
     #env-badge.docs-shift { margin-left: 0; }
 
     .endpoint-label {
@@ -526,23 +488,6 @@
       gap: 12px;
     }
 
-    .code-toolbar-row--rest-auth {
-      width: 100%;
-      display: none;
-      align-items: center;
-      padding-top: 6px;
-      margin-top: 4px;
-      border-top: 1px solid #30363d;
-    }
-
-    .code-toolbar-row--rest-auth:has(.rest-security-toolbar--visible) {
-      display: flex;
-    }
-
-    .code-toolbar-row--rest-auth .rest-security-toolbar {
-      padding-top: 0;
-    }
-
     .code-toolbar-picker {
       display: flex;
       flex-direction: column;
@@ -577,6 +522,11 @@
 
     .code-toolbar-picker select:hover { border-color: #58a6ff; }
     .code-toolbar-picker select:focus { border-color: #58a6ff; box-shadow: 0 0 0 2px rgba(88,166,255,0.12); }
+
+    #picker-auth-wrap select {
+      min-width: min(100%, 260px);
+      max-width: 320px;
+    }
 
     .btn-group { display: flex; gap: 8px; }
 
@@ -910,6 +860,108 @@
 
     .pdf-btn.loading, .postman-btn.loading { opacity: 0.6; cursor: wait; pointer-events: none; }
 
+    /* Postman help modal */
+    .postman-help-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    .postman-help-modal.postman-help-modal--open {
+      display: flex;
+    }
+    .postman-help-modal__backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(1, 4, 9, 0.72);
+      cursor: pointer;
+    }
+    .postman-help-modal__dialog {
+      position: relative;
+      width: 100%;
+      max-width: 440px;
+      max-height: min(86vh, 560px);
+      overflow: auto;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+      padding: 18px 20px 16px;
+      color: #e6edf3;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .postman-help-modal__title {
+      margin: 0 0 12px;
+      font-size: 15px;
+      font-weight: 600;
+      color: #f0f6fc;
+      letter-spacing: -0.02em;
+    }
+    .postman-help-modal__body ol {
+      margin: 0 0 0 18px;
+      padding: 0;
+    }
+    .postman-help-modal__body li {
+      margin-bottom: 8px;
+    }
+    .postman-help-modal__body li:last-child {
+      margin-bottom: 0;
+    }
+    .postman-help-modal__body code {
+      font-size: 12px;
+      background: #21262d;
+      padding: 1px 5px;
+      border-radius: 4px;
+      border: 1px solid #30363d;
+    }
+    .postman-help-modal__actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 1px solid #30363d;
+    }
+    .postman-help-download-btn {
+      background: #238636;
+      color: #fff;
+      border: 1px solid #2ea043;
+      border-radius: 6px;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .postman-help-download-btn:hover:not(:disabled) {
+      background: #2ea043;
+      border-color: #3fb950;
+    }
+    .postman-help-download-btn:disabled {
+      opacity: 0.65;
+      cursor: wait;
+    }
+    .postman-help-close-btn {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 8px 14px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .postman-help-close-btn:hover {
+      background: #30363d;
+      border-color: #8b949e;
+      color: #e6edf3;
+    }
+
     pre {
       margin: 0;
       overflow-x: auto;
@@ -1106,17 +1158,12 @@
               <div class="code-toolbar-picker" id="picker-auth-wrap">
                 <label for="sel-auth">Auth type</label>
                 <select id="sel-auth">
-                  <option value="hmac">HMAC-SHA256</option>
-                  <option value="rsa">RSA</option>
-                  <option value="ed25519">Ed25519</option>
+                  <option value="plain-none">None (unsigned, no header)</option>
+                  <option value="plain-key">API key in header only (unsigned)</option>
+                  <option value="hmac" selected>HMAC-SHA256 (signed)</option>
+                  <option value="rsa">RSA (signed)</option>
+                  <option value="ed25519">Ed25519 (signed)</option>
                 </select>
-              </div>
-            </div>
-            <div class="code-toolbar-row code-toolbar-row--rest-auth">
-              <div class="code-toolbar-picker rest-security-toolbar" id="rest-security-toolbar">
-                <span class="rest-security-toolbar-title">REST auth</span>
-                <label class="rest-sec-label"><input type="checkbox" id="chk-rest-api-key" checked /> X-MBX-APIKEY</label>
-                <label class="rest-sec-label"><input type="checkbox" id="chk-rest-signature" checked /> Signature (HMAC/RSA/Ed25519)</label>
               </div>
             </div>
           </div>
@@ -1135,7 +1182,7 @@
         </svg>
         Copy
       </button>
-      <button type="button" class="postman-btn" id="postman-btn" title="Download ZIP containing Postman Collection v2.1 JSON (REST, HMAC only)">
+      <button type="button" class="postman-btn" id="postman-btn" title="Postman kullanımı ve ZIP indirme">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
           <path d="M8.5 10.5L8 11l-.5-.5-5-5 1-1L8 8.793l4.5-4.5 1 1-5 5z"/>
           <path d="M3 13v1h10v-1H3zm-1 0a1 1 0 001 1h10a1 1 0 001-1v-1H2v1z"/>
@@ -1166,6 +1213,26 @@
     <h2>Binance API — Signed Request Example</h2>
     <div class="print-meta" id="print-meta"></div>
     <div class="print-ep" id="print-ep"></div>
+  </div>
+
+  <div id="postman-help-modal" class="postman-help-modal" aria-hidden="true">
+    <div class="postman-help-modal__backdrop" id="postman-help-modal-backdrop" tabindex="-1"></div>
+    <div class="postman-help-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="postman-help-title">
+      <h2 class="postman-help-modal__title" id="postman-help-title">Postman'e aktarma</h2>
+      <div class="postman-help-modal__body">
+        <ol>
+          <li>Aşağıdan <strong>ZIP indir</strong>'e basın. ZIP'i açın; içindeki <code>.json</code> dosyasını kullanın (ZIP'in kendisini Postman'a vermeyin).</li>
+          <li>Postman'da <strong>Import</strong> → bu JSON dosyasını seçin.</li>
+          <li>Collection'ı seçin → <strong>Variables</strong>: <code>apiKey</code> ve <code>apiSecret</code> alanlarını doldurun (hazır <code>X-MBX-APIKEY</code> header'ı <code>{{apiKey}}</code> kullanır).</li>
+          <li>Burada Auth type olarak <strong>HMAC-SHA256 (signed)</strong> seçiliyken export ettiyseniz, göndermeden önce Pre-request script <code>timestamp</code> ve HMAC imzasını ekler — isteği <strong>Send</strong> ile çalıştırmanız yeterlidir.</li>
+          <li>Unsigned seçeneklerde (<strong>None</strong> veya <strong>API key in header only</strong>) imza script'i yoktur; ortam (mainnet / testnet) ile API anahtarlarınızın eşleştiğinden emin olun.</li>
+        </ol>
+      </div>
+      <div class="postman-help-modal__actions">
+        <button type="button" class="postman-help-download-btn" id="postman-download-zip-btn">ZIP indir</button>
+        <button type="button" class="postman-help-close-btn" id="postman-help-close-btn">Kapat</button>
+      </div>
+    </div>
   </div>
 </main>
 
@@ -1243,6 +1310,14 @@ const UDS_REST_EP = {
 const LANG_NAMES = { python:'Python', javascript:'Node.js', java:'Java', go:'Go', csharp:'C#', php:'PHP', ruby:'Ruby', typescript:'TypeScript', rust:'Rust', cpp:'C++', bash:'Bash' };
 const LANG_HL    = { python:'python', javascript:'javascript', java:'java', go:'go', csharp:'csharp', php:'php', ruby:'ruby', typescript:'typescript', rust:'rust', cpp:'cpp', bash:'bash' };
 const AUTH_NAMES = { hmac:'HMAC-SHA256', rsa:'RSA', ed25519:'Ed25519' };
+/** Toolbar + print label per sel-auth value (REST adds plain modes). */
+const AUTH_DISPLAY = Object.assign(
+  {
+    "plain-none": "REST — no header",
+    "plain-key": "REST — API key header only"
+  },
+  AUTH_NAMES
+);
 
 const NOTES = {
   hmac: {
@@ -8058,10 +8133,9 @@ function clearDocsImport() {
   state.docsRestPath = null;
   state.docsRestMethod = null;
   state.docsWsMethod = null;
-  state.restRequireApiKey = true;
-  state.restRequireSignature = true;
+  state.auth = "hmac";
   state.restSecurityTypeLabel = "";
-  syncRestSecurityCheckboxesFromState();
+  syncRestAuthFlagsFromAuth();
   const bd = document.getElementById("docs-ep-note");
   if (bd) bd.style.display = "none";
   const sb = document.getElementById("rest-security-badge");
@@ -8899,24 +8973,18 @@ function extractBinanceSecurityTypeFromPaste(normIn) {
 }
 
 function normalizeRestSecurityState() {
-  if (state.restRequireSignature && !state.restRequireApiKey) state.restRequireApiKey = true;
+  syncRestAuthFlagsFromAuth();
 }
 
-function syncRestSecurityCheckboxesFromState() {
-  const ka = document.getElementById("chk-rest-api-key");
-  const sg = document.getElementById("chk-rest-signature");
-  if (ka) ka.checked = state.restRequireApiKey;
-  if (sg) sg.checked = state.restRequireSignature;
-}
-
-/** Apply flags from parsed Binance Security Type label (parenthetical in doc title). */
+/** Apply parsed Binance Security Type label → Auth type dropdown (REST only). */
 function applyBinanceDocSecurityType(secRaw) {
   const flags = securityTypeToRestFlags(secRaw);
   if (!flags) return;
-  state.restRequireApiKey = flags.apiKey;
-  state.restRequireSignature = flags.signature;
   state.restSecurityTypeLabel = secRaw;
-  syncRestSecurityCheckboxesFromState();
+  if (!flags.signature && !flags.apiKey) state.auth = "plain-none";
+  else if (!flags.signature && flags.apiKey) state.auth = "plain-key";
+  else if (state.auth === "plain-none" || state.auth === "plain-key") state.auth = "hmac";
+  syncRestAuthFlagsFromAuth();
 }
 
 function parseBinanceDocsPaste(text) {
@@ -9303,6 +9371,60 @@ async function fetchDocUrlAndParse() {
 
 
 /* ── Sync market options based on apitype + env ────────────────────── */
+function appendAuthSelectOption(sel, value, label) {
+  const o = document.createElement("option");
+  o.value = value;
+  o.textContent = label;
+  sel.appendChild(o);
+}
+
+/** REST: none / API-key-only / signed algos. WS + UDS: signed algos only. Rebuilds #sel-auth options. */
+function rebuildAuthSelect() {
+  const sel = document.getElementById("sel-auth");
+  if (!sel) return;
+
+  const api = state.apitype;
+  const sigVals = ["hmac", "rsa", "ed25519"];
+
+  sel.innerHTML = "";
+
+  if (api === "rest") {
+    appendAuthSelectOption(sel, "plain-none", "None (unsigned, no header)");
+    appendAuthSelectOption(sel, "plain-key", "API key in header only (unsigned)");
+    appendAuthSelectOption(sel, "hmac", "HMAC-SHA256 (signed)");
+    appendAuthSelectOption(sel, "rsa", "RSA (signed)");
+    appendAuthSelectOption(sel, "ed25519", "Ed25519 (signed)");
+    const restVals = ["plain-none", "plain-key", "hmac", "rsa", "ed25519"];
+    if (!restVals.includes(state.auth)) state.auth = "hmac";
+  } else {
+    appendAuthSelectOption(sel, "hmac", "HMAC-SHA256");
+    appendAuthSelectOption(sel, "rsa", "RSA");
+    appendAuthSelectOption(sel, "ed25519", "Ed25519");
+    if (state.auth === "plain-none" || state.auth === "plain-key" || !sigVals.includes(state.auth)) state.auth = "hmac";
+  }
+
+  sel.value = state.auth;
+  syncRestAuthFlagsFromAuth();
+}
+
+function syncRestAuthFlagsFromAuth() {
+  if (state.apitype !== "rest") {
+    state.restRequireApiKey = true;
+    state.restRequireSignature = true;
+    return;
+  }
+  if (state.auth === "plain-none") {
+    state.restRequireApiKey = false;
+    state.restRequireSignature = false;
+  } else if (state.auth === "plain-key") {
+    state.restRequireApiKey = true;
+    state.restRequireSignature = false;
+  } else {
+    state.restRequireApiKey = true;
+    state.restRequireSignature = true;
+  }
+}
+
 function syncMarketOptions() {
   const sel       = document.getElementById("sel-market");
   const available = MARKET_AVAILABLE[state.apitype][state.env] || [];
@@ -9315,6 +9437,8 @@ function syncMarketOptions() {
     sel.value    = state.market;
   }
 
+  rebuildAuthSelect();
+
   // Spot UDS supports HMAC (subscribe.signature) and Ed25519 (session.logon); RSA not supported
   const selAuth   = document.getElementById("sel-auth");
   const isUdsSpot = state.apitype === "uds" && state.market === "spot";
@@ -9326,6 +9450,7 @@ function syncMarketOptions() {
   if (isUdsSpot && state.auth === "rsa") {
     state.auth    = "hmac";
     selAuth.value = "hmac";
+    syncRestAuthFlagsFromAuth();
   }
 
   // Params panel: hide for UDS only (REST + WebSocket use the same extra-param UI)
@@ -9448,12 +9573,6 @@ function render() {
     (isRest && state.docsRestPath) || (isWs && state.docsWsMethod);
   if (docNote) docNote.style.display = showDocImported ? "inline" : "none";
 
-  const rsBar = document.getElementById("rest-security-toolbar");
-  if (rsBar) rsBar.classList.toggle("rest-security-toolbar--visible", isRest);
-
-  const authWrap = document.getElementById("picker-auth-wrap");
-  if (authWrap) authWrap.style.display = isRest && !state.restRequireSignature ? "none" : "";
-
   const tsRow = document.querySelector("#params-container .param-fixed-row");
   if (tsRow) tsRow.style.display = isRest && state.restRequireSignature ? "" : "none";
 
@@ -9470,11 +9589,8 @@ function render() {
   const postmanBtn = document.getElementById("postman-btn");
   if (postmanBtn) postmanBtn.style.display = isRest && state.auth === "hmac" ? "" : "none";
 
-  syncRestSecurityCheckboxesFromState();
-
   const marketLabels = { spot:'Spot', usdm:'USD-M Futures', coinm:'COIN-M Futures', portfolio:'Portfolio Margin', options:'Options' };
-  const authMeta =
-    isRest && !state.restRequireSignature ? "Unsigned REST" : AUTH_NAMES[state.auth];
+  const authMeta = AUTH_DISPLAY[state.auth] || state.auth;
   document.getElementById("print-meta").textContent =
     LANG_NAMES[state.lang] + "  |  " + authMeta + "  |  " +
     (isUds ? "User Data Stream" : isWs ? "WebSocket API" : "REST API") + "  |  " + marketLabels[state.market];
@@ -9674,31 +9790,67 @@ function triggerDownloadPostmanZip(zipFilename, innerJsonFilename, dataObj) {
   });
 }
 
+function openPostmanHelpModal() {
+  const root = document.getElementById("postman-help-modal");
+  if (!root || root.classList.contains("postman-help-modal--open")) return;
+  root.classList.add("postman-help-modal--open");
+  root.setAttribute("aria-hidden", "false");
+  const dl = document.getElementById("postman-download-zip-btn");
+  if (dl) requestAnimationFrame(function () { dl.focus(); });
+  document.addEventListener("keydown", postmanHelpModalOnKeydown);
+}
+
+function closePostmanHelpModal() {
+  const root = document.getElementById("postman-help-modal");
+  if (!root) return;
+  root.classList.remove("postman-help-modal--open");
+  root.setAttribute("aria-hidden", "true");
+  document.removeEventListener("keydown", postmanHelpModalOnKeydown);
+  const pb = document.getElementById("postman-btn");
+  if (pb) pb.focus();
+}
+
+function postmanHelpModalOnKeydown(e) {
+  if (e.key === "Escape") {
+    e.preventDefault();
+    closePostmanHelpModal();
+  }
+}
+
+async function downloadPostmanCollectionZipFromModal() {
+  syncExtraParamsFromParamRows();
+  const dl = document.getElementById("postman-download-zip-btn");
+  const prevText = dl ? dl.textContent : "";
+  if (dl) {
+    dl.disabled = true;
+    dl.textContent = "Oluşturuluyor…";
+  }
+  try {
+    const coll = buildBinancePostmanCollection();
+    if (!coll) return;
+    const pathArr = coll.item[0].request.url.path || [];
+    const lastSeg = pathArr.length ? pathArr[pathArr.length - 1] : "endpoint";
+    const slug = String(lastSeg).replace(/[^a-zA-Z0-9._-]+/g, "_") || "endpoint";
+    const base = "binance-rest-" + slug + "-postman";
+    await triggerDownloadPostmanZip(base + ".zip", base + ".json", coll);
+  } finally {
+    if (dl) {
+      dl.disabled = false;
+      dl.textContent = prevText || "ZIP indir";
+    }
+  }
+}
+
 /* ── Event listeners ───────────────────────────────────────────────── */
 document.getElementById("sel-env").addEventListener("change",     e => { state.env     = e.target.value; render(); });
 document.getElementById("sel-apitype").addEventListener("change", e => { state.apitype = e.target.value; render(); });
 document.getElementById("sel-market").addEventListener("change",  e => { state.market  = e.target.value; render(); });
-document.getElementById("sel-auth").addEventListener("change",    e => { state.auth    = e.target.value; render(); });
+document.getElementById("sel-auth").addEventListener("change", e => {
+  state.auth = e.target.value;
+  state.restSecurityTypeLabel = "";
+  render();
+});
 document.getElementById("sel-lang").addEventListener("change",    e => { state.lang    = e.target.value; render(); });
-
-const chkRestApiKey = document.getElementById("chk-rest-api-key");
-const chkRestSig    = document.getElementById("chk-rest-signature");
-if (chkRestApiKey) {
-  chkRestApiKey.addEventListener("change", e => {
-    state.restRequireApiKey = e.target.checked;
-    if (!state.restRequireApiKey && state.restRequireSignature) state.restRequireSignature = false;
-    state.restSecurityTypeLabel = "";
-    render();
-  });
-}
-if (chkRestSig) {
-  chkRestSig.addEventListener("change", e => {
-    state.restRequireSignature = e.target.checked;
-    if (state.restRequireSignature) state.restRequireApiKey = true;
-    state.restSecurityTypeLabel = "";
-    render();
-  });
-}
 
 document.getElementById("add-param-btn").addEventListener("click", addParamRow);
 
@@ -9737,31 +9889,16 @@ document.getElementById("clear-sample-btn").addEventListener("click", () => {
   collectParams();
 });
 
-document.getElementById("postman-btn").addEventListener("click", async () => {
+document.getElementById("postman-btn").addEventListener("click", () => {
   if (state.apitype !== "rest" || state.auth !== "hmac") return;
-  syncExtraParamsFromParamRows();
-  const btn = document.getElementById("postman-btn");
-  const idleHtml =
-    '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">' +
-    '<path d="M8.5 10.5L8 11l-.5-.5-5-5 1-1L8 8.793l4.5-4.5 1 1-5 5z"/>' +
-    '<path d="M3 13v1h10v-1H3zm-1 0a1 1 0 001 1h10a1 1 0 001-1v-1H2v1z"/>' +
-    "</svg> Postman";
-  btn.classList.add("loading");
-  btn.innerHTML =
-    '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 3a5 5 0 100 10A5 5 0 008 3zm0-3a8 8 0 110 16A8 8 0 018 0z" opacity=".3"/><path d="M8 0a8 8 0 018 8h-2a6 6 0 00-6-6V0z"><animateTransform attributeName="transform" type="rotate" from="0 8 8" to="360 8 8" dur=".8s" repeatCount="indefinite"/><\/path><\/svg> Building…';
+  openPostmanHelpModal();
+});
 
-  try {
-    const coll = buildBinancePostmanCollection();
-    if (!coll) return;
-    const pathArr = coll.item[0].request.url.path || [];
-    const lastSeg = pathArr.length ? pathArr[pathArr.length - 1] : "endpoint";
-    const slug = String(lastSeg).replace(/[^a-zA-Z0-9._-]+/g, "_") || "endpoint";
-    const base = "binance-rest-" + slug + "-postman";
-    await triggerDownloadPostmanZip(base + ".zip", base + ".json", coll);
-  } finally {
-    btn.classList.remove("loading");
-    btn.innerHTML = idleHtml;
-  }
+document.getElementById("postman-help-modal-backdrop").addEventListener("click", closePostmanHelpModal);
+document.getElementById("postman-help-close-btn").addEventListener("click", closePostmanHelpModal);
+document.getElementById("postman-download-zip-btn").addEventListener("click", async () => {
+  if (state.apitype !== "rest" || state.auth !== "hmac") return;
+  await downloadPostmanCollectionZipFromModal();
 });
 
 document.getElementById("pdf-btn").addEventListener("click", async () => {
