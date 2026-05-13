@@ -1355,7 +1355,7 @@ signature = hmac.new(
 url     = ENDPOINT + "?" + query_string + "&signature=" + signature
 headers = {"X-MBX-APIKEY": API_KEY}
 
-response = requests.get(url, headers=headers)
+response = requests.request("{{REST_HTTP_METHOD}}", url, headers=headers)
 print(response.url)
 print(response.text)
 print(response.request.headers)`;
@@ -1380,7 +1380,7 @@ const url = new URL(ENDPOINT + "?" + queryString + "&signature=" + signature);
 const options = {
   hostname: url.hostname,
   path: url.pathname + url.search,
-  method: "GET",
+  method: "{{REST_HTTP_METHOD}}",
   headers: { "X-MBX-APIKEY": API_KEY }
 };
 
@@ -1418,7 +1418,7 @@ public class BinanceHmacExample {
         HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create(url))
             .header("X-MBX-APIKEY", API_KEY)
-            .GET()
+            .method("{{REST_HTTP_METHOD}}", HttpRequest.BodyPublishers.noBody())
             .build();
 
         HttpResponse<String> resp = client.send(request, HttpResponse.BodyHandlers.ofString());
@@ -1461,7 +1461,7 @@ func main() {
 	signature   := signHmac(apiSecret, queryString)
 	url         := endpoint + "?" + queryString + "&signature=" + signature
 
-	req, _ := http.NewRequest("GET", url, nil)
+	req, _ := http.NewRequest("{{REST_HTTP_METHOD}}", url, nil)
 	req.Header.Set("X-MBX-APIKEY", apiKey)
 
 	resp, _ := http.DefaultClient.Do(req)
@@ -1499,7 +1499,7 @@ class BinanceHmacExample
 
         using var client = new HttpClient();
         client.DefaultRequestHeaders.Add("X-MBX-APIKEY", ApiKey);
-        var resp = await client.GetAsync(url);
+        var resp = await client.SendAsync(new HttpRequestMessage(HttpMethod.Parse("{{REST_HTTP_METHOD}}"), url));
         Console.WriteLine(url);
         Console.WriteLine(await resp.Content.ReadAsStringAsync());
         Console.WriteLine(resp.RequestMessage?.Headers);
@@ -1525,6 +1525,7 @@ $url         = "{$endpoint}?{$queryString}&signature={$signature}";
 
 $ch = curl_init($url);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "{{REST_HTTP_METHOD}}");
 curl_setopt($ch, CURLOPT_HTTPHEADER, ["X-MBX-APIKEY: {$apiKey}"]);
 $response = curl_exec($ch);
 $info     = curl_getinfo($ch);
@@ -1549,7 +1550,9 @@ url          = URI("#{ENDPOINT}?#{query_string}&signature=#{signature}")
 
 http         = Net::HTTP.new(url.host, url.port)
 http.use_ssl = true
-request      = Net::HTTP::Get.new(url)
+HTTP_METHOD   = "{{REST_HTTP_METHOD}}"
+request_class = {"GET"=>Net::HTTP::Get, "POST"=>Net::HTTP::Post, "PUT"=>Net::HTTP::Put, "DELETE"=>Net::HTTP::Delete, "PATCH"=>Net::HTTP::Patch}.fetch(HTTP_METHOD)
+request       = request_class.new(url)
 request["X-MBX-APIKEY"] = API_KEY
 
 response = http.request(request)
@@ -1576,7 +1579,7 @@ const url = new URL(ENDPOINT + "?" + queryString + "&signature=" + signature);
 const options = {
   hostname: url.hostname,
   path:     url.pathname + url.search,
-  method:   "GET" as const,
+  method:   "{{REST_HTTP_METHOD}}" as const,
   headers:  { "X-MBX-APIKEY": API_KEY }
 };
 
@@ -1600,6 +1603,7 @@ T.hmac.rust = `// Cargo.toml:
 
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
+use std::str::FromStr;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 type HmacSha256 = Hmac<Sha256>;
@@ -1618,8 +1622,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let url = format!("{}?{}&signature={}", endpoint, qs, signature);
 
+    let method = reqwest::Method::from_str("{{REST_HTTP_METHOD}}").unwrap();
     let client = reqwest::blocking::Client::new();
-    let resp   = client.get(&url).header("X-MBX-APIKEY", api_key).send()?;
+    let resp   = client.request(method, &url).header("X-MBX-APIKEY", api_key).send()?;
 
     println!("{}", url);
     println!("{}", resp.text()?);
@@ -1666,6 +1671,7 @@ int main() {
     std::string body;
     curl_slist* hdrs = curl_slist_append(nullptr, ("X-MBX-APIKEY: " + apiKey).c_str());
     curl_easy_setopt(curl, CURLOPT_URL,           url.c_str());
+    curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "{{REST_HTTP_METHOD}}");
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER,    hdrs);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, onData);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA,     &body);
@@ -1690,7 +1696,7 @@ QUERY_STRING="timestamp=\${TIMESTAMP}"
 SIGNATURE=$(echo -n "\$QUERY_STRING" | openssl dgst -sha256 -hmac "\$API_SECRET" | awk '{print \$2}')
 URL="\${ENDPOINT}?\${QUERY_STRING}&signature=\${SIGNATURE}"
 
-RESPONSE=$(curl -s -X GET "\$URL" -H "X-MBX-APIKEY: \$API_KEY")
+RESPONSE=$(curl -s -X {{REST_HTTP_METHOD}} "\$URL" -H "X-MBX-APIKEY: \$API_KEY")
 
 echo "=== URL ==="
 echo "\$URL"
@@ -1728,7 +1734,7 @@ signature = urllib.parse.quote(base64.b64encode(raw_sig).decode())
 url     = ENDPOINT + "?" + query_string + "&signature=" + signature
 headers = {"X-MBX-APIKEY": API_KEY}
 
-response = requests.get(url, headers=headers)
+response = requests.request("{{REST_HTTP_METHOD}}", url, headers=headers)
 print(response.url)
 print(response.text)
 print(response.request.headers)`;
@@ -1756,7 +1762,7 @@ const url = new URL(ENDPOINT + "?" + queryString + "&signature=" + signature);
 const options = {
   hostname: url.hostname,
   path: url.pathname + url.search,
-  method: "GET",
+  method: "{{REST_HTTP_METHOD}}",
   headers: { "X-MBX-APIKEY": API_KEY }
 };
 
@@ -1802,7 +1808,7 @@ public class BinanceRsaExample {
         HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create(url))
             .header("X-MBX-APIKEY", API_KEY)
-            .GET().build();
+            .method("{{REST_HTTP_METHOD}}", HttpRequest.BodyPublishers.noBody()).build();
 
         HttpResponse<String> resp = client.send(request, HttpResponse.BodyHandlers.ofString());
         System.out.println(request.uri());
@@ -1855,7 +1861,7 @@ func main() {
 	signature := url.QueryEscape(base64.StdEncoding.EncodeToString(sig))
 
 	reqURL := endpoint + "?" + queryString + "&signature=" + signature
-	req, _ := http.NewRequest("GET", reqURL, nil)
+	req, _ := http.NewRequest("{{REST_HTTP_METHOD}}", reqURL, nil)
 	req.Header.Set("X-MBX-APIKEY", apiKey)
 
 	resp, _ := http.DefaultClient.Do(req)
@@ -1896,7 +1902,7 @@ class BinanceRsaExample
 
         using var client = new HttpClient();
         client.DefaultRequestHeaders.Add("X-MBX-APIKEY", ApiKey);
-        var resp = await client.GetAsync(url);
+        var resp = await client.SendAsync(new HttpRequestMessage(HttpMethod.Parse("{{REST_HTTP_METHOD}}"), url));
         Console.WriteLine(url);
         Console.WriteLine(await resp.Content.ReadAsStringAsync());
         Console.WriteLine(resp.RequestMessage?.Headers);
@@ -1917,6 +1923,7 @@ $url        = "{$endpoint}?{$queryString}&signature={$encodedSig}";
 
 $ch = curl_init($url);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "{{REST_HTTP_METHOD}}");
 curl_setopt($ch, CURLOPT_HTTPHEADER, ["X-MBX-APIKEY: {$apiKey}"]);
 $response = curl_exec($ch);
 $info     = curl_getinfo($ch);
@@ -1944,7 +1951,9 @@ url       = URI("#{ENDPOINT}?#{query_string}&signature=#{signature}")
 
 http         = Net::HTTP.new(url.host, url.port)
 http.use_ssl = true
-request      = Net::HTTP::Get.new(url)
+HTTP_METHOD   = "{{REST_HTTP_METHOD}}"
+request_class = {"GET"=>Net::HTTP::Get, "POST"=>Net::HTTP::Post, "PUT"=>Net::HTTP::Put, "DELETE"=>Net::HTTP::Delete, "PATCH"=>Net::HTTP::Patch}.fetch(HTTP_METHOD)
+request       = request_class.new(url)
 request["X-MBX-APIKEY"] = API_KEY
 
 response = http.request(request)
@@ -1974,7 +1983,7 @@ const url = new URL(ENDPOINT + "?" + queryString + "&signature=" + signature);
 const options = {
   hostname: url.hostname,
   path:     url.pathname + url.search,
-  method:   "GET" as const,
+  method:   "{{REST_HTTP_METHOD}}" as const,
   headers:  { "X-MBX-APIKEY": API_KEY }
 };
 
@@ -1998,6 +2007,7 @@ T.rsa.rust = `// Cargo.toml:
 
 use base64::{engine::general_purpose, Engine as _};
 use openssl::{hash::MessageDigest, pkey::PKey, sign::Signer};
+use std::str::FromStr;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -2017,8 +2027,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let url = format!("{}?{}&signature={}", endpoint, qs, signature);
 
+    let method = reqwest::Method::from_str("{{REST_HTTP_METHOD}}").unwrap();
     let client = reqwest::blocking::Client::new();
-    let resp   = client.get(&url).header("X-MBX-APIKEY", api_key).send()?;
+    let resp   = client.request(method, &url).header("X-MBX-APIKEY", api_key).send()?;
 
     println!("{}", url);
     println!("{}", resp.text()?);
@@ -2078,6 +2089,7 @@ int main() {
     std::string body;
     curl_slist* hdrs = curl_slist_append(nullptr, ("X-MBX-APIKEY: " + apiKey).c_str());
     curl_easy_setopt(curl, CURLOPT_URL,           url.c_str());
+    curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "{{REST_HTTP_METHOD}}");
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER,    hdrs);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, onData);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA,     &body);
@@ -2103,7 +2115,7 @@ RAW_SIG=$(echo -n "\$QUERY_STRING" | openssl dgst -sha256 -sign "\$PRIVATE_KEY" 
 SIGNATURE=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "\$RAW_SIG")
 URL="\${ENDPOINT}?\${QUERY_STRING}&signature=\${SIGNATURE}"
 
-RESPONSE=$(curl -s -X GET "\$URL" -H "X-MBX-APIKEY: \$API_KEY")
+RESPONSE=$(curl -s -X {{REST_HTTP_METHOD}} "\$URL" -H "X-MBX-APIKEY: \$API_KEY")
 
 echo "=== URL ==="
 echo "\$URL"
@@ -2140,7 +2152,7 @@ signature = urllib.parse.quote(base64.b64encode(raw_sig).decode())
 url     = ENDPOINT + "?" + query_string + "&signature=" + signature
 headers = {"X-MBX-APIKEY": API_KEY}
 
-response = requests.get(url, headers=headers)
+response = requests.request("{{REST_HTTP_METHOD}}", url, headers=headers)
 print(response.url)
 print(response.text)
 print(response.request.headers)`;
@@ -2166,7 +2178,7 @@ const url = new URL(ENDPOINT + "?" + queryString + "&signature=" + signature);
 const options = {
   hostname: url.hostname,
   path: url.pathname + url.search,
-  method: "GET",
+  method: "{{REST_HTTP_METHOD}}",
   headers: { "X-MBX-APIKEY": API_KEY }
 };
 
@@ -2213,7 +2225,7 @@ public class BinanceEd25519Example {
         HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create(url))
             .header("X-MBX-APIKEY", API_KEY)
-            .GET().build();
+            .method("{{REST_HTTP_METHOD}}", HttpRequest.BodyPublishers.noBody()).build();
 
         HttpResponse<String> resp = client.send(request, HttpResponse.BodyHandlers.ofString());
         System.out.println(request.uri());
@@ -2262,7 +2274,7 @@ func main() {
 	signature := url.QueryEscape(base64.StdEncoding.EncodeToString(sig))
 
 	reqURL := endpoint + "?" + queryString + "&signature=" + signature
-	req, _ := http.NewRequest("GET", reqURL, nil)
+	req, _ := http.NewRequest("{{REST_HTTP_METHOD}}", reqURL, nil)
 	req.Header.Set("X-MBX-APIKEY", apiKey)
 
 	resp, _ := http.DefaultClient.Do(req)
@@ -2306,7 +2318,7 @@ class BinanceEd25519Example
 
         using var client = new HttpClient();
         client.DefaultRequestHeaders.Add("X-MBX-APIKEY", ApiKey);
-        var resp = await client.GetAsync(url);
+        var resp = await client.SendAsync(new HttpRequestMessage(HttpMethod.Parse("{{REST_HTTP_METHOD}}"), url));
         Console.WriteLine(url);
         Console.WriteLine(await resp.Content.ReadAsStringAsync());
         Console.WriteLine(resp.RequestMessage?.Headers);
@@ -2335,6 +2347,7 @@ $url        = "{$endpoint}?{$queryString}&signature={$encodedSig}";
 
 $ch = curl_init($url);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "{{REST_HTTP_METHOD}}");
 curl_setopt($ch, CURLOPT_HTTPHEADER, ["X-MBX-APIKEY: {$apiKey}"]);
 $response = curl_exec($ch);
 $info     = curl_getinfo($ch);
@@ -2364,7 +2377,9 @@ url       = URI("#{ENDPOINT}?#{query_string}&signature=#{signature}")
 
 http         = Net::HTTP.new(url.host, url.port)
 http.use_ssl = true
-request      = Net::HTTP::Get.new(url)
+HTTP_METHOD   = "{{REST_HTTP_METHOD}}"
+request_class = {"GET"=>Net::HTTP::Get, "POST"=>Net::HTTP::Post, "PUT"=>Net::HTTP::Put, "DELETE"=>Net::HTTP::Delete, "PATCH"=>Net::HTTP::Patch}.fetch(HTTP_METHOD)
+request       = request_class.new(url)
 request["X-MBX-APIKEY"] = API_KEY
 
 response = http.request(request)
@@ -2393,7 +2408,7 @@ const url = new URL(ENDPOINT + "?" + queryString + "&signature=" + signature);
 const options = {
   hostname: url.hostname,
   path:     url.pathname + url.search,
-  method:   "GET" as const,
+  method:   "{{REST_HTTP_METHOD}}" as const,
   headers:  { "X-MBX-APIKEY": API_KEY }
 };
 
@@ -2417,6 +2432,7 @@ T.ed25519.rust = `// Cargo.toml:
 
 use base64::{engine::general_purpose, Engine as _};
 use openssl::{pkey::PKey, sign::Signer};
+use std::str::FromStr;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -2437,8 +2453,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let url = format!("{}?{}&signature={}", endpoint, qs, signature);
 
+    let method = reqwest::Method::from_str("{{REST_HTTP_METHOD}}").unwrap();
     let client = reqwest::blocking::Client::new();
-    let resp   = client.get(&url).header("X-MBX-APIKEY", api_key).send()?;
+    let resp   = client.request(method, &url).header("X-MBX-APIKEY", api_key).send()?;
 
     println!("{}", url);
     println!("{}", resp.text()?);
@@ -2501,6 +2518,7 @@ int main() {
     std::string body;
     curl_slist* hdrs = curl_slist_append(nullptr, ("X-MBX-APIKEY: " + apiKey).c_str());
     curl_easy_setopt(curl, CURLOPT_URL,           url.c_str());
+    curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "{{REST_HTTP_METHOD}}");
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER,    hdrs);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, onData);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA,     &body);
@@ -2527,7 +2545,7 @@ RAW_SIG=$(echo -n "\$QUERY_STRING" | openssl pkeyutl -sign -inkey "\$PRIVATE_KEY
 SIGNATURE=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "\$RAW_SIG")
 URL="\${ENDPOINT}?\${QUERY_STRING}&signature=\${SIGNATURE}"
 
-RESPONSE=$(curl -s -X GET "\$URL" -H "X-MBX-APIKEY: \$API_KEY")
+RESPONSE=$(curl -s -X {{REST_HTTP_METHOD}} "\$URL" -H "X-MBX-APIKEY: \$API_KEY")
 
 echo "=== URL ==="
 echo "\$URL"
@@ -2554,7 +2572,7 @@ sep = "?" if query_string else ""
 url = ENDPOINT + sep + query_string
 headers = {"X-MBX-APIKEY": API_KEY}
 
-response = requests.get(url, headers=headers)
+response = requests.request("{{REST_HTTP_METHOD}}", url, headers=headers)
 print(response.url)
 print(response.text)
 print(response.request.headers)`;
@@ -2569,7 +2587,7 @@ query_string = urllib.parse.urlencode(params_plain)
 sep = "?" if query_string else ""
 url = ENDPOINT + sep + query_string
 
-response = requests.get(url)
+response = requests.request("{{REST_HTTP_METHOD}}", url)
 print(response.url)
 print(response.text)`;
 
@@ -2586,7 +2604,7 @@ const url = new URL(ENDPOINT + sep + queryString);
 const options = {
   hostname: url.hostname,
   path: url.pathname + url.search,
-  method: "GET",
+  method: "{{REST_HTTP_METHOD}}",
   headers: { "X-MBX-APIKEY": API_KEY }
 };
 
@@ -2613,7 +2631,7 @@ const url = new URL(ENDPOINT + sep + queryString);
 const options = {
   hostname: url.hostname,
   path: url.pathname + url.search,
-  method: "GET"
+  method: "{{REST_HTTP_METHOD}}"
 };
 
 const req = https.request(options, (res) => {
@@ -2639,7 +2657,7 @@ const url = new URL(ENDPOINT + sep + queryString);
 const options = {
   hostname: url.hostname,
   path:     url.pathname + url.search,
-  method:   "GET" as const,
+  method:   "{{REST_HTTP_METHOD}}" as const,
   headers:  { "X-MBX-APIKEY": API_KEY }
 };
 
@@ -2666,7 +2684,7 @@ const url = new URL(ENDPOINT + sep + queryString);
 const options = {
   hostname: url.hostname,
   path:     url.pathname + url.search,
-  method:   "GET" as const
+  method:   "{{REST_HTTP_METHOD}}" as const
 };
 
 const req = https.request(options, (res) => {
@@ -2694,7 +2712,7 @@ public class BinancePlainKeyExample {
         HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create(url))
             .header("X-MBX-APIKEY", API_KEY)
-            .GET()
+            .method("{{REST_HTTP_METHOD}}", HttpRequest.BodyPublishers.noBody())
             .build();
 
         HttpResponse<String> resp = client.send(request, HttpResponse.BodyHandlers.ofString());
@@ -2717,7 +2735,7 @@ public class BinancePlainNoneExample {
         HttpClient client = HttpClient.newHttpClient();
         HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create(url))
-            .GET()
+            .method("{{REST_HTTP_METHOD}}", HttpRequest.BodyPublishers.noBody())
             .build();
 
         HttpResponse<String> resp = client.send(request, HttpResponse.BodyHandlers.ofString());
@@ -2746,7 +2764,7 @@ func main() {
 		url = endpoint + "?" + queryString
 	}
 
-	req, _ := http.NewRequest("GET", url, nil)
+	req, _ := http.NewRequest("{{REST_HTTP_METHOD}}", url, nil)
 	req.Header.Set("X-MBX-APIKEY", apiKey)
 
 	resp, _ := http.DefaultClient.Do(req)
@@ -2774,7 +2792,7 @@ func main() {
 		url = endpoint + "?" + queryString
 	}
 
-	req, _ := http.NewRequest("GET", url, nil)
+	req, _ := http.NewRequest("{{REST_HTTP_METHOD}}", url, nil)
 	resp, _ := http.DefaultClient.Do(req)
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
@@ -2798,7 +2816,7 @@ class BinancePlainKeyExample
 
         using var client = new HttpClient();
         client.DefaultRequestHeaders.Add("X-MBX-APIKEY", ApiKey);
-        var resp = await client.GetAsync(url);
+        var resp = await client.SendAsync(new HttpRequestMessage(HttpMethod.Parse("{{REST_HTTP_METHOD}}"), url));
         Console.WriteLine(url);
         Console.WriteLine(await resp.Content.ReadAsStringAsync());
         Console.WriteLine(resp.RequestMessage?.Headers);
@@ -2819,7 +2837,7 @@ class BinancePlainNoneExample
         string url = Endpoint + (string.IsNullOrEmpty(queryString) ? "" : "?" + queryString);
 
         using var client = new HttpClient();
-        var resp = await client.GetAsync(url);
+        var resp = await client.SendAsync(new HttpRequestMessage(HttpMethod.Parse("{{REST_HTTP_METHOD}}"), url));
         Console.WriteLine(url);
         Console.WriteLine(await resp.Content.ReadAsStringAsync());
     }
@@ -2834,6 +2852,7 @@ $url = $endpoint . ($queryString !== "" ? "?" . $queryString : "");
 
 $ch = curl_init($url);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "{{REST_HTTP_METHOD}}");
 curl_setopt($ch, CURLOPT_HTTPHEADER, ["X-MBX-APIKEY: {$apiKey}"]);
 $response = curl_exec($ch);
 $info     = curl_getinfo($ch);
@@ -2851,6 +2870,7 @@ $url = $endpoint . ($queryString !== "" ? "?" . $queryString : "");
 
 $ch = curl_init($url);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "{{REST_HTTP_METHOD}}");
 $response = curl_exec($ch);
 $info     = curl_getinfo($ch);
 curl_close($ch);
@@ -2871,7 +2891,9 @@ url          = URI(ENDPOINT + (query_string.empty? ? "" : "?" + query_string))
 
 http         = Net::HTTP.new(url.host, url.port)
 http.use_ssl = true
-request      = Net::HTTP::Get.new(url)
+HTTP_METHOD   = "{{REST_HTTP_METHOD}}"
+request_class = {"GET"=>Net::HTTP::Get, "POST"=>Net::HTTP::Post, "PUT"=>Net::HTTP::Put, "DELETE"=>Net::HTTP::Delete, "PATCH"=>Net::HTTP::Patch}.fetch(HTTP_METHOD)
+request       = request_class.new(url)
 request["X-MBX-APIKEY"] = API_KEY
 
 response = http.request(request)
@@ -2891,13 +2913,17 @@ url          = URI(ENDPOINT + (query_string.empty? ? "" : "?" + query_string))
 
 http         = Net::HTTP.new(url.host, url.port)
 http.use_ssl = true
-request      = Net::HTTP::Get.new(url)
+HTTP_METHOD   = "{{REST_HTTP_METHOD}}"
+request_class = {"GET"=>Net::HTTP::Get, "POST"=>Net::HTTP::Post, "PUT"=>Net::HTTP::Put, "DELETE"=>Net::HTTP::Delete, "PATCH"=>Net::HTTP::Patch}.fetch(HTTP_METHOD)
+request       = request_class.new(url)
 
 response = http.request(request)
 puts url.to_s
 puts response.body`;
 
 T_plain.key.rust = `// Cargo.toml: reqwest = { version = "0.12", features = ["blocking"] }
+
+use std::str::FromStr;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let api_key  = "YOUR_API_KEY";
@@ -2910,9 +2936,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         format!("{}?{}", endpoint, qs)
     };
 
+    let method = reqwest::Method::from_str("{{REST_HTTP_METHOD}}").unwrap();
     let client = reqwest::blocking::Client::new();
-    let req = client.get(&url).header("X-MBX-APIKEY", api_key);
-    let resp = req.send()?;
+    let resp = client.request(method, &url).header("X-MBX-APIKEY", api_key).send()?;
     println!("{}", url);
     println!("{}", resp.text()?);
     println!("X-MBX-APIKEY: {}", api_key);
@@ -2920,6 +2946,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }`;
 
 T_plain.none.rust = `// Cargo.toml: reqwest = { version = "0.12", features = ["blocking"] }
+
+use std::str::FromStr;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let endpoint = "{{EP}}";
@@ -2931,7 +2959,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         format!("{}?{}", endpoint, qs)
     };
 
-    let resp = reqwest::blocking::get(&url)?;
+    let method = reqwest::Method::from_str("{{REST_HTTP_METHOD}}").unwrap();
+    let resp = reqwest::blocking::Client::new().request(method, &url).send()?;
     println!("{}", url);
     println!("{}", resp.text()?);
     Ok(())
@@ -2957,6 +2986,7 @@ int main() {
     CURL* curl = curl_easy_init();
     curl_slist* hdrs = curl_slist_append(nullptr, ("X-MBX-APIKEY: " + apiKey).c_str());
     curl_easy_setopt(curl, CURLOPT_URL,           url.c_str());
+    curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "{{REST_HTTP_METHOD}}");
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER,    hdrs);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, onData);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA,     &body);
@@ -2989,6 +3019,7 @@ int main() {
     std::string body;
     CURL* curl = curl_easy_init();
     curl_easy_setopt(curl, CURLOPT_URL,           url.c_str());
+    curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "{{REST_HTTP_METHOD}}");
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, onData);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA,     &body);
     curl_easy_perform(curl);
@@ -3010,7 +3041,7 @@ QUERY_STRING=""
 URL="\${ENDPOINT}"
 if [ -n "\$QUERY_STRING" ]; then URL="\${ENDPOINT}?\${QUERY_STRING}"; fi
 
-RESPONSE=$(curl -s -X GET "\$URL" -H "X-MBX-APIKEY: \$API_KEY")
+RESPONSE=$(curl -s -X {{REST_HTTP_METHOD}} "\$URL" -H "X-MBX-APIKEY: \$API_KEY")
 
 echo "=== URL ==="
 echo "\$URL"
@@ -3027,7 +3058,7 @@ QUERY_STRING=""
 URL="\${ENDPOINT}"
 if [ -n "\$QUERY_STRING" ]; then URL="\${ENDPOINT}?\${QUERY_STRING}"; fi
 
-RESPONSE=$(curl -s -X GET "\$URL")
+RESPONSE=$(curl -s -X {{REST_HTTP_METHOD}} "\$URL")
 
 echo "=== URL ==="
 echo "\$URL"
@@ -9139,7 +9170,9 @@ function applyDocsImportFromText(rawText, alertEmpty, docPageUrl) {
     state.docsWsMethod = null;
     if (hasRestPath) {
       state.docsRestPath = parsed.path.split("?")[0];
-      state.docsRestMethod = parsed.method && /^(GET|POST|PUT|DELETE|PATCH)$/i.test(String(parsed.method)) ? parsed.method : null;
+      state.docsRestMethod = parsed.method && /^(GET|POST|PUT|DELETE|PATCH)$/i.test(String(parsed.method))
+        ? String(parsed.method).toUpperCase()
+        : null;
     } else {
       state.docsRestPath = null;
       state.docsRestMethod = null;
@@ -9295,6 +9328,12 @@ function syncQuestionnaireWideLayoutMode() {
   mw.classList.toggle("main-workspace--questionnaire-wide", wide);
 }
 
+/** HTTP verb from imported Binance REST docs (HTTP Request line); defaults to GET. */
+function resolveRestHttpVerb() {
+  const m = state.docsRestMethod;
+  return m && /^(GET|POST|PUT|DELETE|PATCH)$/.test(String(m)) ? String(m).toUpperCase() : "GET";
+}
+
 function render() {
   if (isEditing) return;
   syncMarketOptions();
@@ -9332,6 +9371,7 @@ function render() {
     .replace(/\{\{EP\}\}/g, ep)
     .replace(/\{\{METHOD\}\}/g, method)
     .replace(/\{\{REST_EP\}\}/g, restEp);
+  if (isRest) rawCode = rawCode.replace(/\{\{REST_HTTP_METHOD\}\}/g, resolveRestHttpVerb());
 
   const notesMap = isUdsFutures ? null : (isUds ? UDS_NOTES : (isWs ? WS_NOTES : NOTES));
   const noteStr  = isUdsFutures
