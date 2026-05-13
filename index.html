@@ -141,22 +141,25 @@
       cursor: not-allowed;
     }
 
-    .doc-url-row .docs-reset-btn {
-      flex-shrink: 0;
+    .clear-sample-btn {
       background: #161b22;
       border: 1px solid #30363d;
+      color: #c9d1d9;
       border-radius: 6px;
-      padding: 8px 14px;
+      padding: 9px 12px;
       font-size: 13px;
-      font-weight: 500;
-      color: #8b949e;
-      text-decoration: none;
+      font-weight: 600;
+      cursor: pointer;
+      outline: none;
+      transition: border-color 0.15s, color 0.15s;
+      white-space: nowrap;
+      width: 100%;
+      text-align: center;
     }
-    .doc-url-row .docs-reset-btn:hover {
+    .clear-sample-btn:hover {
       border-color: #58a6ff;
-      color: #58a6ff;
+      color: #79c0ff;
     }
-
     .doc-fetch-hint {
       margin-top: 8px;
       font-size: 12px;
@@ -271,7 +274,7 @@
 
     .selectors {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 14px;
       margin-bottom: 20px;
     }
@@ -342,17 +345,6 @@
       transition: all 0.15s;
     }
     .docs-parse-btn:hover { background: #2ea043; }
-
-    .docs-reset-btn {
-      background: none;
-      border: none;
-      color: #58a6ff;
-      font-size: 12px;
-      cursor: pointer;
-      text-decoration: underline;
-      padding: 4px 0;
-    }
-    .docs-reset-btn:hover { color: #79c0ff; }
 
     .docs-parse-hint {
       font-size: 12px;
@@ -925,7 +917,7 @@
     }
 
     @media (max-width: 860px) {
-      .selectors { grid-template-columns: repeat(3, 1fr); }
+      .selectors { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
 
     @media (max-width: 640px) {
@@ -979,9 +971,12 @@
       </select>
     </div>
 
-  </div>
+    <div class="select-group">
+      <label for="clear-sample-btn">Sample</label>
+      <button type="button" class="clear-sample-btn" id="clear-sample-btn">Clear &amp; sample code</button>
+    </div>
 
-  <div class="params-container" id="docs-import-panel">
+  </div>
     <div class="params-header">
       <span class="params-title">Documentation import</span>
       <span class="docs-import-badge">REST · WS API</span>
@@ -992,7 +987,6 @@
         <div class="doc-url-row">
           <input type="url" class="doc-url-input" id="doc-url-input" placeholder="https://developers.binance.com/docs/..." autocomplete="off" spellcheck="false">
           <button type="button" class="doc-fetch-btn" id="doc-fetch-btn">Fetch</button>
-          <button type="button" class="docs-reset-btn" id="doc-reset-btn">Clear doc endpoint</button>
         </div>
         <p class="doc-fetch-hint">This step can take a while (often 30–90 seconds through the proxy). If it fails, tap <strong>Manually paste doc</strong>, paste the page text there, then use Parse.</p>
         <div id="doc-fetch-loading" class="doc-fetch-loading" role="status" aria-live="polite" aria-busy="false">
@@ -9544,7 +9538,11 @@ document.getElementById("doc-parse-btn").addEventListener("click", () => {
   const ta = document.getElementById("doc-paste-text");
   applyDocsImportFromText(ta ? ta.value : "", true, document.getElementById("doc-url-input").value.trim());
 });
-document.getElementById("doc-reset-btn").addEventListener("click", () => {
+document.getElementById("clear-sample-btn").addEventListener("click", () => {
+  const urlIn = document.getElementById("doc-url-input");
+  if (urlIn) urlIn.value = "";
+  const taPaste = document.getElementById("doc-paste-text");
+  if (taPaste) taPaste.value = "";
   clearDocsImport();
   document.querySelectorAll("#params-rows .param-row").forEach(row => row.remove());
   collectParams();
