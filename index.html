@@ -1182,7 +1182,7 @@
         </svg>
         Copy
       </button>
-      <button type="button" class="postman-btn" id="postman-btn" title="Postman kullanımı ve ZIP indirme">
+      <button type="button" class="postman-btn" id="postman-btn" title="Postman usage and ZIP download">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
           <path d="M8.5 10.5L8 11l-.5-.5-5-5 1-1L8 8.793l4.5-4.5 1 1-5 5z"/>
           <path d="M3 13v1h10v-1H3zm-1 0a1 1 0 001 1h10a1 1 0 001-1v-1H2v1z"/>
@@ -1218,19 +1218,19 @@
   <div id="postman-help-modal" class="postman-help-modal" aria-hidden="true">
     <div class="postman-help-modal__backdrop" id="postman-help-modal-backdrop" tabindex="-1"></div>
     <div class="postman-help-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="postman-help-title">
-      <h2 class="postman-help-modal__title" id="postman-help-title">Postman'e aktarma</h2>
+      <h2 class="postman-help-modal__title" id="postman-help-title">Import into Postman</h2>
       <div class="postman-help-modal__body">
         <ol>
-          <li>Aşağıdan <strong>ZIP indir</strong>'e basın. ZIP'i açın; içindeki <code>.json</code> dosyasını kullanın (ZIP'in kendisini Postman'a vermeyin).</li>
-          <li>Postman'da <strong>Import</strong> → bu JSON dosyasını seçin.</li>
-          <li>Collection'ı seçin → <strong>Variables</strong>: <code>apiKey</code> ve <code>apiSecret</code> alanlarını doldurun (hazır <code>X-MBX-APIKEY</code> header'ı <code>{{apiKey}}</code> kullanır).</li>
-          <li>Burada Auth type olarak <strong>HMAC-SHA256 (signed)</strong> seçiliyken export ettiyseniz, göndermeden önce Pre-request script <code>timestamp</code> ve HMAC imzasını ekler — isteği <strong>Send</strong> ile çalıştırmanız yeterlidir.</li>
-          <li>Unsigned seçeneklerde (<strong>None</strong> veya <strong>API key in header only</strong>) imza script'i yoktur; ortam (mainnet / testnet) ile API anahtarlarınızın eşleştiğinden emin olun.</li>
+          <li>Click <strong>Download ZIP</strong> below. Unzip it and use the <code>.json</code> file inside (do not import the ZIP itself into Postman).</li>
+          <li>In Postman: <strong>Import</strong> → choose that JSON file.</li>
+          <li>Select the collection → <strong>Variables</strong>: set <code>apiKey</code> and <code>apiSecret</code> (the <code>X-MBX-APIKEY</code> header uses <code>{{apiKey}}</code>).</li>
+          <li>If you exported while <strong>Auth type</strong> was <strong>HMAC-SHA256 (signed)</strong>, the Pre-request script adds <code>timestamp</code> and the HMAC signature before send — click <strong>Send</strong>.</li>
+          <li>For unsigned modes (<strong>None</strong> or <strong>API key in header only</strong>) there is no signature script; ensure your keys match the environment (mainnet / testnet).</li>
         </ol>
       </div>
       <div class="postman-help-modal__actions">
-        <button type="button" class="postman-help-download-btn" id="postman-download-zip-btn">ZIP indir</button>
-        <button type="button" class="postman-help-close-btn" id="postman-help-close-btn">Kapat</button>
+        <button type="button" class="postman-help-download-btn" id="postman-download-zip-btn">Download ZIP</button>
+        <button type="button" class="postman-help-close-btn" id="postman-help-close-btn">Close</button>
       </div>
     </div>
   </div>
@@ -9823,7 +9823,7 @@ async function downloadPostmanCollectionZipFromModal() {
   const prevText = dl ? dl.textContent : "";
   if (dl) {
     dl.disabled = true;
-    dl.textContent = "Oluşturuluyor…";
+    dl.textContent = "Building…";
   }
   try {
     const coll = buildBinancePostmanCollection();
@@ -9836,7 +9836,7 @@ async function downloadPostmanCollectionZipFromModal() {
   } finally {
     if (dl) {
       dl.disabled = false;
-      dl.textContent = prevText || "ZIP indir";
+      dl.textContent = prevText || "Download ZIP";
     }
   }
 }
