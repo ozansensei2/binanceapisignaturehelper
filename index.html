@@ -374,6 +374,69 @@
       white-space: nowrap;
     }
 
+    .rest-security-type-badge {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #79c0ff;
+      background: rgba(56,139,253,0.12);
+      border: 1px solid rgba(56,139,253,0.35);
+      padding: 2px 7px;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+
+    .rest-security-toolbar {
+      display: none;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+    }
+
+    @media (min-width: 560px) {
+      .rest-security-toolbar.rest-security-toolbar--visible {
+        flex-direction: row;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px 14px;
+      }
+    }
+
+    .rest-security-toolbar.rest-security-toolbar--visible {
+      display: flex;
+    }
+
+    .rest-security-toolbar-title {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #8b949e;
+      width: 100%;
+    }
+
+    @media (min-width: 560px) {
+      .rest-security-toolbar-title {
+        width: auto;
+      }
+    }
+
+    .rest-sec-label {
+      font-size: 12px;
+      color: #c9d1d9;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    .rest-sec-label input {
+      cursor: pointer;
+    }
+
     #env-badge.docs-shift { margin-left: 0; }
 
     .endpoint-label {
@@ -944,7 +1007,7 @@
         <div id="doc-paste-collapsible" class="doc-paste-collapsible" role="region" aria-label="Manual documentation paste">
           <div class="doc-paste-box">
             <label class="endpoint-label" style="display:block;margin-bottom:6px;">Paste page text</label>
-            <textarea id="doc-paste-text" spellcheck="false" placeholder='REST: POST /fapi/v1/order + Parameters table. WebSocket: section with Method `order.place` or JSON "method":"order.place" + same parameter table. apiKey/signature/timestamp omitted from rows.'></textarea>
+            <textarea id="doc-paste-text" spellcheck="false" placeholder='REST: POST /fapi/v1/order + Parameters table. Title may include security type, e.g. "Old Trades Lookup (MARKET_DATA)" → API key only, no signature; "(USER_DATA)" → signed. WebSocket: Method `order.place` or JSON "method":"order.place" + parameter table.'></textarea>
             <div class="doc-actions">
               <button type="button" class="docs-parse-btn" id="doc-parse-btn">Parse &amp; fill</button>
             </div>
@@ -960,6 +1023,7 @@
         <span class="endpoint-label">Endpoint</span>
         <span class="endpoint-url" id="endpoint-display">https://api.binance.com/api/v3/account</span>
         <span id="docs-ep-note" class="endpoint-from-docs-badge" style="display:none;">Docs</span>
+        <span id="rest-security-badge" class="rest-security-type-badge" style="display:none;"></span>
         <span class="endpoint-bar-actions">
           <span id="env-badge" style="display:none; font-size:11px; font-weight:700; color:#f0b90b; background:rgba(240,185,11,0.13); border:1px solid rgba(240,185,11,0.35); padding:2px 8px; border-radius:4px; white-space:nowrap; letter-spacing:0.05em;">TESTNET</span>
         </span>
@@ -1014,7 +1078,12 @@
                 <option value="bash">Bash</option>
               </select>
             </div>
-            <div class="code-toolbar-picker">
+            <div class="code-toolbar-picker rest-security-toolbar" id="rest-security-toolbar">
+              <span class="rest-security-toolbar-title">REST auth</span>
+              <label class="rest-sec-label"><input type="checkbox" id="chk-rest-api-key" checked /> X-MBX-APIKEY</label>
+              <label class="rest-sec-label"><input type="checkbox" id="chk-rest-signature" checked /> Signature (HMAC/RSA/Ed25519)</label>
+            </div>
+            <div class="code-toolbar-picker" id="picker-auth-wrap">
               <label for="sel-auth">Auth type</label>
               <select id="sel-auth">
                 <option value="hmac">HMAC-SHA256</option>
@@ -2466,6 +2535,518 @@ echo "=== Response ==="
 echo "\$RESPONSE"
 echo "=== Request Headers ==="
 echo "X-MBX-APIKEY: \$API_KEY"`;
+
+/* ════════════════════════════════════════════════════════════════════
+   Plain REST (no signature): MARKET_DATA / NONE-style endpoints.
+   Anchors for injectPlainRestParams — match signed REST naming patterns where practical.
+═══════════════════════════════════════════════════════════════════ */
+const T_plain = { key: {}, none: {} };
+
+T_plain.key.python = `import urllib.parse
+import requests
+
+API_KEY    = "YOUR_API_KEY"
+ENDPOINT   = "{{EP}}"
+
+params_plain = {}
+query_string = urllib.parse.urlencode(params_plain)
+sep = "?" if query_string else ""
+url = ENDPOINT + sep + query_string
+headers = {"X-MBX-APIKEY": API_KEY}
+
+response = requests.get(url, headers=headers)
+print(response.url)
+print(response.text)
+print(response.request.headers)`;
+
+T_plain.none.python = `import urllib.parse
+import requests
+
+ENDPOINT = "{{EP}}"
+
+params_plain = {}
+query_string = urllib.parse.urlencode(params_plain)
+sep = "?" if query_string else ""
+url = ENDPOINT + sep + query_string
+
+response = requests.get(url)
+print(response.url)
+print(response.text)`;
+
+T_plain.key.javascript = `const https = require("https");
+const { URL } = require("url");
+
+const API_KEY  = "YOUR_API_KEY";
+const ENDPOINT = "{{EP}}";
+
+const queryString = "";
+const sep = queryString ? "?" : "";
+const url = new URL(ENDPOINT + sep + queryString);
+
+const options = {
+  hostname: url.hostname,
+  path: url.pathname + url.search,
+  method: "GET",
+  headers: { "X-MBX-APIKEY": API_KEY }
+};
+
+const req = https.request(options, (res) => {
+  let data = "";
+  res.on("data", (chunk) => (data += chunk));
+  res.on("end", () => {
+    console.log(url.href);
+    console.log(data);
+    console.log(options.headers);
+  });
+});
+req.end();`;
+
+T_plain.none.javascript = `const https = require("https");
+const { URL } = require("url");
+
+const ENDPOINT = "{{EP}}";
+
+const queryString = "";
+const sep = queryString ? "?" : "";
+const url = new URL(ENDPOINT + sep + queryString);
+
+const options = {
+  hostname: url.hostname,
+  path: url.pathname + url.search,
+  method: "GET"
+};
+
+const req = https.request(options, (res) => {
+  let data = "";
+  res.on("data", (chunk) => (data += chunk));
+  res.on("end", () => {
+    console.log(url.href);
+    console.log(data);
+  });
+});
+req.end();`;
+
+T_plain.key.typescript = `import * as https from "https";
+import { URL } from "url";
+
+const API_KEY:  string = "YOUR_API_KEY";
+const ENDPOINT: string = "{{EP}}";
+
+const queryString: string = "";
+const sep = queryString ? "?" : "";
+const url = new URL(ENDPOINT + sep + queryString);
+
+const options = {
+  hostname: url.hostname,
+  path:     url.pathname + url.search,
+  method:   "GET" as const,
+  headers:  { "X-MBX-APIKEY": API_KEY }
+};
+
+const req = https.request(options, (res) => {
+  let data = "";
+  res.on("data", (chunk: string) => (data += chunk));
+  res.on("end", () => {
+    console.log(url.href);
+    console.log(data);
+    console.log(options.headers);
+  });
+});
+req.end();`;
+
+T_plain.none.typescript = `import * as https from "https";
+import { URL } from "url";
+
+const ENDPOINT: string = "{{EP}}";
+
+const queryString: string = "";
+const sep = queryString ? "?" : "";
+const url = new URL(ENDPOINT + sep + queryString);
+
+const options = {
+  hostname: url.hostname,
+  path:     url.pathname + url.search,
+  method:   "GET" as const
+};
+
+const req = https.request(options, (res) => {
+  let data = "";
+  res.on("data", (chunk: string) => (data += chunk));
+  res.on("end", () => {
+    console.log(url.href);
+    console.log(data);
+  });
+});
+req.end();`;
+
+T_plain.key.java = `import java.net.URI;
+import java.net.http.*;
+
+public class BinancePlainKeyExample {
+    static final String API_KEY   = "YOUR_API_KEY";
+    static final String ENDPOINT  = "{{EP}}";
+
+    public static void main(String[] args) throws Exception {
+        String queryString = "";
+        String url = ENDPOINT + (queryString.isEmpty() ? "" : "?" + queryString);
+
+        HttpClient client = HttpClient.newHttpClient();
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .header("X-MBX-APIKEY", API_KEY)
+            .GET()
+            .build();
+
+        HttpResponse<String> resp = client.send(request, HttpResponse.BodyHandlers.ofString());
+        System.out.println(request.uri());
+        System.out.println(resp.body());
+        System.out.println(request.headers());
+    }
+}`;
+
+T_plain.none.java = `import java.net.URI;
+import java.net.http.*;
+
+public class BinancePlainNoneExample {
+    static final String ENDPOINT = "{{EP}}";
+
+    public static void main(String[] args) throws Exception {
+        String queryString = "";
+        String url = ENDPOINT + (queryString.isEmpty() ? "" : "?" + queryString);
+
+        HttpClient client = HttpClient.newHttpClient();
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .GET()
+            .build();
+
+        HttpResponse<String> resp = client.send(request, HttpResponse.BodyHandlers.ofString());
+        System.out.println(request.uri());
+        System.out.println(resp.body());
+    }
+}`;
+
+T_plain.key.go = `package main
+
+import (
+	"fmt"
+	"io"
+	"net/http"
+)
+
+const (
+	apiKey   = "YOUR_API_KEY"
+	endpoint = "{{EP}}"
+)
+
+func main() {
+	queryString := ""
+	url := endpoint
+	if queryString != "" {
+		url = endpoint + "?" + queryString
+	}
+
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("X-MBX-APIKEY", apiKey)
+
+	resp, _ := http.DefaultClient.Do(req)
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	fmt.Println(req.URL.String())
+	fmt.Println(string(body))
+	fmt.Println(req.Header)
+}`;
+
+T_plain.none.go = `package main
+
+import (
+	"fmt"
+	"io"
+	"net/http"
+)
+
+const endpoint = "{{EP}}"
+
+func main() {
+	queryString := ""
+	url := endpoint
+	if queryString != "" {
+		url = endpoint + "?" + queryString
+	}
+
+	req, _ := http.NewRequest("GET", url, nil)
+	resp, _ := http.DefaultClient.Do(req)
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	fmt.Println(req.URL.String())
+	fmt.Println(string(body))
+}`;
+
+T_plain.key.csharp = `using System;
+using System.Net.Http;
+using System.Threading.Tasks;
+
+class BinancePlainKeyExample
+{
+    const string ApiKey   = "YOUR_API_KEY";
+    const string Endpoint = "{{EP}}";
+
+    static async Task Main()
+    {
+        string queryString = "";
+        string url = Endpoint + (string.IsNullOrEmpty(queryString) ? "" : "?" + queryString);
+
+        using var client = new HttpClient();
+        client.DefaultRequestHeaders.Add("X-MBX-APIKEY", ApiKey);
+        var resp = await client.GetAsync(url);
+        Console.WriteLine(url);
+        Console.WriteLine(await resp.Content.ReadAsStringAsync());
+        Console.WriteLine(resp.RequestMessage?.Headers);
+    }
+}`;
+
+T_plain.none.csharp = `using System;
+using System.Net.Http;
+using System.Threading.Tasks;
+
+class BinancePlainNoneExample
+{
+    const string Endpoint = "{{EP}}";
+
+    static async Task Main()
+    {
+        string queryString = "";
+        string url = Endpoint + (string.IsNullOrEmpty(queryString) ? "" : "?" + queryString);
+
+        using var client = new HttpClient();
+        var resp = await client.GetAsync(url);
+        Console.WriteLine(url);
+        Console.WriteLine(await resp.Content.ReadAsStringAsync());
+    }
+}`;
+
+T_plain.key.php = `<?php
+$apiKey   = "YOUR_API_KEY";
+$endpoint = "{{EP}}";
+
+$queryString = "";
+$url = $endpoint . ($queryString !== "" ? "?" . $queryString : "");
+
+$ch = curl_init($url);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, ["X-MBX-APIKEY: {$apiKey}"]);
+$response = curl_exec($ch);
+$info     = curl_getinfo($ch);
+curl_close($ch);
+
+echo $info["url"] . "\n";
+echo $response . "\n";
+echo "X-MBX-APIKEY: {$apiKey}\n";`;
+
+T_plain.none.php = `<?php
+$endpoint = "{{EP}}";
+
+$queryString = "";
+$url = $endpoint . ($queryString !== "" ? "?" . $queryString : "");
+
+$ch = curl_init($url);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+$response = curl_exec($ch);
+$info     = curl_getinfo($ch);
+curl_close($ch);
+
+echo $info["url"] . "\n";
+echo $response . "\n";`;
+
+T_plain.key.ruby = `require "net/http"
+require "uri"
+require "cgi"
+
+API_KEY  = "YOUR_API_KEY"
+ENDPOINT = "{{EP}}"
+
+params_plain = {}
+query_string = params_plain.map { |k, v| CGI.escape(k.to_s) + "=" + CGI.escape(v.to_s) }.join("&")
+url          = URI(ENDPOINT + (query_string.empty? ? "" : "?" + query_string))
+
+http         = Net::HTTP.new(url.host, url.port)
+http.use_ssl = true
+request      = Net::HTTP::Get.new(url)
+request["X-MBX-APIKEY"] = API_KEY
+
+response = http.request(request)
+puts url.to_s
+puts response.body
+puts request.each_header.map { |k, v| "#{k}: #{v}" }.join("\n")`;
+
+T_plain.none.ruby = `require "net/http"
+require "uri"
+require "cgi"
+
+ENDPOINT = "{{EP}}"
+
+params_plain = {}
+query_string = params_plain.map { |k, v| CGI.escape(k.to_s) + "=" + CGI.escape(v.to_s) }.join("&")
+url          = URI(ENDPOINT + (query_string.empty? ? "" : "?" + query_string))
+
+http         = Net::HTTP.new(url.host, url.port)
+http.use_ssl = true
+request      = Net::HTTP::Get.new(url)
+
+response = http.request(request)
+puts url.to_s
+puts response.body`;
+
+T_plain.key.rust = `// Cargo.toml: reqwest = { version = "0.12", features = ["blocking"] }
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let api_key  = "YOUR_API_KEY";
+    let endpoint = "{{EP}}";
+
+    let qs = "";
+    let url = if qs.is_empty() {
+        endpoint.to_string()
+    } else {
+        format!("{}?{}", endpoint, qs)
+    };
+
+    let client = reqwest::blocking::Client::new();
+    let req = client.get(&url).header("X-MBX-APIKEY", api_key);
+    let resp = req.send()?;
+    println!("{}", url);
+    println!("{}", resp.text()?);
+    println!("X-MBX-APIKEY: {}", api_key);
+    Ok(())
+}`;
+
+T_plain.none.rust = `// Cargo.toml: reqwest = { version = "0.12", features = ["blocking"] }
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let endpoint = "{{EP}}";
+
+    let qs = "";
+    let url = if qs.is_empty() {
+        endpoint.to_string()
+    } else {
+        format!("{}?{}", endpoint, qs)
+    };
+
+    let resp = reqwest::blocking::get(&url)?;
+    println!("{}", url);
+    println!("{}", resp.text()?);
+    Ok(())
+}`;
+
+T_plain.key.cpp = `// Compile: g++ -std=c++17 -o app main.cpp -lcurl
+#include <iostream>
+#include <string>
+#include <curl/curl.h>
+
+static size_t onData(void* buf, size_t sz, size_t n, std::string* out) {
+    out->append(static_cast<char*>(buf), sz * n); return sz * n;
+}
+
+int main() {
+    const std::string apiKey   = "YOUR_API_KEY";
+    const std::string endpoint = "{{EP}}";
+
+    std::string qs = "";
+    std::string url = endpoint + (qs.empty() ? "" : std::string("?") + qs);
+
+    std::string body;
+    CURL* curl = curl_easy_init();
+    curl_slist* hdrs = curl_slist_append(nullptr, ("X-MBX-APIKEY: " + apiKey).c_str());
+    curl_easy_setopt(curl, CURLOPT_URL,           url.c_str());
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER,    hdrs);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, onData);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA,     &body);
+    curl_easy_perform(curl);
+
+    char* effective = nullptr;
+    curl_easy_getinfo(curl, CURLINFO_EFFECTIVE_URL, &effective);
+    std::cout << (effective ? effective : url.c_str()) << "\\n" << body << "\\nX-MBX-APIKEY: " << apiKey << "\\n";
+
+    curl_slist_free_all(hdrs);
+    curl_easy_cleanup(curl);
+    return 0;
+}`;
+
+T_plain.none.cpp = `// Compile: g++ -std=c++17 -o app main.cpp -lcurl
+#include <iostream>
+#include <string>
+#include <curl/curl.h>
+
+static size_t onData(void* buf, size_t sz, size_t n, std::string* out) {
+    out->append(static_cast<char*>(buf), sz * n); return sz * n;
+}
+
+int main() {
+    const std::string endpoint = "{{EP}}";
+
+    std::string qs = "";
+    std::string url = endpoint + (qs.empty() ? "" : std::string("?") + qs);
+
+    std::string body;
+    CURL* curl = curl_easy_init();
+    curl_easy_setopt(curl, CURLOPT_URL,           url.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, onData);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA,     &body);
+    curl_easy_perform(curl);
+
+    char* effective = nullptr;
+    curl_easy_getinfo(curl, CURLINFO_EFFECTIVE_URL, &effective);
+    std::cout << (effective ? effective : url.c_str()) << "\\n" << body << "\\n";
+
+    curl_easy_cleanup(curl);
+    return 0;
+}`;
+
+T_plain.key.bash = `#!/bin/bash
+API_KEY="YOUR_API_KEY"
+ENDPOINT="{{EP}}"
+
+QUERY_STRING=""
+
+URL="\${ENDPOINT}"
+if [ -n "\$QUERY_STRING" ]; then URL="\${ENDPOINT}?\${QUERY_STRING}"; fi
+
+RESPONSE=$(curl -s -X GET "\$URL" -H "X-MBX-APIKEY: \$API_KEY")
+
+echo "=== URL ==="
+echo "\$URL"
+echo "=== Response ==="
+echo "\$RESPONSE"
+echo "=== Request Headers ==="
+echo "X-MBX-APIKEY: \$API_KEY"`;
+
+T_plain.none.bash = `#!/bin/bash
+ENDPOINT="{{EP}}"
+
+QUERY_STRING=""
+
+URL="\${ENDPOINT}"
+if [ -n "\$QUERY_STRING" ]; then URL="\${ENDPOINT}?\${QUERY_STRING}"; fi
+
+RESPONSE=$(curl -s -X GET "\$URL")
+
+echo "=== URL ==="
+echo "\$URL"
+echo "=== Response ==="
+echo "\$RESPONSE"`;
+
+const NOTES_PLAIN = {
+  python:     'No signature — <code>MARKET_DATA</code>-style (API key header only) or public.',
+  javascript: 'No signature — API key header only or fully public request.',
+  typescript: 'No signature — API key header only or fully public request.',
+  java:       'No signature — plain HttpClient GET.',
+  go:         'No signature — plain net/http GET.',
+  csharp:     'No signature — plain HttpClient GET.',
+  php:        'No signature — cURL without HMAC.',
+  ruby:       'No signature — Net::HTTP GET.',
+  rust:       'No signature — blocking reqwest only.',
+  cpp:        'No signature — libcurl only.',
+  bash:       'No signature — curl only.'
+};
 
 /* ════════════════════════════════════════════════════════════════════
    WebSocket API Templates   {{EP}} → endpoint   {{METHOD}} → WS method name
@@ -5518,6 +6099,78 @@ function injectExtraParams(code, lang, params) {
   }
 }
 
+/** Inject query params for plain REST templates (MARKET_DATA / NONE — no signature). */
+function injectPlainRestParams(code, lang, params) {
+  if (!params || params.length === 0) return code;
+  const escPy = v => String(v).replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n");
+  const qPhp = params.map(p => encodeURIComponent(p.key) + "=" + encodeURIComponent(String(p.val))).join("&");
+
+  switch (lang) {
+    case "python":
+      return code.replace(
+        "params_plain = {}",
+        "params_plain = {" + params.map(p => '"' + p.key + '": "' + escPy(p.val) + '"').join(", ") + "}"
+      );
+    case "ruby":
+      return code.replace(
+        "params_plain = {}",
+        "params_plain = { " + params.map(p => '"' + escPy(p.key) + '" => "' + escPy(p.val) + '"').join(", ") + " }"
+      );
+    case "javascript":
+    case "typescript":
+      return code.replace(
+        /const queryString = "";/,
+        'const queryString = "' +
+          params.map(p => encodeURIComponent(p.key) + "=" + encodeURIComponent(String(p.val))).join("&") +
+          '";'
+      );
+    case "java":
+      return code.replace(
+        /String queryString = "";/,
+        'String queryString = "' +
+          params.map(p => encodeURIComponent(p.key) + "=" + encodeURIComponent(String(p.val))).join("&") +
+          '";'
+      );
+    case "go":
+      return code.replace(/\bqueryString\s*:=\s*""/, 'queryString := "' +
+          params.map(p => encodeURIComponent(p.key) + "=" + encodeURIComponent(String(p.val))).join("&") +
+          '"'
+      );
+    case "csharp":
+      return code.replace(
+        /string queryString = "";/,
+        'string queryString = "' +
+          params.map(p => encodeURIComponent(p.key) + "=" + encodeURIComponent(String(p.val))).join("&") +
+          '";'
+      );
+    case "php":
+      return code.replace(/\$queryString = "";/, '$queryString = "' + qPhp + '";');
+    case "rust":
+      return code.replace(
+        /let qs = "";/,
+        'let qs = "' +
+          params.map(p => encodeURIComponent(p.key) + "=" + encodeURIComponent(String(p.val))).join("&") +
+          '";'
+      );
+    case "cpp":
+      return code.replace(
+        /std::string qs = "";/,
+        'std::string qs = "' +
+          params.map(p => encodeURIComponent(p.key) + "=" + encodeURIComponent(String(p.val))).join("&") +
+          '";'
+      );
+    case "bash":
+      return code.replace(
+        /QUERY_STRING=""/,
+        'QUERY_STRING="' +
+          params.map(p => encodeURIComponent(p.key) + "=" + encodeURIComponent(String(p.val))).join("&") +
+          '"'
+      );
+    default:
+      return code;
+  }
+}
+
 function wsSanitizeCSharpId(key) {
   const k = String(key || "");
   const s = /^[a-zA-Z_]/.test(k) ? k : "_" + k;
@@ -5787,7 +6440,10 @@ let state   = {
   lang: "python",
   docsRestPath: null,
   docsRestMethod: null,
-  docsWsMethod: null
+  docsWsMethod: null,
+  restRequireApiKey: true,
+  restRequireSignature: true,
+  restSecurityTypeLabel: ""
 };
 let extraParams = [];
 let paramIdSeed = 0;
@@ -7335,8 +7991,14 @@ function clearDocsImport() {
   state.docsRestPath = null;
   state.docsRestMethod = null;
   state.docsWsMethod = null;
+  state.restRequireApiKey = true;
+  state.restRequireSignature = true;
+  state.restSecurityTypeLabel = "";
+  syncRestSecurityCheckboxesFromState();
   const bd = document.getElementById("docs-ep-note");
   if (bd) bd.style.display = "none";
+  const sb = document.getElementById("rest-security-badge");
+  if (sb) sb.style.display = "none";
 }
 
 function inferMarketFromPath(path) {
@@ -8132,6 +8794,64 @@ function stripMarkdownBlockquoteLines(normIn) {
     .join("\n");
 }
 
+const BINANCE_SECURITY_TYPES = new Set(["NONE", "TRADE", "USER_DATA", "USER_STREAM", "MARKET_DATA"]);
+
+function securityTypeToRestFlags(sec) {
+  if (!sec) return null;
+  switch (sec) {
+    case "NONE":
+      return { apiKey: false, signature: false };
+    case "MARKET_DATA":
+    case "USER_STREAM":
+      return { apiKey: true, signature: false };
+    case "TRADE":
+    case "USER_DATA":
+      return { apiKey: true, signature: true };
+    default:
+      return null;
+  }
+}
+
+/**
+ * Binance doc headings often include (USER_DATA), (MARKET_DATA), etc.
+ * See https://developers.binance.com/docs/derivatives/usds-margined-futures/account/rest-api/Account-Information-V3
+ */
+function extractBinanceSecurityTypeFromPaste(normIn) {
+  const norm = (normIn || "").replace(/\r\n/g, "\n");
+  const head = norm.split("\n").slice(0, 180).join("\n");
+  const patterns = [
+    /^#{1,6}\s*.+\(([A-Z][A-Z0-9_]*)\)/m,
+    /\*\*[^*\n]+\(([A-Z][A-Z0-9_]*)\)\*\*/,
+    /^[ \t`*]{0,4}[A-Za-z0-9][^\n(]{0,140}\(([A-Z][A-Z0-9_]*)\)\s*$/m
+  ];
+  for (let pi = 0; pi < patterns.length; pi++) {
+    const m = patterns[pi].exec(head);
+    if (m && BINANCE_SECURITY_TYPES.has(m[1])) return m[1];
+  }
+  return null;
+}
+
+function normalizeRestSecurityState() {
+  if (state.restRequireSignature && !state.restRequireApiKey) state.restRequireApiKey = true;
+}
+
+function syncRestSecurityCheckboxesFromState() {
+  const ka = document.getElementById("chk-rest-api-key");
+  const sg = document.getElementById("chk-rest-signature");
+  if (ka) ka.checked = state.restRequireApiKey;
+  if (sg) sg.checked = state.restRequireSignature;
+}
+
+/** Apply flags from parsed Binance Security Type label (parenthetical in doc title). */
+function applyBinanceDocSecurityType(secRaw) {
+  const flags = securityTypeToRestFlags(secRaw);
+  if (!flags) return;
+  state.restRequireApiKey = flags.apiKey;
+  state.restRequireSignature = flags.signature;
+  state.restSecurityTypeLabel = secRaw;
+  syncRestSecurityCheckboxesFromState();
+}
+
 function parseBinanceDocsPaste(text) {
   const out = { method: null, path: null, rows: [], wsRpcMethod: null };
   const norm = text.replace(/\r\n/g, "\n");
@@ -8430,6 +9150,14 @@ function applyDocsImportFromText(rawText, alertEmpty, docPageUrl) {
     if (hasWsRpc) state.docsWsMethod = parsed.wsRpcMethod;
   }
 
+  const rawNormHead = (rawText || "").replace(/\r\n/g, "\n");
+  const secRaw =
+    extractBinanceSecurityTypeFromPaste(rawNormHead) || extractBinanceSecurityTypeFromPaste(body);
+  if (state.apitype === "rest") {
+    if (secRaw) applyBinanceDocSecurityType(secRaw);
+    else state.restSecurityTypeLabel = "";
+  }
+
   const bd = document.getElementById("docs-ep-note");
   if (bd) {
     const show = (state.apitype === "rest" && state.docsRestPath) || (state.apitype === "ws" && state.docsWsMethod);
@@ -8570,6 +9298,7 @@ function syncQuestionnaireWideLayoutMode() {
 function render() {
   if (isEditing) return;
   syncMarketOptions();
+  normalizeRestSecurityState();
 
   const isWs       = state.apitype === "ws";
   const isUds      = state.apitype === "uds";
@@ -8592,7 +9321,12 @@ function render() {
   } else if (isWs) {
     rawCode = (T_ws[state.auth][state.lang] || "// Not available for this combination");
   } else {
-    rawCode = (T[state.auth][state.lang] || "// Not available for this combination");
+    if (!state.restRequireSignature) {
+      const bucket = state.restRequireApiKey ? T_plain.key : T_plain.none;
+      rawCode = bucket[state.lang] || T_plain.none[state.lang] || "// Not available for this combination";
+    } else {
+      rawCode = (T[state.auth][state.lang] || "// Not available for this combination");
+    }
   }
   rawCode = rawCode
     .replace(/\{\{EP\}\}/g, ep)
@@ -8602,7 +9336,9 @@ function render() {
   const notesMap = isUdsFutures ? null : (isUds ? UDS_NOTES : (isWs ? WS_NOTES : NOTES));
   const noteStr  = isUdsFutures
     ? (UDS_LK_NOTES[state.lang] || "")
-    : ((notesMap ? (notesMap[state.auth] || {}) : {})[state.lang] || "");
+    : isRest && !state.restRequireSignature
+      ? (NOTES_PLAIN[state.lang] || "")
+      : ((notesMap ? (notesMap[state.auth] || {}) : {})[state.lang] || "");
 
   document.getElementById("sel-apitype").value = state.apitype;
   document.getElementById("sel-lang").value = state.lang;
@@ -8614,9 +9350,13 @@ function render() {
   syncExtraParamsFromParamRows();
 
   const code =
-    isRest ? injectExtraParams(rawCode, state.lang, extraParams)
-      : isWs ? injectWsTradingParams(rawCode, state.lang, state.auth, extraParams)
-      : rawCode;
+    isRest
+      ? state.restRequireSignature
+        ? injectExtraParams(rawCode, state.lang, extraParams)
+        : injectPlainRestParams(rawCode, state.lang, extraParams)
+      : isWs
+        ? injectWsTradingParams(rawCode, state.lang, state.auth, extraParams)
+        : rawCode;
 
   const block = document.getElementById("code-block");
   block.className = "language-" + LANG_HL[state.lang];
@@ -8632,9 +9372,32 @@ function render() {
     (isRest && state.docsRestPath) || (isWs && state.docsWsMethod);
   if (docNote) docNote.style.display = showDocImported ? "inline" : "none";
 
+  const rsBar = document.getElementById("rest-security-toolbar");
+  if (rsBar) rsBar.classList.toggle("rest-security-toolbar--visible", isRest);
+
+  const authWrap = document.getElementById("picker-auth-wrap");
+  if (authWrap) authWrap.style.display = isRest && !state.restRequireSignature ? "none" : "";
+
+  const tsRow = document.querySelector("#params-container .param-fixed-row");
+  if (tsRow) tsRow.style.display = isRest && state.restRequireSignature ? "" : "none";
+
+  const secBadge = document.getElementById("rest-security-badge");
+  if (secBadge) {
+    if (isRest && state.restSecurityTypeLabel) {
+      secBadge.textContent = state.restSecurityTypeLabel;
+      secBadge.style.display = "inline";
+    } else {
+      secBadge.style.display = "none";
+    }
+  }
+
+  syncRestSecurityCheckboxesFromState();
+
   const marketLabels = { spot:'Spot', usdm:'USD-M Futures', coinm:'COIN-M Futures', portfolio:'Portfolio Margin', options:'Options' };
+  const authMeta =
+    isRest && !state.restRequireSignature ? "Unsigned REST" : AUTH_NAMES[state.auth];
   document.getElementById("print-meta").textContent =
-    LANG_NAMES[state.lang] + "  |  " + AUTH_NAMES[state.auth] + "  |  " +
+    LANG_NAMES[state.lang] + "  |  " + authMeta + "  |  " +
     (isUds ? "User Data Stream" : isWs ? "WebSocket API" : "REST API") + "  |  " + marketLabels[state.market];
   document.getElementById("print-ep").textContent = ep;
   syncQuestionnaireWideLayoutMode();
@@ -8694,6 +9457,26 @@ document.getElementById("sel-apitype").addEventListener("change", e => { state.a
 document.getElementById("sel-market").addEventListener("change",  e => { state.market  = e.target.value; render(); });
 document.getElementById("sel-auth").addEventListener("change",    e => { state.auth    = e.target.value; render(); });
 document.getElementById("sel-lang").addEventListener("change",    e => { state.lang    = e.target.value; render(); });
+
+const chkRestApiKey = document.getElementById("chk-rest-api-key");
+const chkRestSig    = document.getElementById("chk-rest-signature");
+if (chkRestApiKey) {
+  chkRestApiKey.addEventListener("change", e => {
+    state.restRequireApiKey = e.target.checked;
+    if (!state.restRequireApiKey && state.restRequireSignature) state.restRequireSignature = false;
+    state.restSecurityTypeLabel = "";
+    render();
+  });
+}
+if (chkRestSig) {
+  chkRestSig.addEventListener("change", e => {
+    state.restRequireSignature = e.target.checked;
+    if (state.restRequireSignature) state.restRequireApiKey = true;
+    state.restSecurityTypeLabel = "";
+    render();
+  });
+}
+
 document.getElementById("add-param-btn").addEventListener("click", addParamRow);
 
 document.getElementById("travel-rule-q-region").addEventListener("change", () => {
