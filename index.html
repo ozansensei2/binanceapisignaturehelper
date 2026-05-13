@@ -142,23 +142,24 @@
     }
 
     .clear-sample-btn {
-      background: #161b22;
-      border: 1px solid #30363d;
-      color: #c9d1d9;
+      background: #238636;
+      border: 1px solid #2ea043;
+      color: #fff;
       border-radius: 6px;
-      padding: 9px 12px;
-      font-size: 13px;
-      font-weight: 600;
+      padding: 5px 12px;
+      font-size: 12px;
+      font-weight: 500;
       cursor: pointer;
       outline: none;
-      transition: border-color 0.15s, color 0.15s;
+      transition: background 0.15s, border-color 0.15s;
       white-space: nowrap;
       width: 100%;
       text-align: center;
     }
     .clear-sample-btn:hover {
-      border-color: #58a6ff;
-      color: #79c0ff;
+      background: #2ea043;
+      border-color: #3fb950;
+      color: #fff;
     }
     .doc-fetch-hint {
       margin-top: 8px;
@@ -381,18 +382,11 @@
 
     .rest-security-toolbar {
       display: none;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 4px;
-    }
-
-    @media (min-width: 560px) {
-      .rest-security-toolbar.rest-security-toolbar--visible {
-        flex-direction: row;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 12px 14px;
-      }
+      flex-direction: row;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px 14px;
+      width: 100%;
     }
 
     .rest-security-toolbar.rest-security-toolbar--visible {
@@ -405,13 +399,8 @@
       text-transform: uppercase;
       letter-spacing: 0.06em;
       color: #8b949e;
-      width: 100%;
-    }
-
-    @media (min-width: 560px) {
-      .rest-security-toolbar-title {
-        width: auto;
-      }
+      flex-shrink: 0;
+      margin-right: 4px;
     }
 
     .rest-sec-label {
@@ -518,9 +507,33 @@
 
     .code-toolbar-pickers {
       display: flex;
-      align-items: center;
-      gap: 12px;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .code-toolbar-row {
+      display: flex;
+      align-items: flex-end;
       flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .code-toolbar-row--rest-auth {
+      width: 100%;
+      display: none;
+      align-items: center;
+      padding-top: 6px;
+      margin-top: 4px;
+      border-top: 1px solid #30363d;
+    }
+
+    .code-toolbar-row--rest-auth:has(.rest-security-toolbar--visible) {
+      display: flex;
+    }
+
+    .code-toolbar-row--rest-auth .rest-security-toolbar {
+      padding-top: 0;
     }
 
     .code-toolbar-picker {
@@ -706,6 +719,14 @@
       display: flex;
       flex-direction: column;
       gap: 12px;
+    }
+
+    /* Documentation import card — explicit outer edge (panel vs page background). */
+    #docs-import-panel.params-container {
+      border: 1px solid #484f58;
+      border-radius: 8px;
+      box-shadow: 0 0 0 1px rgba(1, 4, 9, 0.85), 0 4px 14px rgba(0, 0, 0, 0.35);
+      background: #161b22;
     }
 
     .add-param-btn {
@@ -1056,34 +1077,38 @@
       <div class="code-header">
         <div class="header-left">
           <div class="code-toolbar-pickers">
-            <div class="code-toolbar-picker">
-              <label for="sel-lang">Language</label>
-              <select id="sel-lang">
-                <option value="python">Python</option>
-                <option value="javascript">Node.js</option>
-                <option value="java">Java</option>
-                <option value="go">Go</option>
-                <option value="csharp">C#</option>
-                <option value="php">PHP</option>
-                <option value="ruby">Ruby</option>
-                <option value="typescript">TypeScript</option>
-                <option value="rust">Rust</option>
-                <option value="cpp">C++</option>
-                <option value="bash">Bash</option>
-              </select>
+            <div class="code-toolbar-row code-toolbar-row--primary">
+              <div class="code-toolbar-picker">
+                <label for="sel-lang">Language</label>
+                <select id="sel-lang">
+                  <option value="python">Python</option>
+                  <option value="javascript">Node.js</option>
+                  <option value="java">Java</option>
+                  <option value="go">Go</option>
+                  <option value="csharp">C#</option>
+                  <option value="php">PHP</option>
+                  <option value="ruby">Ruby</option>
+                  <option value="typescript">TypeScript</option>
+                  <option value="rust">Rust</option>
+                  <option value="cpp">C++</option>
+                  <option value="bash">Bash</option>
+                </select>
+              </div>
+              <div class="code-toolbar-picker" id="picker-auth-wrap">
+                <label for="sel-auth">Auth type</label>
+                <select id="sel-auth">
+                  <option value="hmac">HMAC-SHA256</option>
+                  <option value="rsa">RSA</option>
+                  <option value="ed25519">Ed25519</option>
+                </select>
+              </div>
             </div>
-            <div class="code-toolbar-picker rest-security-toolbar" id="rest-security-toolbar">
-              <span class="rest-security-toolbar-title">REST auth</span>
-              <label class="rest-sec-label"><input type="checkbox" id="chk-rest-api-key" checked /> X-MBX-APIKEY</label>
-              <label class="rest-sec-label"><input type="checkbox" id="chk-rest-signature" checked /> Signature (HMAC/RSA/Ed25519)</label>
-            </div>
-            <div class="code-toolbar-picker" id="picker-auth-wrap">
-              <label for="sel-auth">Auth type</label>
-              <select id="sel-auth">
-                <option value="hmac">HMAC-SHA256</option>
-                <option value="rsa">RSA</option>
-                <option value="ed25519">Ed25519</option>
-              </select>
+            <div class="code-toolbar-row code-toolbar-row--rest-auth">
+              <div class="code-toolbar-picker rest-security-toolbar" id="rest-security-toolbar">
+                <span class="rest-security-toolbar-title">REST auth</span>
+                <label class="rest-sec-label"><input type="checkbox" id="chk-rest-api-key" checked /> X-MBX-APIKEY</label>
+                <label class="rest-sec-label"><input type="checkbox" id="chk-rest-signature" checked /> Signature (HMAC/RSA/Ed25519)</label>
+              </div>
             </div>
           </div>
         </div>
