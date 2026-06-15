@@ -9441,7 +9441,8 @@ async function fetchDocUrlAndParse(urlOverride) {
   setDocFetchControlsDisabled(true);
   setDocFetchLoading(true);
   try {
-    const proxied = "https://r.jina.ai/" + encodeURIComponent(url);
+    const cleanUrl = url.replace(/#request-parameters$/i, "").replace(/#request-weight$/i, "");
+    const proxied = "https://r.jina.ai/" + encodeURIComponent(cleanUrl);
     const res = await fetch(proxied, { headers: { Accept: "text/plain" } });
     const text = await res.text();
     if (!text || text.length < 40) throw new Error("Empty or short response");
