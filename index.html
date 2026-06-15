@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Binance API Code Generator v202606151935</title>
+  <title>Binance API Code Generator v202606151953</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1079,7 +1079,7 @@
 <header>
   <div class="logo">B</div>
   <div>
-    <h1>Binance API Code Generator <span style="font-size:0.55em;opacity:0.5;font-weight:400">v202606151935</span></h1>
+    <h1>Binance API Code Generator <span style="font-size:0.55em;opacity:0.5;font-weight:400">v202606151953</span></h1>
     <p>Signed REST, WebSocket, and User Data Stream examples — with optional Binance docs import for REST.</p>
   </div>
 </header>
@@ -4878,8 +4878,10 @@ def signed_querystring():
         "timestamp":  round(time.time() * 1000),
     }
     qs  = urlencode(params)
-    sig = _hmac.new(API_SECRET.encode(), qs.encode(), hashlib.sha256).hexdigest()
-    return qs + "&signature=" + sig
+    sig  = _hmac.new(API_SECRET.encode(), qs.encode(), hashlib.sha256).hexdigest()
+    full = qs + "&signature=" + sig
+    print(full)
+    return full
 
 def ping_loop(ws):
     while True:
@@ -4909,7 +4911,9 @@ function signedQs() {
     const params = new URLSearchParams({ random: rand, topic: TOPIC, recvWindow: "60000", timestamp: String(Date.now()) });
     const qs     = params.toString();
     const sig    = crypto.createHmac("sha256", API_SECRET).update(qs).digest("hex");
-    return qs + "&signature=" + sig;
+    const full   = qs + "&signature=" + sig;
+    console.log(full);
+    return full;
 }
 
 const ws = new WebSocket(\`wss://api.binance.com/sapi/wss?\${signedQs()}\`, {
@@ -4934,7 +4938,9 @@ function signedQs(): string {
     const params = new URLSearchParams({ random: rand, topic: TOPIC, recvWindow: "60000", timestamp: String(Date.now()) });
     const qs     = params.toString();
     const sig    = crypto.createHmac("sha256", API_SECRET).update(qs).digest("hex");
-    return qs + "&signature=" + sig;
+    const full   = qs + "&signature=" + sig;
+    console.log(full);
+    return full;
 }
 
 const ws = new WebSocket(\`wss://api.binance.com/sapi/wss?\${signedQs()}\`, {
@@ -4981,6 +4987,7 @@ public class AnnouncementWs {
         String qs  = "random=" + randomStr(32) + "&topic=" + TOPIC + "&recvWindow=60000&timestamp=" + System.currentTimeMillis();
         String sig = hmacHex(API_SECRET, qs);
         String url = "wss://api.binance.com/sapi/wss?" + qs + "&signature=" + sig;
+        System.out.println(qs + "&signature=" + sig);
 
         HttpClient client = HttpClient.newHttpClient();
         ScheduledExecutorService sched = Executors.newSingleThreadScheduledExecutor();
@@ -5049,6 +5056,7 @@ func main() {
 	ts  := time.Now().UnixMilli()
 	qs  := fmt.Sprintf("random=%s&topic=%s&recvWindow=60000&timestamp=%d", randomStr(32), topic, ts)
 	sig := hmacHex(apiSecret, qs)
+	fmt.Println(qs + "&signature=" + sig)
 	url := "wss://api.binance.com/sapi/wss?" + qs + "&signature=" + sig
 
 	conn, _, err := websocket.DefaultDialer.Dial(url, http.Header{"X-MBX-APIKEY": {apiKey}})
@@ -5099,6 +5107,7 @@ class AnnouncementWs {
         long ts  = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         string qs  = $"random={RandomStr(32)}&topic={TOPIC}&recvWindow=60000&timestamp={ts}";
         string sig = HmacHex(API_SECRET, qs);
+        Console.WriteLine(qs + "&signature=" + sig);
         string url = $"wss://api.binance.com/sapi/wss?{qs}&signature={sig}";
 
         var ws = new ClientWebSocket();
@@ -5140,6 +5149,7 @@ function randomStr(int $n): string {
 $ts  = (int)round(microtime(true) * 1000);
 $qs  = "random=" . randomStr(32) . "&topic=$TOPIC&recvWindow=60000&timestamp=$ts";
 $sig = hash_hmac("sha256", $qs, $API_SECRET);
+echo $qs . "&signature=" . $sig . "\\n";
 $url = "wss://api.binance.com/sapi/wss?{$qs}&signature={$sig}";
 
 $ws = new Client($url, ["headers" => ["X-MBX-APIKEY" => $API_KEY]]);
@@ -5161,6 +5171,7 @@ ts  = (Time.now.to_f * 1000).round
 rnd = SecureRandom.alphanumeric(32)
 qs  = "random=#{rnd}&topic=#{TOPIC}&recvWindow=60000&timestamp=#{ts}"
 sig = OpenSSL::HMAC.hexdigest("SHA256", API_SECRET, qs)
+puts "#{qs}&signature=#{sig}"
 url = "wss://api.binance.com/sapi/wss?#{qs}&signature=#{sig}"
 
 ws = WebSocket::Client::Simple.connect(url, headers: { "X-MBX-APIKEY" => API_KEY })
@@ -5200,6 +5211,7 @@ fn main() {
     let mut mac = HmacSha256::new_from_slice(api_secret.as_bytes()).unwrap();
     mac.update(qs.as_bytes());
     let sig = hex::encode(mac.finalize().into_bytes());
+    println!("{}&signature={}", qs, sig);
     let url = format!("wss://api.binance.com/sapi/wss?{}&signature={}", qs, sig);
 
     let req = Request::builder().uri(&url).header("X-MBX-APIKEY", api_key).body(()).unwrap();
@@ -5254,7 +5266,9 @@ int main() {
         std::chrono::system_clock::now().time_since_epoch()).count();
 
     std::string qs  = "random=" + randomStr(32) + "&topic=" + TOPIC + "&recvWindow=60000&timestamp=" + std::to_string(ts);
-    std::string url = "wss://api.binance.com/sapi/wss?" + qs + "&signature=" + hmacHex(API_SECRET, qs);
+    std::string sig = hmacHex(API_SECRET, qs);
+    std::cout << qs << "&signature=" << sig << std::endl;
+    std::string url = "wss://api.binance.com/sapi/wss?" + qs + "&signature=" + sig;
 
     ix::WebSocket ws;
     ws.setUrl(url);
@@ -5282,6 +5296,7 @@ RAND=$(python3 -c "import random,string; print(''.join(random.sample(string.asci
 TS=$(python3 -c "import time; print(round(time.time()*1000))")
 QS="random=\${RAND}&topic=\${TOPIC}&recvWindow=60000&timestamp=\${TS}"
 SIG=$(printf '%s' "\$QS" | openssl dgst -sha256 -hmac "\$API_SECRET" | awk '{print $2}')
+echo "\${QS}&signature=\${SIG}"
 URL="wss://api.binance.com/sapi/wss?\${QS}&signature=\${SIG}"
 
 echo "Connecting..."
@@ -5306,9 +5321,11 @@ def signed_querystring():
         "recvWindow": 60000,
         "timestamp":  round(time.time() * 1000),
     }
-    qs  = urlencode(params)
-    sig = quote(base64.b64encode(private_key.sign(qs.encode("utf-8"))).decode(), safe="")
-    return qs + "&signature=" + sig
+    qs   = urlencode(params)
+    sig  = quote(base64.b64encode(private_key.sign(qs.encode("utf-8"))).decode(), safe="")
+    full = qs + "&signature=" + sig
+    print(full)
+    return full
 
 def ping_loop(ws):
     while True:
@@ -5339,7 +5356,9 @@ function signedQs() {
     const params = new URLSearchParams({ random: rand, topic: TOPIC, recvWindow: "60000", timestamp: String(Date.now()) });
     const qs     = params.toString();
     const sig    = encodeURIComponent(crypto.sign(null, Buffer.from(qs), privateKey).toString("base64"));
-    return qs + "&signature=" + sig;
+    const full   = qs + "&signature=" + sig;
+    console.log(full);
+    return full;
 }
 
 const ws = new WebSocket(\`wss://api.binance.com/sapi/wss?\${signedQs()}\`, {
@@ -5365,7 +5384,9 @@ function signedQs(): string {
     const params = new URLSearchParams({ random: rand, topic: TOPIC, recvWindow: "60000", timestamp: String(Date.now()) });
     const qs     = params.toString();
     const sig    = encodeURIComponent(crypto.sign(null, Buffer.from(qs), privateKey).toString("base64"));
-    return qs + "&signature=" + sig;
+    const full   = qs + "&signature=" + sig;
+    console.log(full);
+    return full;
 }
 
 const ws = new WebSocket(\`wss://api.binance.com/sapi/wss?\${signedQs()}\`, {
@@ -5412,6 +5433,7 @@ public class AnnouncementWsEd25519 {
         signer.initSign(privKey);
         signer.update(qs.getBytes(StandardCharsets.UTF_8));
         String sig = java.net.URLEncoder.encode(Base64.getEncoder().encodeToString(signer.sign()), "UTF-8");
+        System.out.println(qs + "&signature=" + sig);
         String url = "wss://api.binance.com/sapi/wss?" + qs + "&signature=" + sig;
 
         ScheduledExecutorService sched = Executors.newSingleThreadScheduledExecutor();
@@ -5480,6 +5502,7 @@ func main() {
 	ts  := time.Now().UnixMilli()
 	qs  := fmt.Sprintf("random=%s&topic=%s&recvWindow=60000&timestamp=%d", randomStr(32), topic, ts)
 	sig := url.QueryEscape(base64.StdEncoding.EncodeToString(ed25519.Sign(privKey, []byte(qs))))
+	fmt.Println(qs + "&signature=" + sig)
 	rawURL := "wss://api.binance.com/sapi/wss?" + qs + "&signature=" + sig
 
 	conn, _, err := websocket.DefaultDialer.Dial(rawURL, http.Header{"X-MBX-APIKEY": {apiKey}})
@@ -5534,6 +5557,7 @@ class AnnouncementWsEd25519 {
         byte[] qs_bytes = Encoding.UTF8.GetBytes(qs);
         signer.BlockUpdate(qs_bytes, 0, qs_bytes.Length);
         string sig = Uri.EscapeDataString(Convert.ToBase64String(signer.GenerateSignature()));
+        Console.WriteLine(qs + "&signature=" + sig);
         string url = $"wss://api.binance.com/sapi/wss?{qs}&signature={sig}";
 
         var ws = new ClientWebSocket();
@@ -5575,6 +5599,7 @@ $ts  = (int)round(microtime(true) * 1000);
 $qs  = "random=" . randomStr(32) . "&topic=$TOPIC&recvWindow=60000&timestamp=$ts";
 openssl_sign($qs, $rawSig, $privKey, OPENSSL_ALGO_SHA512); // Ed25519 ignores hash arg
 $sig = urlencode(base64_encode($rawSig));
+echo $qs . "&signature=" . $sig . "\\n";
 $url = "wss://api.binance.com/sapi/wss?{$qs}&signature={$sig}";
 
 $ws = new Client($url, ["headers" => ["X-MBX-APIKEY" => $API_KEY]]);
@@ -5595,6 +5620,7 @@ pkey = OpenSSL::PKey.read(File.read("ed25519_private.pem"))
 ts   = (Time.now.to_f * 1000).round
 qs   = "random=#{SecureRandom.alphanumeric(32)}&topic=#{TOPIC}&recvWindow=60000&timestamp=#{ts}"
 sig  = URI.encode_www_form_component(Base64.strict_encode64(pkey.sign(nil, qs)))
+puts "#{qs}&signature=#{sig}"
 url  = "wss://api.binance.com/sapi/wss?#{qs}&signature=#{sig}"
 
 ws = WebSocket::Client::Simple.connect(url, headers: { "X-MBX-APIKEY" => API_KEY })
@@ -5631,6 +5657,7 @@ fn main() {
     let mut signer = openssl::sign::Signer::new_without_digest(&pkey).unwrap();
     let raw_sig = signer.sign_oneshot_to_vec(qs.as_bytes()).unwrap();
     let sig = urlencoding::encode(&STANDARD.encode(&raw_sig)).into_owned();
+    println!("{}&signature={}", qs, sig);
     let url = format!("wss://api.binance.com/sapi/wss?{}&signature={}", qs, sig);
 
     let req = Request::builder().uri(&url).header("X-MBX-APIKEY", api_key).body(()).unwrap();
@@ -5701,7 +5728,9 @@ int main() {
     EVP_DigestSign(ctx, sig.data(), &sigLen, (unsigned char*)qs.c_str(), qs.size());
     EVP_MD_CTX_free(ctx); EVP_PKEY_free(pkey);
 
-    std::string url = "wss://api.binance.com/sapi/wss?" + qs + "&signature=" + urlEncode(base64Encode(sig));
+    std::string sigStr = urlEncode(base64Encode(sig));
+    std::cout << qs << "&signature=" << sigStr << std::endl;
+    std::string url = "wss://api.binance.com/sapi/wss?" + qs + "&signature=" + sigStr;
     ix::WebSocket ws; ws.setUrl(url); ws.setExtraHeaders({ {"X-MBX-APIKEY", API_KEY} }); ws.setPingInterval(30);
     ws.setOnMessageCallback([](const ix::WebSocketMessagePtr& m) {
         if (m->type == ix::WebSocketMessageType::Open) std::cout << "Connected.\\n";
@@ -5720,6 +5749,7 @@ RAND=$(python3 -c "import random,string; print(''.join(random.sample(string.asci
 TS=$(python3 -c "import time; print(round(time.time()*1000))")
 QS="random=\${RAND}&topic=\${TOPIC}&recvWindow=60000&timestamp=\${TS}"
 SIG=$(printf '%s' "\$QS" | openssl pkeyutl -sign -inkey "\$PRIVATE_KEY" | openssl base64 -A | python3 -c "import sys,urllib.parse; print(urllib.parse.quote(sys.stdin.read().strip()))")
+echo "\${QS}&signature=\${SIG}"
 URL="wss://api.binance.com/sapi/wss?\${QS}&signature=\${SIG}"
 
 echo "Connecting..."
@@ -5746,11 +5776,13 @@ def signed_querystring():
         "recvWindow": 60000,
         "timestamp":  round(time.time() * 1000),
     }
-    qs  = urlencode(params)
-    sig = quote(base64.b64encode(
+    qs   = urlencode(params)
+    sig  = quote(base64.b64encode(
         private_key.sign(qs.encode("utf-8"), padding.PKCS1v15(), hashes.SHA256())
     ).decode(), safe="")
-    return qs + "&signature=" + sig
+    full = qs + "&signature=" + sig
+    print(full)
+    return full
 
 def ping_loop(ws):
     while True:
@@ -5781,7 +5813,9 @@ function signedQs() {
     const sig    = encodeURIComponent(crypto.sign("sha256", Buffer.from(qs), {
         key: privateKey, padding: crypto.constants.RSA_PKCS1_PADDING
     }).toString("base64"));
-    return qs + "&signature=" + sig;
+    const full   = qs + "&signature=" + sig;
+    console.log(full);
+    return full;
 }
 
 const ws = new WebSocket(\`wss://api.binance.com/sapi/wss?\${signedQs()}\`, {
@@ -5809,7 +5843,9 @@ function signedQs(): string {
     const sig    = encodeURIComponent(crypto.sign("sha256", Buffer.from(qs), {
         key: privateKey, padding: crypto.constants.RSA_PKCS1_PADDING
     }).toString("base64"));
-    return qs + "&signature=" + sig;
+    const full   = qs + "&signature=" + sig;
+    console.log(full);
+    return full;
 }
 
 const ws = new WebSocket(\`wss://api.binance.com/sapi/wss?\${signedQs()}\`, {
@@ -5855,6 +5891,7 @@ public class AnnouncementWsRsa {
         signer.initSign(privKey);
         signer.update(qs.getBytes(StandardCharsets.UTF_8));
         String sig = java.net.URLEncoder.encode(Base64.getEncoder().encodeToString(signer.sign()), "UTF-8");
+        System.out.println(qs + "&signature=" + sig);
         String url = "wss://api.binance.com/sapi/wss?" + qs + "&signature=" + sig;
 
         ScheduledExecutorService sched = Executors.newSingleThreadScheduledExecutor();
@@ -5922,6 +5959,7 @@ func main() {
 	h   := sha256.Sum256([]byte(qs))
 	rawSig, _ := rsa.SignPKCS1v15(rand.Reader, rsaKey, crypto.SHA256, h[:])
 	sig := url.QueryEscape(base64.StdEncoding.EncodeToString(rawSig))
+	fmt.Println(qs + "&signature=" + sig)
 	rawURL := "wss://api.binance.com/sapi/wss?" + qs + "&signature=" + sig
 
 	conn, _, err := websocket.DefaultDialer.Dial(rawURL, http.Header{"X-MBX-APIKEY": {apiKey}})
@@ -5968,6 +6006,7 @@ class AnnouncementWsRsa {
         string qs  = $"random={RandomStr(32)}&topic={TOPIC}&recvWindow=60000&timestamp={ts}";
         byte[] rawSig = rsa.SignData(Encoding.UTF8.GetBytes(qs), HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
         string sig = Uri.EscapeDataString(Convert.ToBase64String(rawSig));
+        Console.WriteLine(qs + "&signature=" + sig);
         string url = $"wss://api.binance.com/sapi/wss?{qs}&signature={sig}";
 
         var ws = new ClientWebSocket();
@@ -6008,6 +6047,7 @@ $ts  = (int)round(microtime(true) * 1000);
 $qs  = "random=" . randomStr(32) . "&topic=$TOPIC&recvWindow=60000&timestamp=$ts";
 openssl_sign($qs, $rawSig, $privKey, OPENSSL_ALGO_SHA256);
 $sig = urlencode(base64_encode($rawSig));
+echo $qs . "&signature=" . $sig . "\\n";
 $url = "wss://api.binance.com/sapi/wss?{$qs}&signature={$sig}";
 
 $ws = new Client($url, ["headers" => ["X-MBX-APIKEY" => $API_KEY]]);
@@ -6027,6 +6067,7 @@ pkey = OpenSSL::PKey::RSA.new(File.read("rsa_private.pem"))
 ts   = (Time.now.to_f * 1000).round
 qs   = "random=#{SecureRandom.alphanumeric(32)}&topic=#{TOPIC}&recvWindow=60000&timestamp=#{ts}"
 sig  = URI.encode_www_form_component(Base64.strict_encode64(pkey.sign(OpenSSL::Digest::SHA256.new, qs)))
+puts "#{qs}&signature=#{sig}"
 url  = "wss://api.binance.com/sapi/wss?#{qs}&signature=#{sig}"
 
 ws = WebSocket::Client::Simple.connect(url, headers: { "X-MBX-APIKEY" => API_KEY })
@@ -6064,6 +6105,7 @@ fn main() {
     signer.set_rsa_padding(Padding::PKCS1).unwrap();
     signer.update(qs.as_bytes()).unwrap();
     let sig = urlencoding::encode(&STANDARD.encode(signer.sign_to_vec().unwrap())).into_owned();
+    println!("{}&signature={}", qs, sig);
     let url = format!("wss://api.binance.com/sapi/wss?{}&signature={}", qs, sig);
 
     let req = Request::builder().uri(&url).header("X-MBX-APIKEY", api_key).body(()).unwrap();
@@ -6136,7 +6178,9 @@ int main() {
     EVP_DigestSignFinal(ctx,sig.data(),&sigLen);
     EVP_MD_CTX_free(ctx); EVP_PKEY_free(pkey);
 
-    std::string url = "wss://api.binance.com/sapi/wss?"+qs+"&signature="+urlEncode(base64Encode(sig));
+    std::string sigStr = urlEncode(base64Encode(sig));
+    std::cout << qs << "&signature=" << sigStr << std::endl;
+    std::string url = "wss://api.binance.com/sapi/wss?"+qs+"&signature="+sigStr;
     ix::WebSocket ws; ws.setUrl(url); ws.setExtraHeaders({{"X-MBX-APIKEY",API_KEY}}); ws.setPingInterval(30);
     ws.setOnMessageCallback([](const ix::WebSocketMessagePtr& m){
         if (m->type==ix::WebSocketMessageType::Open) std::cout<<"Connected.\\n";
@@ -6155,6 +6199,7 @@ RAND=$(python3 -c "import random,string; print(''.join(random.sample(string.asci
 TS=$(python3 -c "import time; print(round(time.time()*1000))")
 QS="random=\${RAND}&topic=\${TOPIC}&recvWindow=60000&timestamp=\${TS}"
 SIG=$(printf '%s' "\$QS" | openssl dgst -sha256 -sign "\$PRIVATE_KEY" | openssl base64 -A | python3 -c "import sys,urllib.parse; print(urllib.parse.quote(sys.stdin.read().strip()))")
+echo "\${QS}&signature=\${SIG}"
 URL="wss://api.binance.com/sapi/wss?\${QS}&signature=\${SIG}"
 
 echo "Connecting..."
