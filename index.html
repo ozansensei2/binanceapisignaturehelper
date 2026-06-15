@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Binance API Code Generator v202606152012</title>
+  <title>Binance API Code Generator v202606152037</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1072,6 +1072,87 @@
     @media (max-width: 400px) {
       .selectors { grid-template-columns: 1fr; }
     }
+
+    /* ── Binance Square Modal ─────────────────────────────────── */
+    #sq-modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.80);
+      z-index: 9000;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #sq-modal {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      width: min(860px, 96vw);
+      max-height: 92vh;
+      overflow-y: auto;
+      padding: 28px 28px 24px;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+    }
+    .sq-modal-header {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      margin-bottom: 20px;
+    }
+    .sq-modal-header h2 {
+      margin: 0 0 4px; font-size: 18px; font-weight: 700; color: #f0b90b;
+    }
+    .sq-modal-header p { margin: 0; font-size: 13px; color: #8b949e; }
+    .sq-close-btn {
+      background: none; border: 1px solid #30363d; color: #8b949e;
+      font-size: 20px; line-height: 1; cursor: pointer;
+      border-radius: 6px; padding: 2px 9px; flex-shrink: 0;
+      transition: color .15s, border-color .15s;
+    }
+    .sq-close-btn:hover { color: #e6edf3; border-color: #6e7681; }
+    .sq-card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    .sq-card {
+      padding: 14px 10px 12px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: border-color .15s, background .15s;
+      text-align: center;
+    }
+    .sq-card:hover  { border-color: #f0b90b; background: rgba(240,185,11,0.06); }
+    .sq-card.sq-active { border-color: #f0b90b; background: rgba(240,185,11,0.10); }
+    .sq-card-type-badge {
+      display: inline-block;
+      font-size: 10px; font-weight: 700; letter-spacing: .06em;
+      padding: 2px 7px; border-radius: 4px; margin-bottom: 8px;
+      background: rgba(240,185,11,0.18); color: #f0b90b;
+    }
+    .sq-card-label { font-size: 13px; font-weight: 600; color: #e6edf3; }
+    .sq-card-desc  { font-size: 11px; color: #8b949e; margin-top: 4px; line-height: 1.45; }
+    .sq-card-ep    { font-size: 10px; color: #555d69; margin-top: 6px; font-family: monospace; }
+    #sq-code-wrap {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .sq-code-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 9px 14px;
+      border-bottom: 1px solid #30363d;
+      background: #161b22;
+    }
+    .sq-code-title { font-size: 13px; font-weight: 600; color: #e6edf3; }
+    .sq-code-lang  { font-size: 11px; color: #8b949e; margin-left: 8px; }
+    .sq-copy-btn {
+      background: none; border: 1px solid #30363d; color: #8b949e;
+      font-size: 12px; cursor: pointer; border-radius: 5px;
+      padding: 4px 11px; transition: color .15s, border-color .15s;
+    }
+    .sq-copy-btn:hover   { color: #e6edf3; border-color: #6e7681; }
+    .sq-copy-btn.sq-copied { color: #3fb950; border-color: #3fb950; }
+    #sq-code-wrap pre { margin: 0; padding: 16px; overflow-x: auto; font-size: 12.5px; line-height: 1.65; }
   </style>
 </head>
 <body>
@@ -1079,7 +1160,7 @@
 <header>
   <div class="logo">B</div>
   <div>
-    <h1>Binance API Code Generator <span style="font-size:0.55em;opacity:0.5;font-weight:400">v202606152012</span></h1>
+    <h1>Binance API Code Generator <span style="font-size:0.55em;opacity:0.5;font-weight:400">v202606152037</span></h1>
     <p>Signed REST, WebSocket, and User Data Stream examples — with optional Binance docs import for REST.</p>
   </div>
 </header>
@@ -1166,6 +1247,7 @@
           <button type="button" class="ready-template-btn" id="ready-tpl-travel-withdraw" data-doc-url="https://developers.binance.com/docs/wallet/travel-rule/withdraw" title="Withdraw (Travel Rule) — POST /sapi/v1/localentity/withdraw/apply">Travel Rule · Withdraw</button>
           <button type="button" class="ready-template-btn" id="ready-tpl-travel-deposit-v2" data-doc-url="https://developers.binance.com/docs/wallet/travel-rule/deposit-provide-info-v2" title="Submit Deposit Questionnaire V2 — PUT /sapi/v2/localentity/deposit/provide-info">Deposit Questionnaire V2</button>
           <button type="button" class="ready-template-btn" id="ready-tpl-announcement" title="Announcement WebSocket — wss://api.binance.com/sapi/wss">Announcement WS</button>
+          <button type="button" class="ready-template-btn" id="ready-tpl-square" title="Binance Square Post API — publish text, image, article, video posts">Binance Square</button>
         </div>
       </div>
     </div>
@@ -11437,7 +11519,403 @@ document.getElementById("copy-btn").addEventListener("click", () => {
   });
 });
 
+// ── Binance Square Modal ─────────────────────────────────────────
+const SQ_TYPES = [
+  {
+    id: "text",
+    label: "Text Post",
+    badge: "TEXT",
+    desc: "Short text post, no media",
+    ep: "POST /content/add",
+    code:
+`import requests
+
+API_KEY = "YOUR_SQUARE_API_KEY"
+
+headers = {
+    "X-Square-OpenAPI-Key": API_KEY,
+    "Content-Type": "application/json",
+    "clienttype": "binanceSkill"
+}
+
+payload = {
+    "contentType": 1,
+    "bodyTextOnly": "Hello Binance Square! #BTC $ETH"
+}
+
+resp = requests.post(
+    "https://www.binance.com/bapi/composite/v1/public/pgc/openApi/content/add",
+    headers=headers,
+    json=payload
+)
+
+data = resp.json()
+if data["code"] == "000000":
+    print("Success!")
+    print(f"ID:   {data['data']['id'] or 'unavailable'}")
+    print(f"Link: {data['data']['shareLink'] or 'unavailable'}")
+else:
+    print(f"Error [{data['code']}]: {data['message']}")`
+  },
+  {
+    id: "article",
+    label: "Article",
+    badge: "ARTICLE",
+    desc: "Title + long text, no media",
+    ep: "POST /content/add",
+    code:
+`import requests
+
+API_KEY = "YOUR_SQUARE_API_KEY"
+
+headers = {
+    "X-Square-OpenAPI-Key": API_KEY,
+    "Content-Type": "application/json",
+    "clienttype": "binanceSkill"
+}
+
+payload = {
+    "contentType": 2,
+    "title": "Market Weekly Report",
+    "bodyTextOnly": "# Introduction\\n\\nThis week Bitcoin showed strength...\\n\\n## Details\\n\\nFull analysis here."
+}
+
+resp = requests.post(
+    "https://www.binance.com/bapi/composite/v1/public/pgc/openApi/content/add",
+    headers=headers,
+    json=payload
+)
+
+data = resp.json()
+if data["code"] == "000000":
+    print("Success!")
+    print(f"ID:   {data['data']['id'] or 'unavailable'}")
+    print(f"Link: {data['data']['shareLink'] or 'unavailable'}")
+else:
+    print(f"Error [{data['code']}]: {data['message']}")`
+  },
+  {
+    id: "image",
+    label: "Image Post",
+    badge: "IMAGE",
+    desc: "Text + up to 4 images",
+    ep: "/image/presignedUrl → /content/add",
+    code:
+`import os
+import time
+import mimetypes
+import requests
+
+API_KEY = "YOUR_SQUARE_API_KEY"
+BASE_V1 = "https://www.binance.com/bapi/composite/v1/public/pgc/openApi"
+BASE_V2 = "https://www.binance.com/bapi/composite/v2/public/pgc/openApi"
+
+HEADERS = {
+    "X-Square-OpenAPI-Key": API_KEY,
+    "Content-Type": "application/json",
+    "clienttype": "binanceSkill"
+}
+
+
+def upload_image(img_path):
+    name = os.path.basename(img_path)
+
+    # Step 1: Get presigned S3 upload URL
+    r = requests.post(f"{BASE_V2}/image/presignedUrl", headers=HEADERS,
+                      json={"imageName": name})
+    d = r.json()
+    if d["code"] != "000000":
+        raise RuntimeError(f"Error [{d['code']}]: {d['message']}")
+    presigned_url = d["data"]["presignedUrl"]
+    file_ticket   = d["data"]["fileTicket"]
+
+    # Step 2: Upload binary to S3
+    ctype = mimetypes.guess_type(img_path)[0] or "image/jpeg"
+    with open(img_path, "rb") as f:
+        requests.put(presigned_url, data=f, headers={"Content-Type": ctype})
+    print(f"  Uploaded {name}, polling status...")
+
+    # Step 3: Poll until processing complete
+    for attempt in range(10):
+        r = requests.post(f"{BASE_V2}/image/imageStatus", headers=HEADERS,
+                          json={"fileTicket": file_ticket})
+        st = r.json()["data"]
+        if st["status"] == 1:
+            print(f"  Ready: {st['imageUrl']}")
+            return st["imageUrl"]
+        elif st["status"] == 2:
+            raise RuntimeError(f"Processing failed: {st['failedReason']}")
+        print(f"  Processing... ({attempt + 1}/10)")
+        time.sleep(3)
+    raise TimeoutError("Timed out waiting for image processing")
+
+
+# Upload 1–4 images
+image_urls = [
+    upload_image("./chart1.png"),
+    upload_image("./chart2.png"),
+]
+
+# Publish short image post
+resp = requests.post(
+    f"{BASE_V1}/content/add",
+    headers=HEADERS,
+    json={
+        "contentType": 1,
+        "bodyTextOnly": "Chart analysis #BTC",
+        "imageList": image_urls
+    }
+)
+
+data = resp.json()
+if data["code"] == "000000":
+    print("Success!")
+    print(f"ID:   {data['data']['id'] or 'unavailable'}")
+    print(f"Link: {data['data']['shareLink'] or 'unavailable'}")
+else:
+    print(f"Error [{data['code']}]: {data['message']}")`
+  },
+  {
+    id: "article-cover",
+    label: "Article + Cover",
+    badge: "ARTICLE",
+    desc: "Title + text + 1 cover image",
+    ep: "/image/presignedUrl → /content/add",
+    code:
+`import os
+import time
+import mimetypes
+import requests
+
+API_KEY = "YOUR_SQUARE_API_KEY"
+BASE_V1 = "https://www.binance.com/bapi/composite/v1/public/pgc/openApi"
+BASE_V2 = "https://www.binance.com/bapi/composite/v2/public/pgc/openApi"
+
+HEADERS = {
+    "X-Square-OpenAPI-Key": API_KEY,
+    "Content-Type": "application/json",
+    "clienttype": "binanceSkill"
+}
+
+
+def upload_image(img_path):
+    name = os.path.basename(img_path)
+    r = requests.post(f"{BASE_V2}/image/presignedUrl", headers=HEADERS,
+                      json={"imageName": name})
+    d = r.json()
+    if d["code"] != "000000":
+        raise RuntimeError(f"Error [{d['code']}]: {d['message']}")
+    presigned_url = d["data"]["presignedUrl"]
+    file_ticket   = d["data"]["fileTicket"]
+    ctype = mimetypes.guess_type(img_path)[0] or "image/jpeg"
+    with open(img_path, "rb") as f:
+        requests.put(presigned_url, data=f, headers={"Content-Type": ctype})
+    print(f"  Uploaded {name}, polling status...")
+    for attempt in range(10):
+        r = requests.post(f"{BASE_V2}/image/imageStatus", headers=HEADERS,
+                          json={"fileTicket": file_ticket})
+        st = r.json()["data"]
+        if st["status"] == 1:
+            print(f"  Ready: {st['imageUrl']}")
+            return st["imageUrl"]
+        elif st["status"] == 2:
+            raise RuntimeError(f"Processing failed: {st['failedReason']}")
+        print(f"  Processing... ({attempt + 1}/10)")
+        time.sleep(3)
+    raise TimeoutError("Timed out waiting for image processing")
+
+
+# Upload exactly 1 cover image
+cover_url = upload_image("./cover.png")
+
+# Publish article with cover
+resp = requests.post(
+    f"{BASE_V1}/content/add",
+    headers=HEADERS,
+    json={
+        "contentType": 2,
+        "title": "Market Report Q2",
+        "bodyTextOnly": "# Overview\\n\\nDetailed market analysis for Q2...",
+        "cover": cover_url
+    }
+)
+
+data = resp.json()
+if data["code"] == "000000":
+    print("Success!")
+    print(f"ID:   {data['data']['id'] or 'unavailable'}")
+    print(f"Link: {data['data']['shareLink'] or 'unavailable'}")
+else:
+    print(f"Error [{data['code']}]: {data['message']}")`
+  },
+  {
+    id: "video",
+    label: "Video Post",
+    badge: "VIDEO",
+    desc: "Video + auto cover (needs ffmpeg)",
+    ep: "/image/presignedUrl → /content/add",
+    code:
+`import os
+import time
+import subprocess
+import mimetypes
+import requests
+
+# Requirements: pip install requests
+# System deps:  ffmpeg must be installed and in PATH
+
+API_KEY    = "YOUR_SQUARE_API_KEY"
+VIDEO_PATH = "./my_video.mp4"
+VIDEO_DUR  = 7.5          # seconds — or detect with ffprobe
+POST_TEXT  = "My crypto analysis"
+COVER_TMP  = "/tmp/sq_cover.jpg"
+
+BASE_V1 = "https://www.binance.com/bapi/composite/v1/public/pgc/openApi"
+BASE_V2 = "https://www.binance.com/bapi/composite/v2/public/pgc/openApi"
+
+HEADERS = {
+    "X-Square-OpenAPI-Key": API_KEY,
+    "Content-Type": "application/json",
+    "clienttype": "binanceSkill"
+}
+
+
+def upload_file(file_path):
+    name = os.path.basename(file_path)
+    r = requests.post(f"{BASE_V2}/image/presignedUrl", headers=HEADERS,
+                      json={"imageName": name})
+    d = r.json()
+    if d["code"] != "000000":
+        raise RuntimeError(f"Error [{d['code']}]: {d['message']}")
+    presigned_url = d["data"]["presignedUrl"]
+    file_ticket   = d["data"]["fileTicket"]
+    ctype = mimetypes.guess_type(file_path)[0] or "application/octet-stream"
+    with open(file_path, "rb") as f:
+        requests.put(presigned_url, data=f, headers={"Content-Type": ctype})
+    print(f"  Uploaded {name}, polling status...")
+    for attempt in range(10):
+        r = requests.post(f"{BASE_V2}/image/imageStatus", headers=HEADERS,
+                          json={"fileTicket": file_ticket})
+        st = r.json()["data"]
+        if st["status"] == 1:
+            print(f"  Ready: {st['imageUrl']}")
+            return st["imageUrl"]
+        elif st["status"] == 2:
+            raise RuntimeError(f"Processing failed: {st['failedReason']}")
+        print(f"  Processing... ({attempt + 1}/10)")
+        time.sleep(3)
+    raise TimeoutError("Timed out waiting for processing")
+
+
+# Extract first frame as cover using ffmpeg
+subprocess.run(
+    ["ffmpeg", "-y", "-i", VIDEO_PATH, "-frames:v", "1", COVER_TMP],
+    check=True, capture_output=True
+)
+print("Cover frame extracted.")
+
+video_url = upload_file(VIDEO_PATH)
+cover_url  = upload_file(COVER_TMP)
+
+resp = requests.post(
+    f"{BASE_V1}/content/add",
+    headers=HEADERS,
+    json={
+        "contentType": 1,
+        "bodyTextOnly": POST_TEXT,
+        "duration": VIDEO_DUR,
+        "cover": cover_url,
+        "videoList": [video_url]
+    }
+)
+
+data = resp.json()
+if data["code"] == "000000":
+    print("Success!")
+    print(f"ID:   {data['data']['id'] or 'unavailable'}")
+    print(f"Link: {data['data']['shareLink'] or 'unavailable'}")
+else:
+    print(f"Error [{data['code']}]: {data['message']}")`
+  },
+];
+
+function openSquareModal() {
+  const overlay = document.getElementById("sq-modal-overlay");
+  overlay.style.display = "flex";
+  const grid = document.getElementById("sq-card-grid");
+  if (!grid.children.length) {
+    SQ_TYPES.forEach(t => {
+      const card = document.createElement("div");
+      card.className = "sq-card";
+      card.id = `sq-card-${t.id}`;
+      card.innerHTML =
+        `<div class="sq-card-type-badge">${t.badge}</div>` +
+        `<div class="sq-card-label">${t.label}</div>` +
+        `<div class="sq-card-desc">${t.desc}</div>` +
+        `<div class="sq-card-ep">${t.ep}</div>`;
+      card.addEventListener("click", () => showSquareCode(t.id));
+      grid.appendChild(card);
+    });
+  }
+}
+
+function closeSquareModal() {
+  document.getElementById("sq-modal-overlay").style.display = "none";
+}
+
+function showSquareCode(id) {
+  const t = SQ_TYPES.find(x => x.id === id);
+  if (!t) return;
+  document.querySelectorAll(".sq-card").forEach(c => c.classList.remove("sq-active"));
+  const card = document.getElementById(`sq-card-${id}`);
+  if (card) card.classList.add("sq-active");
+  document.getElementById("sq-code-title").textContent = t.label;
+  const block = document.getElementById("sq-code-block");
+  block.textContent = t.code;
+  block.removeAttribute("data-highlighted");
+  if (window.hljs) hljs.highlightElement(block);
+  const wrap = document.getElementById("sq-code-wrap");
+  wrap.style.display = "";
+  setTimeout(() => wrap.scrollIntoView({ behavior: "smooth", block: "nearest" }), 50);
+}
+
+function copySquareCode() {
+  const code = document.getElementById("sq-code-block").textContent;
+  navigator.clipboard.writeText(code).then(() => {
+    const btn = document.getElementById("sq-copy-btn");
+    btn.textContent = "Copied!";
+    btn.classList.add("sq-copied");
+    setTimeout(() => { btn.textContent = "Copy"; btn.classList.remove("sq-copied"); }, 2000);
+  });
+}
+
+document.getElementById("ready-tpl-square").addEventListener("click", openSquareModal);
+
 render();
 </script>
+
+<!-- ── Binance Square Modal ──────────────────────────────────────── -->
+<div id="sq-modal-overlay" style="display:none;" onclick="if(event.target===this)closeSquareModal()">
+  <div id="sq-modal">
+    <div class="sq-modal-header">
+      <div>
+        <h2>Binance Square API</h2>
+        <p>Select a post type to view the Python example</p>
+      </div>
+      <button class="sq-close-btn" onclick="closeSquareModal()">&#x2715;</button>
+    </div>
+    <div class="sq-card-grid" id="sq-card-grid"></div>
+    <div id="sq-code-wrap" style="display:none;">
+      <div class="sq-code-header">
+        <div>
+          <span class="sq-code-title" id="sq-code-title"></span>
+          <span class="sq-code-lang">Python &middot; requests</span>
+        </div>
+        <button class="sq-copy-btn" id="sq-copy-btn" onclick="copySquareCode()">Copy</button>
+      </div>
+      <pre><code id="sq-code-block" class="language-python"></code></pre>
+    </div>
+  </div>
+</div>
 </body>
 </html>
