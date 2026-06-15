@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Binance API Code Generator v202606151910</title>
+  <title>Binance API Code Generator v202606151935</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1079,7 +1079,7 @@
 <header>
   <div class="logo">B</div>
   <div>
-    <h1>Binance API Code Generator <span style="font-size:0.55em;opacity:0.5;font-weight:400">v202606151910</span></h1>
+    <h1>Binance API Code Generator <span style="font-size:0.55em;opacity:0.5;font-weight:400">v202606151935</span></h1>
     <p>Signed REST, WebSocket, and User Data Stream examples — with optional Binance docs import for REST.</p>
   </div>
 </header>
@@ -1100,6 +1100,7 @@
         <option value="rest">REST API</option>
         <option value="ws">WebSocket API</option>
         <option value="uds">User Data Stream</option>
+        <option value="announcement">Announcement WS</option>
       </select>
     </div>
 
@@ -1164,6 +1165,7 @@
         <div class="ready-templates-body">
           <button type="button" class="ready-template-btn" id="ready-tpl-travel-withdraw" data-doc-url="https://developers.binance.com/docs/wallet/travel-rule/withdraw" title="Withdraw (Travel Rule) — POST /sapi/v1/localentity/withdraw/apply">Travel Rule · Withdraw</button>
           <button type="button" class="ready-template-btn" id="ready-tpl-travel-deposit-v2" data-doc-url="https://developers.binance.com/docs/wallet/travel-rule/deposit-provide-info-v2" title="Submit Deposit Questionnaire V2 — PUT /sapi/v2/localentity/deposit/provide-info">Deposit Questionnaire V2</button>
+          <button type="button" class="ready-template-btn" id="ready-tpl-announcement" title="Announcement WebSocket — wss://api.binance.com/sapi/wss">Announcement WS</button>
         </div>
       </div>
     </div>
@@ -1357,14 +1359,19 @@ const ENDPOINTS = {
     testnet: {
       spot: 'wss://demo-ws-api.binance.com'
     }
+  },
+  announcement: {
+    mainnet: { spot: 'wss://api.binance.com/sapi/wss' },
+    testnet: {}
   }
 };
 
 // Markets available per apitype+env combo
 const MARKET_AVAILABLE = {
-  rest: { mainnet: ['spot','usdm','coinm','portfolio','options'], testnet: ['spot','usdm','coinm'] },
-  ws:   { mainnet: ['spot','usdm','coinm'],                       testnet: ['spot','usdm','coinm'] },
-  uds:  { mainnet: ['spot','usdm','coinm','portfolio','options'],   testnet: ['spot'] }
+  rest:         { mainnet: ['spot','usdm','coinm','portfolio','options'], testnet: ['spot','usdm','coinm'] },
+  ws:           { mainnet: ['spot','usdm','coinm'],                       testnet: ['spot','usdm','coinm'] },
+  uds:          { mainnet: ['spot','usdm','coinm','portfolio','options'],   testnet: ['spot'] },
+  announcement: { mainnet: ['spot'],                                       testnet: [] }
 };
 
 /* ── WS method names per market ────────────────────────────────────── */
@@ -4844,6 +4851,1314 @@ REQUEST='{"id":"1","method":"'\${METHOD}'","params":{}}'
 
 # session.logon then send actual request
 (echo "\$LOGON"; sleep 1; echo "\$REQUEST"; sleep 1) | websocat "\$BASE_URL"`;
+
+/* ════════════════════════════════════════════════════════════════════
+   Announcement WebSocket Templates
+   URL:    wss://api.binance.com/sapi/wss?{signed_params}
+   Header: X-MBX-APIKEY: {api_key}
+   Params: random (32-char), topic, recvWindow, timestamp + signature
+   Ping every 30 s — just receive in a loop, no session.logon
+═══════════════════════════════════════════════════════════════════ */
+const T_announcement = { hmac: {}, ed25519: {}, rsa: {} };
+
+/* ── Announcement · HMAC ─────────────────────────────────────────── */
+T_announcement.hmac.python = `import websocket
+import time, hashlib, hmac as _hmac, random, string, threading
+from urllib.parse import urlencode
+
+API_KEY    = "YOUR_API_KEY"
+API_SECRET = "YOUR_API_SECRET"
+TOPIC      = "com_announcement_en"
+
+def signed_querystring():
+    params = {
+        "random":     ''.join(random.sample(string.ascii_letters + string.digits, 32)),
+        "topic":      TOPIC,
+        "recvWindow": 60000,
+        "timestamp":  round(time.time() * 1000),
+    }
+    qs  = urlencode(params)
+    sig = _hmac.new(API_SECRET.encode(), qs.encode(), hashlib.sha256).hexdigest()
+    return qs + "&signature=" + sig
+
+def ping_loop(ws):
+    while True:
+        time.sleep(30)
+        try:
+            ws.ping()
+        except Exception as e:
+            print(f"Ping error: {e}"); break
+
+ws = websocket.WebSocket()
+ws.connect(f"wss://api.binance.com/sapi/wss?{signed_querystring()}",
+           header=[f"X-MBX-APIKEY:{API_KEY}"])
+threading.Thread(target=ping_loop, args=(ws,), daemon=True).start()
+print("Connected. Listening for announcements...")
+while True:
+    print(ws.recv())`;
+
+T_announcement.hmac.javascript = `const crypto    = require("crypto");
+const WebSocket = require("ws");
+
+const API_KEY    = "YOUR_API_KEY";
+const API_SECRET = "YOUR_API_SECRET";
+const TOPIC      = "com_announcement_en";
+
+function signedQs() {
+    const rand   = crypto.randomBytes(16).toString("hex");  // 32 hex chars
+    const params = new URLSearchParams({ random: rand, topic: TOPIC, recvWindow: "60000", timestamp: String(Date.now()) });
+    const qs     = params.toString();
+    const sig    = crypto.createHmac("sha256", API_SECRET).update(qs).digest("hex");
+    return qs + "&signature=" + sig;
+}
+
+const ws = new WebSocket(\`wss://api.binance.com/sapi/wss?\${signedQs()}\`, {
+    headers: { "X-MBX-APIKEY": API_KEY }
+});
+
+setInterval(() => { if (ws.readyState === WebSocket.OPEN) ws.ping(); }, 30000);
+ws.on("open",    ()     => console.log("Connected. Listening for announcements..."));
+ws.on("message", (data) => console.log(data.toString()));
+ws.on("error",   (err)  => console.error(err));
+ws.on("close",   ()     => console.log("Connection closed"));`;
+
+T_announcement.hmac.typescript = `import * as crypto from "crypto";
+import WebSocket from "ws";
+
+const API_KEY:    string = "YOUR_API_KEY";
+const API_SECRET: string = "YOUR_API_SECRET";
+const TOPIC:      string = "com_announcement_en";
+
+function signedQs(): string {
+    const rand   = crypto.randomBytes(16).toString("hex");
+    const params = new URLSearchParams({ random: rand, topic: TOPIC, recvWindow: "60000", timestamp: String(Date.now()) });
+    const qs     = params.toString();
+    const sig    = crypto.createHmac("sha256", API_SECRET).update(qs).digest("hex");
+    return qs + "&signature=" + sig;
+}
+
+const ws = new WebSocket(\`wss://api.binance.com/sapi/wss?\${signedQs()}\`, {
+    headers: { "X-MBX-APIKEY": API_KEY }
+});
+
+setInterval(() => { if (ws.readyState === WebSocket.OPEN) ws.ping(); }, 30000);
+ws.on("open",    ()                    => console.log("Connected. Listening for announcements..."));
+ws.on("message", (data: WebSocket.RawData) => console.log(data.toString()));
+ws.on("error",   (err: Error)          => console.error(err));
+ws.on("close",   ()                    => console.log("Connection closed"));`;
+
+T_announcement.hmac.java = `import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.net.URI;
+import java.net.http.*;
+import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
+import java.util.concurrent.*;
+
+public class AnnouncementWs {
+    static final String API_KEY    = "YOUR_API_KEY";
+    static final String API_SECRET = "YOUR_API_SECRET";
+    static final String TOPIC      = "com_announcement_en";
+
+    static String randomStr(int n) {
+        final String CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        SecureRandom rng = new SecureRandom();
+        StringBuilder sb = new StringBuilder(n);
+        for (int i = 0; i < n; i++) sb.append(CHARS.charAt(rng.nextInt(CHARS.length())));
+        return sb.toString();
+    }
+
+    static String hmacHex(String secret, String data) throws Exception {
+        Mac mac = Mac.getInstance("HmacSHA256");
+        mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+        byte[] raw = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
+        StringBuilder sb = new StringBuilder();
+        for (byte b : raw) sb.append(String.format("%02x", b));
+        return sb.toString();
+    }
+
+    public static void main(String[] args) throws Exception {
+        String qs  = "random=" + randomStr(32) + "&topic=" + TOPIC + "&recvWindow=60000&timestamp=" + System.currentTimeMillis();
+        String sig = hmacHex(API_SECRET, qs);
+        String url = "wss://api.binance.com/sapi/wss?" + qs + "&signature=" + sig;
+
+        HttpClient client = HttpClient.newHttpClient();
+        ScheduledExecutorService sched = Executors.newSingleThreadScheduledExecutor();
+        client.newWebSocketBuilder()
+            .header("X-MBX-APIKEY", API_KEY)
+            .buildAsync(URI.create(url), new WebSocket.Listener() {
+                StringBuilder buf = new StringBuilder();
+                public void onOpen(WebSocket ws) {
+                    System.out.println("Connected. Listening for announcements...");
+                    ws.request(1);
+                    sched.scheduleAtFixedRate(
+                        () -> ws.sendPing(java.nio.ByteBuffer.allocate(0)), 30, 30, TimeUnit.SECONDS);
+                }
+                public CompletionStage<?> onText(WebSocket ws, CharSequence data, boolean last) {
+                    buf.append(data);
+                    if (last) { System.out.println(buf); buf.setLength(0); }
+                    ws.request(1); return null;
+                }
+                public CompletionStage<?> onClose(WebSocket ws, int status, String reason) {
+                    System.out.println("Closed: " + status + " " + reason); sched.shutdown(); return null;
+                }
+            }).join();
+        Thread.currentThread().join();
+    }
+}`;
+
+T_announcement.hmac.go = `package main
+
+import (
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
+	"log"
+	"math/big"
+	"net/http"
+	"time"
+
+	"github.com/gorilla/websocket"
+)
+
+const (
+	apiKey    = "YOUR_API_KEY"
+	apiSecret = "YOUR_API_SECRET"
+	topic     = "com_announcement_en"
+)
+
+func randomStr(n int) string {
+	const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+	b := make([]byte, n)
+	for i := range b {
+		idx, _ := rand.Int(rand.Reader, big.NewInt(int64(len(chars))))
+		b[i] = chars[idx.Int64()]
+	}
+	return string(b)
+}
+
+func hmacHex(secret, data string) string {
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(data))
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
+func main() {
+	ts  := time.Now().UnixMilli()
+	qs  := fmt.Sprintf("random=%s&topic=%s&recvWindow=60000&timestamp=%d", randomStr(32), topic, ts)
+	sig := hmacHex(apiSecret, qs)
+	url := "wss://api.binance.com/sapi/wss?" + qs + "&signature=" + sig
+
+	conn, _, err := websocket.DefaultDialer.Dial(url, http.Header{"X-MBX-APIKEY": {apiKey}})
+	if err != nil { log.Fatal("Dial:", err) }
+	defer conn.Close()
+
+	go func() {
+		for range time.Tick(30 * time.Second) {
+			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil { return }
+		}
+	}()
+
+	fmt.Println("Connected. Listening for announcements...")
+	for {
+		_, msg, err := conn.ReadMessage()
+		if err != nil { log.Println("Read:", err); break }
+		fmt.Println(string(msg))
+	}
+}`;
+
+T_announcement.hmac.csharp = `using System;
+using System.Net.WebSockets;
+using System.Security.Cryptography;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+
+class AnnouncementWs {
+    const string API_KEY    = "YOUR_API_KEY";
+    const string API_SECRET = "YOUR_API_SECRET";
+    const string TOPIC      = "com_announcement_en";
+
+    static string RandomStr(int n) {
+        const string C = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        var sb = new StringBuilder(n);
+        var buf = new byte[1];
+        using var rng = RandomNumberGenerator.Create();
+        while (sb.Length < n) { rng.GetBytes(buf); int i = buf[0] % C.Length; sb.Append(C[i]); }
+        return sb.ToString();
+    }
+
+    static string HmacHex(string key, string data) {
+        using var mac = new HMACSHA256(Encoding.UTF8.GetBytes(key));
+        return BitConverter.ToString(mac.ComputeHash(Encoding.UTF8.GetBytes(data))).Replace("-","").ToLower();
+    }
+
+    static async Task Main() {
+        long ts  = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        string qs  = $"random={RandomStr(32)}&topic={TOPIC}&recvWindow=60000&timestamp={ts}";
+        string sig = HmacHex(API_SECRET, qs);
+        string url = $"wss://api.binance.com/sapi/wss?{qs}&signature={sig}";
+
+        var ws = new ClientWebSocket();
+        ws.Options.SetRequestHeader("X-MBX-APIKEY", API_KEY);
+        await ws.ConnectAsync(new Uri(url), CancellationToken.None);
+        Console.WriteLine("Connected. Listening for announcements...");
+
+        _ = Task.Run(async () => {
+            while (ws.State == WebSocketState.Open) {
+                await Task.Delay(30000);
+                await ws.SendAsync(Array.Empty<byte>(), WebSocketMessageType.Binary, true, CancellationToken.None);
+            }
+        });
+
+        var buf = new byte[65536];
+        while (ws.State == WebSocketState.Open) {
+            var r = await ws.ReceiveAsync(buf, CancellationToken.None);
+            Console.WriteLine(Encoding.UTF8.GetString(buf, 0, r.Count));
+        }
+    }
+}`;
+
+T_announcement.hmac.php = `<?php
+// composer require textalk/websocket
+require "vendor/autoload.php";
+use WebSocket\\Client;
+
+$API_KEY    = "YOUR_API_KEY";
+$API_SECRET = "YOUR_API_SECRET";
+$TOPIC      = "com_announcement_en";
+
+function randomStr(int $n): string {
+    $c = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    $r = "";
+    for ($i = 0; $i < $n; $i++) $r .= $c[random_int(0, strlen($c) - 1)];
+    return $r;
+}
+
+$ts  = (int)round(microtime(true) * 1000);
+$qs  = "random=" . randomStr(32) . "&topic=$TOPIC&recvWindow=60000&timestamp=$ts";
+$sig = hash_hmac("sha256", $qs, $API_SECRET);
+$url = "wss://api.binance.com/sapi/wss?{$qs}&signature={$sig}";
+
+$ws = new Client($url, ["headers" => ["X-MBX-APIKEY" => $API_KEY]]);
+echo "Connected. Listening for announcements...\\n";
+while (true) {
+    echo $ws->receive() . "\\n";
+}`;
+
+T_announcement.hmac.ruby = `# gem install websocket-client-simple
+require "websocket-client-simple"
+require "openssl"
+require "securerandom"
+
+API_KEY    = "YOUR_API_KEY"
+API_SECRET = "YOUR_API_SECRET"
+TOPIC      = "com_announcement_en"
+
+ts  = (Time.now.to_f * 1000).round
+rnd = SecureRandom.alphanumeric(32)
+qs  = "random=#{rnd}&topic=#{TOPIC}&recvWindow=60000&timestamp=#{ts}"
+sig = OpenSSL::HMAC.hexdigest("SHA256", API_SECRET, qs)
+url = "wss://api.binance.com/sapi/wss?#{qs}&signature=#{sig}"
+
+ws = WebSocket::Client::Simple.connect(url, headers: { "X-MBX-APIKEY" => API_KEY })
+
+Thread.new { loop { sleep 30; ws.send("", type: :ping) } }
+
+ws.on(:open)    { puts "Connected. Listening for announcements..." }
+ws.on(:message) { |m| puts m.data }
+ws.on(:error)   { |e| puts "Error: #{e.message}" }
+ws.on(:close)   { puts "Closed"; exit }
+loop {}`;
+
+T_announcement.hmac.rust = `// Cargo.toml:
+// tungstenite = { version = "0.24", features = ["native-tls"] }
+// hmac = "0.12"  |  sha2 = "0.10"  |  hex = "0.4"  |  rand = "0.8"
+use hmac::{Hmac, Mac};
+use rand::Rng;
+use sha2::Sha256;
+use std::time::{SystemTime, UNIX_EPOCH};
+use tungstenite::{connect, http::Request, Message};
+
+type HmacSha256 = Hmac<Sha256>;
+
+fn random_str(n: usize) -> String {
+    const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    let mut rng = rand::thread_rng();
+    (0..n).map(|_| CHARS[rng.gen_range(0..CHARS.len())] as char).collect()
+}
+
+fn main() {
+    let api_key    = "YOUR_API_KEY";
+    let api_secret = "YOUR_API_SECRET";
+    let topic      = "com_announcement_en";
+    let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
+
+    let qs = format!("random={}&topic={}&recvWindow=60000&timestamp={}", random_str(32), topic, ts);
+    let mut mac = HmacSha256::new_from_slice(api_secret.as_bytes()).unwrap();
+    mac.update(qs.as_bytes());
+    let sig = hex::encode(mac.finalize().into_bytes());
+    let url = format!("wss://api.binance.com/sapi/wss?{}&signature={}", qs, sig);
+
+    let req = Request::builder().uri(&url).header("X-MBX-APIKEY", api_key).body(()).unwrap();
+    let (mut ws, _) = connect(req).expect("connect failed");
+    println!("Connected. Listening for announcements...");
+
+    loop {
+        match ws.read() {
+            Ok(Message::Text(t))  => println!("{}", t),
+            Ok(Message::Ping(d))  => { ws.send(Message::Pong(d)).unwrap(); }
+            Ok(Message::Close(_)) => { println!("Closed"); break; }
+            Err(e) => { eprintln!("Error: {}", e); break; }
+            _ => {}
+        }
+    }
+}`;
+
+T_announcement.hmac.cpp = `// Install IXWebSocket: https://github.com/machinezone/IXWebSocket
+// Compile: g++ -std=c++17 main.cpp -lixwebsocket -lssl -lcrypto -lpthread
+#include <ixwebsocket/IXWebSocket.h>
+#include <openssl/hmac.h>
+#include <iostream>
+#include <sstream>
+#include <iomanip>
+#include <chrono>
+#include <random>
+#include <string>
+
+std::string randomStr(int n) {
+    static const char C[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    std::mt19937 rng(std::random_device{}());
+    std::uniform_int_distribution<> dist(0, sizeof(C) - 2);
+    std::string s(n, ' ');
+    for (auto& c : s) c = C[dist(rng)];
+    return s;
+}
+
+std::string hmacHex(const std::string& key, const std::string& data) {
+    unsigned char out[32]; unsigned int len = 32;
+    HMAC(EVP_sha256(), key.c_str(), (int)key.size(),
+         (unsigned char*)data.c_str(), (int)data.size(), out, &len);
+    std::ostringstream ss;
+    for (int i = 0; i < 32; i++) ss << std::hex << std::setw(2) << std::setfill('0') << (int)out[i];
+    return ss.str();
+}
+
+int main() {
+    const std::string API_KEY    = "YOUR_API_KEY";
+    const std::string API_SECRET = "YOUR_API_SECRET";
+    const std::string TOPIC      = "com_announcement_en";
+    auto ts = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+
+    std::string qs  = "random=" + randomStr(32) + "&topic=" + TOPIC + "&recvWindow=60000&timestamp=" + std::to_string(ts);
+    std::string url = "wss://api.binance.com/sapi/wss?" + qs + "&signature=" + hmacHex(API_SECRET, qs);
+
+    ix::WebSocket ws;
+    ws.setUrl(url);
+    ws.setExtraHeaders({ {"X-MBX-APIKEY", API_KEY} });
+    ws.setPingInterval(30);
+    ws.setOnMessageCallback([](const ix::WebSocketMessagePtr& msg) {
+        if (msg->type == ix::WebSocketMessageType::Open)
+            std::cout << "Connected. Listening for announcements...\\n";
+        else if (msg->type == ix::WebSocketMessageType::Message)
+            std::cout << msg->str << "\\n";
+        else if (msg->type == ix::WebSocketMessageType::Error)
+            std::cerr << msg->errorInfo.reason << "\\n";
+    });
+    ws.start();
+    while (true) std::this_thread::sleep_for(std::chrono::seconds(1));
+}`;
+
+T_announcement.hmac.bash = `#!/bin/bash
+# Requires: websocat, openssl, python3
+API_KEY="YOUR_API_KEY"
+API_SECRET="YOUR_API_SECRET"
+TOPIC="com_announcement_en"
+
+RAND=$(python3 -c "import random,string; print(''.join(random.sample(string.ascii_letters+string.digits,32)))")
+TS=$(python3 -c "import time; print(round(time.time()*1000))")
+QS="random=\${RAND}&topic=\${TOPIC}&recvWindow=60000&timestamp=\${TS}"
+SIG=$(printf '%s' "\$QS" | openssl dgst -sha256 -hmac "\$API_SECRET" | awk '{print $2}')
+URL="wss://api.binance.com/sapi/wss?\${QS}&signature=\${SIG}"
+
+echo "Connecting..."
+websocat --header "X-MBX-APIKEY:\${API_KEY}" "\$URL"`;
+
+/* ── Announcement · Ed25519 ──────────────────────────────────────── */
+T_announcement.ed25519.python = `import websocket
+import time, base64, random, string, threading
+from urllib.parse import urlencode, quote
+from cryptography.hazmat.primitives.serialization import load_pem_private_key
+
+API_KEY = "YOUR_API_KEY"
+TOPIC   = "com_announcement_en"
+
+with open("ed25519_private.pem", "rb") as f:
+    private_key = load_pem_private_key(f.read(), password=None)
+
+def signed_querystring():
+    params = {
+        "random":     ''.join(random.sample(string.ascii_letters + string.digits, 32)),
+        "topic":      TOPIC,
+        "recvWindow": 60000,
+        "timestamp":  round(time.time() * 1000),
+    }
+    qs  = urlencode(params)
+    sig = quote(base64.b64encode(private_key.sign(qs.encode("utf-8"))).decode(), safe="")
+    return qs + "&signature=" + sig
+
+def ping_loop(ws):
+    while True:
+        time.sleep(30)
+        try:
+            ws.ping()
+        except Exception as e:
+            print(f"Ping error: {e}"); break
+
+ws = websocket.WebSocket()
+ws.connect(f"wss://api.binance.com/sapi/wss?{signed_querystring()}",
+           header=[f"X-MBX-APIKEY:{API_KEY}"])
+threading.Thread(target=ping_loop, args=(ws,), daemon=True).start()
+print("Connected. Listening for announcements...")
+while True:
+    print(ws.recv())`;
+
+T_announcement.ed25519.javascript = `const crypto    = require("crypto");
+const fs        = require("fs");
+const WebSocket = require("ws");
+
+const API_KEY    = "YOUR_API_KEY";
+const TOPIC      = "com_announcement_en";
+const privateKey = crypto.createPrivateKey(fs.readFileSync("ed25519_private.pem"));
+
+function signedQs() {
+    const rand   = crypto.randomBytes(16).toString("hex");
+    const params = new URLSearchParams({ random: rand, topic: TOPIC, recvWindow: "60000", timestamp: String(Date.now()) });
+    const qs     = params.toString();
+    const sig    = encodeURIComponent(crypto.sign(null, Buffer.from(qs), privateKey).toString("base64"));
+    return qs + "&signature=" + sig;
+}
+
+const ws = new WebSocket(\`wss://api.binance.com/sapi/wss?\${signedQs()}\`, {
+    headers: { "X-MBX-APIKEY": API_KEY }
+});
+
+setInterval(() => { if (ws.readyState === WebSocket.OPEN) ws.ping(); }, 30000);
+ws.on("open",    ()     => console.log("Connected. Listening for announcements..."));
+ws.on("message", (data) => console.log(data.toString()));
+ws.on("error",   (err)  => console.error(err));
+ws.on("close",   ()     => console.log("Connection closed"));`;
+
+T_announcement.ed25519.typescript = `import * as crypto from "crypto";
+import * as fs     from "fs";
+import WebSocket   from "ws";
+
+const API_KEY:    string = "YOUR_API_KEY";
+const TOPIC:      string = "com_announcement_en";
+const privateKey = crypto.createPrivateKey(fs.readFileSync("ed25519_private.pem"));
+
+function signedQs(): string {
+    const rand   = crypto.randomBytes(16).toString("hex");
+    const params = new URLSearchParams({ random: rand, topic: TOPIC, recvWindow: "60000", timestamp: String(Date.now()) });
+    const qs     = params.toString();
+    const sig    = encodeURIComponent(crypto.sign(null, Buffer.from(qs), privateKey).toString("base64"));
+    return qs + "&signature=" + sig;
+}
+
+const ws = new WebSocket(\`wss://api.binance.com/sapi/wss?\${signedQs()}\`, {
+    headers: { "X-MBX-APIKEY": API_KEY }
+});
+
+setInterval(() => { if (ws.readyState === WebSocket.OPEN) ws.ping(); }, 30000);
+ws.on("open",    ()                         => console.log("Connected. Listening for announcements..."));
+ws.on("message", (data: WebSocket.RawData)  => console.log(data.toString()));
+ws.on("error",   (err: Error)               => console.error(err));
+ws.on("close",   ()                         => console.log("Connection closed"));`;
+
+T_announcement.ed25519.java = `import java.net.URI;
+import java.net.http.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.security.*;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.util.Base64;
+import java.util.concurrent.*;
+
+public class AnnouncementWsEd25519 {
+    static final String API_KEY = "YOUR_API_KEY";
+    static final String TOPIC   = "com_announcement_en";
+
+    static String randomStr(int n) {
+        final String C = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        SecureRandom rng = new SecureRandom(); StringBuilder sb = new StringBuilder(n);
+        for (int i = 0; i < n; i++) sb.append(C.charAt(rng.nextInt(C.length())));
+        return sb.toString();
+    }
+
+    public static void main(String[] args) throws Exception {
+        // Load Ed25519 private key (PKCS#8 DER, strip PEM headers then Base64-decode)
+        String pem = new String(Files.readAllBytes(Paths.get("ed25519_private.pem")))
+            .replaceAll("-----.*-----", "").replaceAll("\\\\s", "");
+        byte[] der = Base64.getDecoder().decode(pem);
+        KeyFactory kf = KeyFactory.getInstance("Ed25519");
+        PrivateKey privKey = kf.generatePrivate(new PKCS8EncodedKeySpec(der));
+
+        String qs = "random=" + randomStr(32) + "&topic=" + TOPIC + "&recvWindow=60000&timestamp=" + System.currentTimeMillis();
+        Signature signer = Signature.getInstance("Ed25519");
+        signer.initSign(privKey);
+        signer.update(qs.getBytes(StandardCharsets.UTF_8));
+        String sig = java.net.URLEncoder.encode(Base64.getEncoder().encodeToString(signer.sign()), "UTF-8");
+        String url = "wss://api.binance.com/sapi/wss?" + qs + "&signature=" + sig;
+
+        ScheduledExecutorService sched = Executors.newSingleThreadScheduledExecutor();
+        HttpClient.newHttpClient().newWebSocketBuilder()
+            .header("X-MBX-APIKEY", API_KEY)
+            .buildAsync(URI.create(url), new WebSocket.Listener() {
+                StringBuilder buf = new StringBuilder();
+                public void onOpen(WebSocket ws) {
+                    System.out.println("Connected. Listening for announcements..."); ws.request(1);
+                    sched.scheduleAtFixedRate(() -> ws.sendPing(java.nio.ByteBuffer.allocate(0)), 30, 30, TimeUnit.SECONDS);
+                }
+                public CompletionStage<?> onText(WebSocket ws, CharSequence data, boolean last) {
+                    buf.append(data);
+                    if (last) { System.out.println(buf); buf.setLength(0); }
+                    ws.request(1); return null;
+                }
+                public CompletionStage<?> onClose(WebSocket ws, int s, String r) {
+                    System.out.println("Closed: " + s); sched.shutdown(); return null;
+                }
+            }).join();
+        Thread.currentThread().join();
+    }
+}`;
+
+T_announcement.ed25519.go = `package main
+
+import (
+	"crypto/rand"
+	"crypto/ed25519"
+	"encoding/base64"
+	"encoding/pem"
+	"fmt"
+	"log"
+	"math/big"
+	"net/http"
+	"net/url"
+	"os"
+	"time"
+
+	"github.com/gorilla/websocket"
+	"golang.org/x/crypto/cryptobyte"
+)
+
+const (
+	apiKey = "YOUR_API_KEY"
+	topic  = "com_announcement_en"
+)
+
+func randomStr(n int) string {
+	const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+	b := make([]byte, n)
+	for i := range b {
+		idx, _ := rand.Int(rand.Reader, big.NewInt(int64(len(chars))))
+		b[i] = chars[idx.Int64()]
+	}
+	return string(b)
+}
+
+func main() {
+	pemBytes, _ := os.ReadFile("ed25519_private.pem")
+	block, _ := pem.Decode(pemBytes)
+	_ = cryptobyte.String(block.Bytes) // suppress unused import; use crypto/x509 in practice
+	// For a proper PKCS#8 Ed25519 key use: privKey, _ := x509.ParsePKCS8PrivateKey(block.Bytes)
+	privKey := ed25519.NewKeyFromSeed(block.Bytes[len(block.Bytes)-32:]) // simplified — use x509.ParsePKCS8PrivateKey
+
+	ts  := time.Now().UnixMilli()
+	qs  := fmt.Sprintf("random=%s&topic=%s&recvWindow=60000&timestamp=%d", randomStr(32), topic, ts)
+	sig := url.QueryEscape(base64.StdEncoding.EncodeToString(ed25519.Sign(privKey, []byte(qs))))
+	rawURL := "wss://api.binance.com/sapi/wss?" + qs + "&signature=" + sig
+
+	conn, _, err := websocket.DefaultDialer.Dial(rawURL, http.Header{"X-MBX-APIKEY": {apiKey}})
+	if err != nil { log.Fatal(err) }
+	defer conn.Close()
+
+	go func() {
+		for range time.Tick(30 * time.Second) {
+			conn.WriteMessage(websocket.PingMessage, nil)
+		}
+	}()
+
+	fmt.Println("Connected. Listening for announcements...")
+	for {
+		_, msg, err := conn.ReadMessage()
+		if err != nil { log.Println(err); break }
+		fmt.Println(string(msg))
+	}
+}`;
+
+T_announcement.ed25519.csharp = `// dotnet add package BouncyCastle.Cryptography
+using Org.BouncyCastle.Crypto.Parameters;
+using Org.BouncyCastle.Crypto.Signers;
+using Org.BouncyCastle.OpenSsl;
+using System;
+using System.Net.WebSockets;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using System.IO;
+
+class AnnouncementWsEd25519 {
+    const string API_KEY = "YOUR_API_KEY";
+    const string TOPIC   = "com_announcement_en";
+
+    static string RandomStr(int n) {
+        const string C = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        var sb = new StringBuilder(n); var buf = new byte[1];
+        using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
+        while (sb.Length < n) { rng.GetBytes(buf); sb.Append(C[buf[0] % C.Length]); }
+        return sb.ToString();
+    }
+
+    static async Task Main() {
+        var reader  = new PemReader(new StringReader(File.ReadAllText("ed25519_private.pem")));
+        var keyPair = (Org.BouncyCastle.Crypto.AsymmetricCipherKeyPair)reader.ReadObject();
+        var signer  = new Ed25519Signer();
+        signer.Init(true, (Ed25519PrivateKeyParameters)keyPair.Private);
+
+        long ts  = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        string qs = $"random={RandomStr(32)}&topic={TOPIC}&recvWindow=60000&timestamp={ts}";
+        byte[] qs_bytes = Encoding.UTF8.GetBytes(qs);
+        signer.BlockUpdate(qs_bytes, 0, qs_bytes.Length);
+        string sig = Uri.EscapeDataString(Convert.ToBase64String(signer.GenerateSignature()));
+        string url = $"wss://api.binance.com/sapi/wss?{qs}&signature={sig}";
+
+        var ws = new ClientWebSocket();
+        ws.Options.SetRequestHeader("X-MBX-APIKEY", API_KEY);
+        await ws.ConnectAsync(new Uri(url), CancellationToken.None);
+        Console.WriteLine("Connected. Listening for announcements...");
+
+        _ = Task.Run(async () => {
+            while (ws.State == WebSocketState.Open) {
+                await Task.Delay(30000);
+                await ws.SendAsync(Array.Empty<byte>(), WebSocketMessageType.Binary, true, CancellationToken.None);
+            }
+        });
+
+        var buf = new byte[65536];
+        while (ws.State == WebSocketState.Open) {
+            var r = await ws.ReceiveAsync(buf, CancellationToken.None);
+            Console.WriteLine(Encoding.UTF8.GetString(buf, 0, r.Count));
+        }
+    }
+}`;
+
+T_announcement.ed25519.php = `<?php
+// PHP 8.1+ with OpenSSL 3.0+
+// composer require textalk/websocket
+require "vendor/autoload.php";
+use WebSocket\\Client;
+
+$API_KEY    = "YOUR_API_KEY";
+$TOPIC      = "com_announcement_en";
+
+function randomStr(int $n): string {
+    $c = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    $r = ""; for ($i = 0; $i < $n; $i++) $r .= $c[random_int(0, strlen($c)-1)]; return $r;
+}
+
+$privKey = openssl_pkey_get_private(file_get_contents("ed25519_private.pem"));
+$ts  = (int)round(microtime(true) * 1000);
+$qs  = "random=" . randomStr(32) . "&topic=$TOPIC&recvWindow=60000&timestamp=$ts";
+openssl_sign($qs, $rawSig, $privKey, OPENSSL_ALGO_SHA512); // Ed25519 ignores hash arg
+$sig = urlencode(base64_encode($rawSig));
+$url = "wss://api.binance.com/sapi/wss?{$qs}&signature={$sig}";
+
+$ws = new Client($url, ["headers" => ["X-MBX-APIKEY" => $API_KEY]]);
+echo "Connected. Listening for announcements...\\n";
+while (true) { echo $ws->receive() . "\\n"; }`;
+
+T_announcement.ed25519.ruby = `# Ruby 3.1+ with OpenSSL 3.0+
+# gem install websocket-client-simple
+require "websocket-client-simple"
+require "openssl"
+require "base64"
+require "securerandom"
+
+API_KEY  = "YOUR_API_KEY"
+TOPIC    = "com_announcement_en"
+
+pkey = OpenSSL::PKey.read(File.read("ed25519_private.pem"))
+ts   = (Time.now.to_f * 1000).round
+qs   = "random=#{SecureRandom.alphanumeric(32)}&topic=#{TOPIC}&recvWindow=60000&timestamp=#{ts}"
+sig  = URI.encode_www_form_component(Base64.strict_encode64(pkey.sign(nil, qs)))
+url  = "wss://api.binance.com/sapi/wss?#{qs}&signature=#{sig}"
+
+ws = WebSocket::Client::Simple.connect(url, headers: { "X-MBX-APIKEY" => API_KEY })
+Thread.new { loop { sleep 30; ws.send("", type: :ping) } }
+ws.on(:open)    { puts "Connected. Listening for announcements..." }
+ws.on(:message) { |m| puts m.data }
+ws.on(:error)   { |e| puts "Error: #{e.message}" }
+ws.on(:close)   { puts "Closed"; exit }
+loop {}`;
+
+T_announcement.ed25519.rust = `// Cargo.toml:
+// tungstenite = { version = "0.24", features = ["native-tls"] }
+// openssl = "0.10"  |  base64 = "0.22"  |  rand = "0.8"
+use base64::{engine::general_purpose::STANDARD, Engine};
+use openssl::pkey::PKey;
+use rand::Rng;
+use std::time::{SystemTime, UNIX_EPOCH};
+use tungstenite::{connect, http::Request, Message};
+
+fn random_str(n: usize) -> String {
+    const C: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    let mut rng = rand::thread_rng();
+    (0..n).map(|_| C[rng.gen_range(0..C.len())] as char).collect()
+}
+
+fn main() {
+    let api_key = "YOUR_API_KEY";
+    let topic   = "com_announcement_en";
+    let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
+
+    let qs = format!("random={}&topic={}&recvWindow=60000&timestamp={}", random_str(32), topic, ts);
+    let pem = std::fs::read("ed25519_private.pem").unwrap();
+    let pkey = PKey::private_key_from_pem(&pem).unwrap();
+    let mut signer = openssl::sign::Signer::new_without_digest(&pkey).unwrap();
+    let raw_sig = signer.sign_oneshot_to_vec(qs.as_bytes()).unwrap();
+    let sig = urlencoding::encode(&STANDARD.encode(&raw_sig)).into_owned();
+    let url = format!("wss://api.binance.com/sapi/wss?{}&signature={}", qs, sig);
+
+    let req = Request::builder().uri(&url).header("X-MBX-APIKEY", api_key).body(()).unwrap();
+    let (mut ws, _) = connect(req).expect("connect failed");
+    println!("Connected. Listening for announcements...");
+
+    loop {
+        match ws.read() {
+            Ok(Message::Text(t))  => println!("{}", t),
+            Ok(Message::Ping(d))  => { ws.send(Message::Pong(d)).unwrap(); }
+            Ok(Message::Close(_)) => { println!("Closed"); break; }
+            Err(e) => { eprintln!("{}", e); break; }
+            _ => {}
+        }
+    }
+}`;
+
+T_announcement.ed25519.cpp = `// Install IXWebSocket + OpenSSL
+// Compile: g++ -std=c++17 main.cpp -lixwebsocket -lssl -lcrypto -lpthread
+#include <ixwebsocket/IXWebSocket.h>
+#include <openssl/evp.h>
+#include <openssl/pem.h>
+#include <iostream>
+#include <sstream>
+#include <chrono>
+#include <random>
+#include <string>
+#include <vector>
+
+std::string randomStr(int n) {
+    static const char C[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    std::mt19937 rng(std::random_device{}());
+    std::uniform_int_distribution<> d(0, sizeof(C)-2);
+    std::string s(n,' '); for (auto& c : s) c = C[d(rng)]; return s;
+}
+
+std::string base64Encode(const std::vector<unsigned char>& data) {
+    BIO *b64 = BIO_new(BIO_f_base64()), *mem = BIO_new(BIO_s_mem());
+    BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
+    BIO_push(b64, mem); BIO_write(b64, data.data(), (int)data.size()); BIO_flush(b64);
+    char* out; long len = BIO_get_mem_data(mem, &out);
+    std::string r(out, len); BIO_free_all(b64); return r;
+}
+
+std::string urlEncode(const std::string& s) {
+    std::ostringstream oss;
+    for (unsigned char c : s) {
+        if (isalnum(c)||c=='-'||c=='_'||c=='.'||c=='~') oss << c;
+        else oss << '%' << std::hex << std::uppercase << std::setw(2) << std::setfill('0') << (int)c;
+    }
+    return oss.str();
+}
+
+int main() {
+    const std::string API_KEY = "YOUR_API_KEY";
+    const std::string TOPIC   = "com_announcement_en";
+    auto ts = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+
+    std::string qs = "random=" + randomStr(32) + "&topic=" + TOPIC + "&recvWindow=60000&timestamp=" + std::to_string(ts);
+
+    FILE* f = fopen("ed25519_private.pem","r");
+    EVP_PKEY* pkey = PEM_read_PrivateKey(f, nullptr, nullptr, nullptr); fclose(f);
+    EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+    EVP_DigestSignInit(ctx, nullptr, nullptr, nullptr, pkey);
+    size_t sigLen = 0; EVP_DigestSign(ctx, nullptr, &sigLen, (unsigned char*)qs.c_str(), qs.size());
+    std::vector<unsigned char> sig(sigLen);
+    EVP_DigestSign(ctx, sig.data(), &sigLen, (unsigned char*)qs.c_str(), qs.size());
+    EVP_MD_CTX_free(ctx); EVP_PKEY_free(pkey);
+
+    std::string url = "wss://api.binance.com/sapi/wss?" + qs + "&signature=" + urlEncode(base64Encode(sig));
+    ix::WebSocket ws; ws.setUrl(url); ws.setExtraHeaders({ {"X-MBX-APIKEY", API_KEY} }); ws.setPingInterval(30);
+    ws.setOnMessageCallback([](const ix::WebSocketMessagePtr& m) {
+        if (m->type == ix::WebSocketMessageType::Open) std::cout << "Connected.\\n";
+        else if (m->type == ix::WebSocketMessageType::Message) std::cout << m->str << "\\n";
+    });
+    ws.start(); while (true) std::this_thread::sleep_for(std::chrono::seconds(1));
+}`;
+
+T_announcement.ed25519.bash = `#!/bin/bash
+# Requires: websocat, openssl 3.0+, python3
+API_KEY="YOUR_API_KEY"
+TOPIC="com_announcement_en"
+PRIVATE_KEY="ed25519_private.pem"
+
+RAND=$(python3 -c "import random,string; print(''.join(random.sample(string.ascii_letters+string.digits,32)))")
+TS=$(python3 -c "import time; print(round(time.time()*1000))")
+QS="random=\${RAND}&topic=\${TOPIC}&recvWindow=60000&timestamp=\${TS}"
+SIG=$(printf '%s' "\$QS" | openssl pkeyutl -sign -inkey "\$PRIVATE_KEY" | openssl base64 -A | python3 -c "import sys,urllib.parse; print(urllib.parse.quote(sys.stdin.read().strip()))")
+URL="wss://api.binance.com/sapi/wss?\${QS}&signature=\${SIG}"
+
+echo "Connecting..."
+websocat --header "X-MBX-APIKEY:\${API_KEY}" "\$URL"`;
+
+/* ── Announcement · RSA ──────────────────────────────────────────── */
+T_announcement.rsa.python = `import websocket
+import time, base64, random, string, threading
+from urllib.parse import urlencode, quote
+from cryptography.hazmat.primitives.serialization import load_pem_private_key
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives import hashes
+
+API_KEY = "YOUR_API_KEY"
+TOPIC   = "com_announcement_en"
+
+with open("rsa_private.pem", "rb") as f:
+    private_key = load_pem_private_key(f.read(), password=None)
+
+def signed_querystring():
+    params = {
+        "random":     ''.join(random.sample(string.ascii_letters + string.digits, 32)),
+        "topic":      TOPIC,
+        "recvWindow": 60000,
+        "timestamp":  round(time.time() * 1000),
+    }
+    qs  = urlencode(params)
+    sig = quote(base64.b64encode(
+        private_key.sign(qs.encode("utf-8"), padding.PKCS1v15(), hashes.SHA256())
+    ).decode(), safe="")
+    return qs + "&signature=" + sig
+
+def ping_loop(ws):
+    while True:
+        time.sleep(30)
+        try: ws.ping()
+        except Exception as e: print(f"Ping error: {e}"); break
+
+ws = websocket.WebSocket()
+ws.connect(f"wss://api.binance.com/sapi/wss?{signed_querystring()}",
+           header=[f"X-MBX-APIKEY:{API_KEY}"])
+threading.Thread(target=ping_loop, args=(ws,), daemon=True).start()
+print("Connected. Listening for announcements...")
+while True:
+    print(ws.recv())`;
+
+T_announcement.rsa.javascript = `const crypto    = require("crypto");
+const fs        = require("fs");
+const WebSocket = require("ws");
+
+const API_KEY    = "YOUR_API_KEY";
+const TOPIC      = "com_announcement_en";
+const privateKey = crypto.createPrivateKey(fs.readFileSync("rsa_private.pem"));
+
+function signedQs() {
+    const rand   = crypto.randomBytes(16).toString("hex");
+    const params = new URLSearchParams({ random: rand, topic: TOPIC, recvWindow: "60000", timestamp: String(Date.now()) });
+    const qs     = params.toString();
+    const sig    = encodeURIComponent(crypto.sign("sha256", Buffer.from(qs), {
+        key: privateKey, padding: crypto.constants.RSA_PKCS1_PADDING
+    }).toString("base64"));
+    return qs + "&signature=" + sig;
+}
+
+const ws = new WebSocket(\`wss://api.binance.com/sapi/wss?\${signedQs()}\`, {
+    headers: { "X-MBX-APIKEY": API_KEY }
+});
+
+setInterval(() => { if (ws.readyState === WebSocket.OPEN) ws.ping(); }, 30000);
+ws.on("open",    ()     => console.log("Connected. Listening for announcements..."));
+ws.on("message", (data) => console.log(data.toString()));
+ws.on("error",   (err)  => console.error(err));
+ws.on("close",   ()     => console.log("Connection closed"));`;
+
+T_announcement.rsa.typescript = `import * as crypto from "crypto";
+import * as fs     from "fs";
+import WebSocket   from "ws";
+
+const API_KEY:    string = "YOUR_API_KEY";
+const TOPIC:      string = "com_announcement_en";
+const privateKey = crypto.createPrivateKey(fs.readFileSync("rsa_private.pem"));
+
+function signedQs(): string {
+    const rand   = crypto.randomBytes(16).toString("hex");
+    const params = new URLSearchParams({ random: rand, topic: TOPIC, recvWindow: "60000", timestamp: String(Date.now()) });
+    const qs     = params.toString();
+    const sig    = encodeURIComponent(crypto.sign("sha256", Buffer.from(qs), {
+        key: privateKey, padding: crypto.constants.RSA_PKCS1_PADDING
+    }).toString("base64"));
+    return qs + "&signature=" + sig;
+}
+
+const ws = new WebSocket(\`wss://api.binance.com/sapi/wss?\${signedQs()}\`, {
+    headers: { "X-MBX-APIKEY": API_KEY }
+});
+
+setInterval(() => { if (ws.readyState === WebSocket.OPEN) ws.ping(); }, 30000);
+ws.on("open",    ()                         => console.log("Connected. Listening for announcements..."));
+ws.on("message", (data: WebSocket.RawData)  => console.log(data.toString()));
+ws.on("error",   (err: Error)               => console.error(err));
+ws.on("close",   ()                         => console.log("Connection closed"));`;
+
+T_announcement.rsa.java = `import java.net.URI;
+import java.net.http.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.security.*;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.util.Base64;
+import java.util.concurrent.*;
+
+public class AnnouncementWsRsa {
+    static final String API_KEY = "YOUR_API_KEY";
+    static final String TOPIC   = "com_announcement_en";
+
+    static String randomStr(int n) {
+        final String C = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        SecureRandom rng = new SecureRandom(); StringBuilder sb = new StringBuilder(n);
+        for (int i = 0; i < n; i++) sb.append(C.charAt(rng.nextInt(C.length())));
+        return sb.toString();
+    }
+
+    public static void main(String[] args) throws Exception {
+        String pem = new String(Files.readAllBytes(Paths.get("rsa_private.pem")))
+            .replaceAll("-----.*-----", "").replaceAll("\\\\s", "");
+        byte[] der = Base64.getDecoder().decode(pem);
+        KeyFactory kf = KeyFactory.getInstance("RSA");
+        PrivateKey privKey = kf.generatePrivate(new PKCS8EncodedKeySpec(der));
+
+        String qs = "random=" + randomStr(32) + "&topic=" + TOPIC + "&recvWindow=60000&timestamp=" + System.currentTimeMillis();
+        Signature signer = Signature.getInstance("SHA256withRSA");
+        signer.initSign(privKey);
+        signer.update(qs.getBytes(StandardCharsets.UTF_8));
+        String sig = java.net.URLEncoder.encode(Base64.getEncoder().encodeToString(signer.sign()), "UTF-8");
+        String url = "wss://api.binance.com/sapi/wss?" + qs + "&signature=" + sig;
+
+        ScheduledExecutorService sched = Executors.newSingleThreadScheduledExecutor();
+        HttpClient.newHttpClient().newWebSocketBuilder()
+            .header("X-MBX-APIKEY", API_KEY)
+            .buildAsync(URI.create(url), new WebSocket.Listener() {
+                StringBuilder buf = new StringBuilder();
+                public void onOpen(WebSocket ws) {
+                    System.out.println("Connected. Listening for announcements..."); ws.request(1);
+                    sched.scheduleAtFixedRate(() -> ws.sendPing(java.nio.ByteBuffer.allocate(0)), 30, 30, TimeUnit.SECONDS);
+                }
+                public CompletionStage<?> onText(WebSocket ws, CharSequence data, boolean last) {
+                    buf.append(data); if (last) { System.out.println(buf); buf.setLength(0); }
+                    ws.request(1); return null;
+                }
+                public CompletionStage<?> onClose(WebSocket ws, int s, String r) {
+                    System.out.println("Closed: "+s); sched.shutdown(); return null;
+                }
+            }).join();
+        Thread.currentThread().join();
+    }
+}`;
+
+T_announcement.rsa.go = `package main
+
+import (
+	"crypto"
+	"crypto/rand"
+	mathrand "math/rand"
+	"crypto/rsa"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/pem"
+	"fmt"
+	"log"
+	"net/http"
+	"net/url"
+	"os"
+	"time"
+
+	"github.com/gorilla/websocket"
+)
+
+const (
+	apiKey = "YOUR_API_KEY"
+	topic  = "com_announcement_en"
+)
+
+func randomStr(n int) string {
+	const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+	b := make([]byte, n)
+	for i := range b { b[i] = chars[mathrand.Intn(len(chars))] }
+	return string(b)
+}
+
+func main() {
+	pemBytes, _ := os.ReadFile("rsa_private.pem")
+	block, _    := pem.Decode(pemBytes)
+	privKey, _  := x509.ParsePKCS8PrivateKey(block.Bytes)
+	rsaKey      := privKey.(*rsa.PrivateKey)
+
+	ts  := time.Now().UnixMilli()
+	qs  := fmt.Sprintf("random=%s&topic=%s&recvWindow=60000&timestamp=%d", randomStr(32), topic, ts)
+	h   := sha256.Sum256([]byte(qs))
+	rawSig, _ := rsa.SignPKCS1v15(rand.Reader, rsaKey, crypto.SHA256, h[:])
+	sig := url.QueryEscape(base64.StdEncoding.EncodeToString(rawSig))
+	rawURL := "wss://api.binance.com/sapi/wss?" + qs + "&signature=" + sig
+
+	conn, _, err := websocket.DefaultDialer.Dial(rawURL, http.Header{"X-MBX-APIKEY": {apiKey}})
+	if err != nil { log.Fatal(err) }
+	defer conn.Close()
+
+	go func() {
+		for range time.Tick(30 * time.Second) { conn.WriteMessage(websocket.PingMessage, nil) }
+	}()
+
+	fmt.Println("Connected. Listening for announcements...")
+	for {
+		_, msg, err := conn.ReadMessage()
+		if err != nil { log.Println(err); break }
+		fmt.Println(string(msg))
+	}
+}`;
+
+T_announcement.rsa.csharp = `using System;
+using System.Net.WebSockets;
+using System.Security.Cryptography;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using System.IO;
+
+class AnnouncementWsRsa {
+    const string API_KEY = "YOUR_API_KEY";
+    const string TOPIC   = "com_announcement_en";
+
+    static string RandomStr(int n) {
+        const string C = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        var sb = new StringBuilder(n); var buf = new byte[1];
+        using var rng = RandomNumberGenerator.Create();
+        while (sb.Length < n) { rng.GetBytes(buf); sb.Append(C[buf[0] % C.Length]); }
+        return sb.ToString();
+    }
+
+    static async Task Main() {
+        using var rsa = RSA.Create();
+        rsa.ImportFromPem(File.ReadAllText("rsa_private.pem"));
+
+        long ts  = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        string qs  = $"random={RandomStr(32)}&topic={TOPIC}&recvWindow=60000&timestamp={ts}";
+        byte[] rawSig = rsa.SignData(Encoding.UTF8.GetBytes(qs), HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        string sig = Uri.EscapeDataString(Convert.ToBase64String(rawSig));
+        string url = $"wss://api.binance.com/sapi/wss?{qs}&signature={sig}";
+
+        var ws = new ClientWebSocket();
+        ws.Options.SetRequestHeader("X-MBX-APIKEY", API_KEY);
+        await ws.ConnectAsync(new Uri(url), CancellationToken.None);
+        Console.WriteLine("Connected. Listening for announcements...");
+
+        _ = Task.Run(async () => {
+            while (ws.State == WebSocketState.Open) {
+                await Task.Delay(30000);
+                await ws.SendAsync(Array.Empty<byte>(), WebSocketMessageType.Binary, true, CancellationToken.None);
+            }
+        });
+
+        var buf = new byte[65536];
+        while (ws.State == WebSocketState.Open) {
+            var r = await ws.ReceiveAsync(buf, CancellationToken.None);
+            Console.WriteLine(Encoding.UTF8.GetString(buf, 0, r.Count));
+        }
+    }
+}`;
+
+T_announcement.rsa.php = `<?php
+// composer require textalk/websocket
+require "vendor/autoload.php";
+use WebSocket\\Client;
+
+$API_KEY = "YOUR_API_KEY";
+$TOPIC   = "com_announcement_en";
+
+function randomStr(int $n): string {
+    $c = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    $r = ""; for ($i=0; $i<$n; $i++) $r .= $c[random_int(0,strlen($c)-1)]; return $r;
+}
+
+$privKey = openssl_pkey_get_private(file_get_contents("rsa_private.pem"));
+$ts  = (int)round(microtime(true) * 1000);
+$qs  = "random=" . randomStr(32) . "&topic=$TOPIC&recvWindow=60000&timestamp=$ts";
+openssl_sign($qs, $rawSig, $privKey, OPENSSL_ALGO_SHA256);
+$sig = urlencode(base64_encode($rawSig));
+$url = "wss://api.binance.com/sapi/wss?{$qs}&signature={$sig}";
+
+$ws = new Client($url, ["headers" => ["X-MBX-APIKEY" => $API_KEY]]);
+echo "Connected. Listening for announcements...\\n";
+while (true) { echo $ws->receive() . "\\n"; }`;
+
+T_announcement.rsa.ruby = `# gem install websocket-client-simple
+require "websocket-client-simple"
+require "openssl"
+require "base64"
+require "securerandom"
+
+API_KEY  = "YOUR_API_KEY"
+TOPIC    = "com_announcement_en"
+
+pkey = OpenSSL::PKey::RSA.new(File.read("rsa_private.pem"))
+ts   = (Time.now.to_f * 1000).round
+qs   = "random=#{SecureRandom.alphanumeric(32)}&topic=#{TOPIC}&recvWindow=60000&timestamp=#{ts}"
+sig  = URI.encode_www_form_component(Base64.strict_encode64(pkey.sign(OpenSSL::Digest::SHA256.new, qs)))
+url  = "wss://api.binance.com/sapi/wss?#{qs}&signature=#{sig}"
+
+ws = WebSocket::Client::Simple.connect(url, headers: { "X-MBX-APIKEY" => API_KEY })
+Thread.new { loop { sleep 30; ws.send("", type: :ping) } }
+ws.on(:open)    { puts "Connected. Listening for announcements..." }
+ws.on(:message) { |m| puts m.data }
+ws.on(:error)   { |e| puts "Error: #{e.message}" }
+ws.on(:close)   { puts "Closed"; exit }
+loop {}`;
+
+T_announcement.rsa.rust = `// Cargo.toml:
+// tungstenite = { version = "0.24", features = ["native-tls"] }
+// openssl = "0.10"  |  base64 = "0.22"  |  rand = "0.8"  |  urlencoding = "2"
+use base64::{engine::general_purpose::STANDARD, Engine};
+use openssl::{hash::MessageDigest, pkey::PKey, rsa::Padding, sign::Signer};
+use rand::Rng;
+use std::time::{SystemTime, UNIX_EPOCH};
+use tungstenite::{connect, http::Request, Message};
+
+fn random_str(n: usize) -> String {
+    const C: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    let mut rng = rand::thread_rng();
+    (0..n).map(|_| C[rng.gen_range(0..C.len())] as char).collect()
+}
+
+fn main() {
+    let api_key = "YOUR_API_KEY";
+    let topic   = "com_announcement_en";
+    let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
+
+    let qs = format!("random={}&topic={}&recvWindow=60000&timestamp={}", random_str(32), topic, ts);
+    let pem = std::fs::read("rsa_private.pem").unwrap();
+    let pkey = PKey::private_key_from_pem(&pem).unwrap();
+    let mut signer = Signer::new(MessageDigest::sha256(), &pkey).unwrap();
+    signer.set_rsa_padding(Padding::PKCS1).unwrap();
+    signer.update(qs.as_bytes()).unwrap();
+    let sig = urlencoding::encode(&STANDARD.encode(signer.sign_to_vec().unwrap())).into_owned();
+    let url = format!("wss://api.binance.com/sapi/wss?{}&signature={}", qs, sig);
+
+    let req = Request::builder().uri(&url).header("X-MBX-APIKEY", api_key).body(()).unwrap();
+    let (mut ws, _) = connect(req).expect("connect failed");
+    println!("Connected. Listening for announcements...");
+
+    loop {
+        match ws.read() {
+            Ok(Message::Text(t))  => println!("{}", t),
+            Ok(Message::Ping(d))  => { ws.send(Message::Pong(d)).unwrap(); }
+            Ok(Message::Close(_)) => { println!("Closed"); break; }
+            Err(e) => { eprintln!("{}", e); break; }
+            _ => {}
+        }
+    }
+}`;
+
+T_announcement.rsa.cpp = `// Install IXWebSocket + OpenSSL
+// Compile: g++ -std=c++17 main.cpp -lixwebsocket -lssl -lcrypto -lpthread
+#include <ixwebsocket/IXWebSocket.h>
+#include <openssl/evp.h>
+#include <openssl/pem.h>
+#include <iostream>
+#include <sstream>
+#include <iomanip>
+#include <chrono>
+#include <random>
+#include <string>
+#include <vector>
+
+std::string randomStr(int n) {
+    static const char C[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    std::mt19937 rng(std::random_device{}());
+    std::uniform_int_distribution<> d(0,sizeof(C)-2);
+    std::string s(n,' '); for (auto& c:s) c=C[d(rng)]; return s;
+}
+
+std::string base64Encode(const std::vector<unsigned char>& data) {
+    BIO *b64=BIO_new(BIO_f_base64()),*mem=BIO_new(BIO_s_mem());
+    BIO_set_flags(b64,BIO_FLAGS_BASE64_NO_NL); BIO_push(b64,mem);
+    BIO_write(b64,data.data(),(int)data.size()); BIO_flush(b64);
+    char* out; long len=BIO_get_mem_data(mem,&out);
+    std::string r(out,len); BIO_free_all(b64); return r;
+}
+
+std::string urlEncode(const std::string& s) {
+    std::ostringstream oss;
+    for (unsigned char c:s) {
+        if (isalnum(c)||c=='-'||c=='_'||c=='.'||c=='~') oss<<c;
+        else oss<<'%'<<std::hex<<std::uppercase<<std::setw(2)<<std::setfill('0')<<(int)c;
+    }
+    return oss.str();
+}
+
+int main() {
+    const std::string API_KEY = "YOUR_API_KEY";
+    const std::string TOPIC   = "com_announcement_en";
+    auto ts = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+
+    std::string qs = "random="+randomStr(32)+"&topic="+TOPIC+"&recvWindow=60000&timestamp="+std::to_string(ts);
+
+    FILE* f = fopen("rsa_private.pem","r");
+    EVP_PKEY* pkey = PEM_read_PrivateKey(f,nullptr,nullptr,nullptr); fclose(f);
+    EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+    EVP_DigestSignInit(ctx,nullptr,EVP_sha256(),nullptr,pkey);
+    EVP_DigestSignUpdate(ctx,qs.c_str(),qs.size());
+    size_t sigLen=0; EVP_DigestSignFinal(ctx,nullptr,&sigLen);
+    std::vector<unsigned char> sig(sigLen);
+    EVP_DigestSignFinal(ctx,sig.data(),&sigLen);
+    EVP_MD_CTX_free(ctx); EVP_PKEY_free(pkey);
+
+    std::string url = "wss://api.binance.com/sapi/wss?"+qs+"&signature="+urlEncode(base64Encode(sig));
+    ix::WebSocket ws; ws.setUrl(url); ws.setExtraHeaders({{"X-MBX-APIKEY",API_KEY}}); ws.setPingInterval(30);
+    ws.setOnMessageCallback([](const ix::WebSocketMessagePtr& m){
+        if (m->type==ix::WebSocketMessageType::Open) std::cout<<"Connected.\\n";
+        else if (m->type==ix::WebSocketMessageType::Message) std::cout<<m->str<<"\\n";
+    });
+    ws.start(); while(true) std::this_thread::sleep_for(std::chrono::seconds(1));
+}`;
+
+T_announcement.rsa.bash = `#!/bin/bash
+# Requires: websocat, openssl, python3
+API_KEY="YOUR_API_KEY"
+TOPIC="com_announcement_en"
+PRIVATE_KEY="rsa_private.pem"
+
+RAND=$(python3 -c "import random,string; print(''.join(random.sample(string.ascii_letters+string.digits,32)))")
+TS=$(python3 -c "import time; print(round(time.time()*1000))")
+QS="random=\${RAND}&topic=\${TOPIC}&recvWindow=60000&timestamp=\${TS}"
+SIG=$(printf '%s' "\$QS" | openssl dgst -sha256 -sign "\$PRIVATE_KEY" | openssl base64 -A | python3 -c "import sys,urllib.parse; print(urllib.parse.quote(sys.stdin.read().strip()))")
+URL="wss://api.binance.com/sapi/wss?\${QS}&signature=\${SIG}"
+
+echo "Connecting..."
+websocat --header "X-MBX-APIKEY:\${API_KEY}" "\$URL"`;
 
 /* ════════════════════════════════════════════════════════════════════
    User Data Stream Templates
@@ -9590,10 +10905,11 @@ function render() {
   syncMarketOptions();
   normalizeRestSecurityState();
 
-  const isWs       = state.apitype === "ws";
-  const isUds      = state.apitype === "uds";
-  const isUdsFutures = isUds && state.market !== "spot";
-  const isRest       = state.apitype === "rest";
+  const isWs           = state.apitype === "ws";
+  const isUds          = state.apitype === "uds";
+  const isAnnouncement = state.apitype === "announcement";
+  const isUdsFutures   = isUds && state.market !== "spot";
+  const isRest         = state.apitype === "rest";
   const epOtherMap   = !isRest && ENDPOINTS[state.apitype] ? ENDPOINTS[state.apitype][state.env] : null;
   const ep           = isRest
     ? resolveRestUrl(state)
@@ -9610,6 +10926,8 @@ function render() {
     rawCode = (T_uds[state.auth][state.lang] || "// Not available for this combination");
   } else if (isWs) {
     rawCode = (T_ws[state.auth][state.lang] || "// Not available for this combination");
+  } else if (isAnnouncement) {
+    rawCode = (T_announcement[state.auth][state.lang] || "// Not available for this combination");
   } else {
     if (!state.restRequireSignature) {
       const bucket = state.restRequireApiKey ? T_plain.key : T_plain.none;
@@ -9624,7 +10942,7 @@ function render() {
     .replace(/\{\{REST_EP\}\}/g, restEp);
   if (isRest) rawCode = rawCode.replace(/\{\{REST_HTTP_METHOD\}\}/g, resolveRestHttpVerb());
 
-  const notesMap = isUdsFutures ? null : (isUds ? UDS_NOTES : (isWs ? WS_NOTES : NOTES));
+  const notesMap = isUdsFutures ? null : (isUds ? UDS_NOTES : (isWs || isAnnouncement ? WS_NOTES : NOTES));
   const noteStr  = isUdsFutures
     ? (UDS_LK_NOTES[state.lang] || "")
     : isRest && !state.restRequireSignature
@@ -9683,7 +11001,7 @@ function render() {
   const authMeta = AUTH_DISPLAY[state.auth] || state.auth;
   document.getElementById("print-meta").textContent =
     LANG_NAMES[state.lang] + "  |  " + authMeta + "  |  " +
-    (isUds ? "User Data Stream" : isWs ? "WebSocket API" : "REST API") + "  |  " + marketLabels[state.market];
+    (isUds ? "User Data Stream" : isAnnouncement ? "Announcement WS" : isWs ? "WebSocket API" : "REST API") + "  |  " + marketLabels[state.market];
   document.getElementById("print-ep").textContent = ep;
   syncQuestionnaireWideLayoutMode();
 }
@@ -9970,6 +11288,13 @@ document.getElementById("ready-tpl-travel-withdraw").addEventListener("click", (
 });
 document.getElementById("ready-tpl-travel-deposit-v2").addEventListener("click", () => {
   fetchDocUrlAndParse(READY_TEMPLATE_DOC_URLS.travelRuleDepositV2);
+});
+document.getElementById("ready-tpl-announcement").addEventListener("click", () => {
+  state.apitype = "announcement";
+  state.market  = "spot";
+  const sel = document.getElementById("sel-apitype");
+  if (sel) sel.value = "announcement";
+  render();
 });
 document.getElementById("doc-parse-btn").addEventListener("click", () => {
   const ta = document.getElementById("doc-paste-text");
