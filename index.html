@@ -9430,7 +9430,7 @@ function setDocFetchControlsDisabled(on) {
 
 async function fetchDocUrlAndParse(urlOverride) {
   const input = document.getElementById("doc-url-input");
-  const url =
+  let url =
     typeof urlOverride === "string" && urlOverride.trim()
       ? urlOverride.trim()
       : input && input.value.trim();
