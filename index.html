@@ -9441,7 +9441,7 @@ async function fetchDocUrlAndParse(urlOverride) {
   setDocFetchControlsDisabled(true);
   setDocFetchLoading(true);
   try {
-    const cleanUrl = url.replace(/#request-parameters$/i, "").replace(/#request-weight$/i, "");
+    const cleanUrl = url.split("#")[0];
     const proxied = "https://r.jina.ai/" + encodeURIComponent(cleanUrl);
     const res = await fetch(proxied, { headers: { Accept: "text/plain" } });
     const text = await res.text();
