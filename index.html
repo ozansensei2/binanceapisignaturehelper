@@ -8289,13 +8289,6 @@ function slugifyDocHeading(title) {
     .replace(/^-+|-+$/g, "");
 }
 
-/** Strip trailing `#request-parameters` — Jina fetch should use the page URL without this generic anchor. */
-function stripRequestParametersDocHash(urlStr) {
-  const s = String(urlStr || "").trim();
-  if (!s) return s;
-  return s.replace(/#request-parameters\/?$/i, "");
-}
-
 /** Reads hash from full URL or naked fragment string */
 function extractDocUrlFragment(docPageUrl) {
   if (!docPageUrl || typeof docPageUrl !== "string") return "";
@@ -9430,7 +9423,7 @@ function setDocFetchControlsDisabled(on) {
 
 async function fetchDocUrlAndParse(urlOverride) {
   const input = document.getElementById("doc-url-input");
-  let url =
+  const url =
     typeof urlOverride === "string" && urlOverride.trim()
       ? urlOverride.trim()
       : input && input.value.trim();
@@ -9438,7 +9431,6 @@ async function fetchDocUrlAndParse(urlOverride) {
     window.alert("Enter a documentation URL.");
     return;
   }
-  url = stripRequestParametersDocHash(url);
   if (input) input.value = url;
   applyDocUrlInferredApiType(url, "");
   if (state.apitype !== "rest" && state.apitype !== "ws") {
