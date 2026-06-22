@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Binance API Code Generator v202606152037</title>
+  <title>Binance API Code Generator v202606221338</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1160,7 +1160,7 @@
 <header>
   <div class="logo">B</div>
   <div>
-    <h1>Binance API Code Generator <span style="font-size:0.55em;opacity:0.5;font-weight:400">v202606152037</span></h1>
+    <h1>Binance API Code Generator <span style="font-size:0.55em;opacity:0.5;font-weight:400">v202606221338</span></h1>
     <p>Signed REST, WebSocket, and User Data Stream examples — with optional Binance docs import for REST.</p>
   </div>
 </header>
@@ -7696,64 +7696,194 @@ const UDS_LK_NOTES = {
 /* ── Extra-param injection per language ────────────────────────────── */
 function injectExtraParams(code, lang, params) {
   if (!params || params.length === 0) return code;
-  const ampQs = '&' + params.map(p => p.key + '=' + encodeURIComponent(String(p.val))).join('&');
+
+  const qParam      = params.find(p => p.key === 'questionnaire');
+  const otherParams = params.filter(p => p.key !== 'questionnaire');
+
+  // Pre-encoded fragment for non-questionnaire params (RFC 3986 via encodeURIComponent)
+  const ampQsOther = otherParams.length
+    ? '&' + otherParams.map(p => p.key + '=' + encodeURIComponent(String(p.val))).join('&')
+    : '';
+
+  // Full pre-encoded fragment used by languages without special questionnaire handling
+  const ampQsFull = '&' + params.map(p => p.key + '=' + encodeURIComponent(String(p.val))).join('&');
+
+  // Escape helpers
+  const escPy     = v => String(v).replace(/\\/g, "\\\\").replace(/"/g,  '\\"').replace(/\n/g, "\\n");
+  const escSingle = v => String(v).replace(/\\/g, "\\\\").replace(/'/g,  "\\'");
+  const escDbl    = v => String(v).replace(/\\/g, "\\\\").replace(/"/g,  '\\"').replace(/\n/g, "\\n");
 
   switch (lang) {
+    // ── Python ─────────────────────────────────────────────────────────
     case 'python': {
-      const escPyStr = v =>
-        String(v).replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n");
-      const extra = params.map(p => '"' + p.key + '": "' + escPyStr(p.val) + '"').join(', ');
-      return code.replace(
-        'params       = {"timestamp": timestamp}',
-        'params       = {"timestamp": timestamp, ' + extra + '}'
-      );
+      const dictEntries = otherParams.map(p => '"' + p.key + '": "' + escPy(p.val) + '"');
+      if (qParam) {
+        dictEntries.push('"questionnaire": json.dumps(questionnaire, separators=(",", ":"))');
+      }
+      const extra = dictEntries.join(', ');
+      const newParamsLine = qParam
+        ? 'questionnaire = json.loads("' + escPy(qParam.val) + '")\n' +
+          'params       = {"timestamp": timestamp, ' + extra + '}'
+        : 'params       = {"timestamp": timestamp, ' + extra + '}';
+
+      let result = code.replace('params       = {"timestamp": timestamp}', newParamsLine);
+      if (qParam) {
+        if (!result.includes('import json')) {
+          result = result.replace('import requests\n', 'import json\nimport requests\n');
+        }
+        // quote (RFC 3986) instead of default quote_plus
+        result = result.replace(
+          'query_string = urllib.parse.urlencode(params)',
+          'query_string = urllib.parse.urlencode(params, quote_via=urllib.parse.quote)'
+        );
+      }
+      return result;
     }
+
+    // ── JavaScript / TypeScript ────────────────────────────────────────
     case 'javascript':
-    case 'typescript':
+    case 'typescript': {
+      if (!qParam) {
+        return code.replace(
+          /const queryString\s*=\s*"timestamp=" \+ timestamp;/,
+          () => 'const queryString = "timestamp=" + timestamp + "' + ampQsFull + '";'
+        );
+      }
+      const qVal = escSingle(String(qParam.val));
       return code.replace(
         /const queryString\s*=\s*"timestamp=" \+ timestamp;/,
-        () => 'const queryString = "timestamp=" + timestamp + "' + ampQs + '";'
+        () => 'const questionnaire = \'' + qVal + '\';\n' +
+              'const queryString   = "timestamp=" + timestamp' +
+              (ampQsOther ? ' + "' + ampQsOther + '"' : '') +
+              ' + "&questionnaire=" + encodeURIComponent(questionnaire);'
       );
-    case 'java':
+    }
+
+    // ── Java ───────────────────────────────────────────────────────────
+    case 'java': {
+      if (!qParam) {
+        return code.replace(
+          'String queryString = "timestamp=" + timestamp;',
+          () => 'String queryString = "timestamp=" + timestamp + "' + ampQsFull + '";'
+        );
+      }
+      const qVal = escDbl(String(qParam.val));
       return code.replace(
         'String queryString = "timestamp=" + timestamp;',
-        () => 'String queryString = "timestamp=" + timestamp + "' + ampQs + '";'
+        () => 'String questionnaire = "' + qVal + '";\n        ' +
+              'String queryString   = "timestamp=" + timestamp' +
+              (ampQsOther ? ' + "' + ampQsOther + '"' : '') +
+              ' + "&questionnaire=" + java.net.URLEncoder' +
+              '.encode(questionnaire, java.nio.charset.StandardCharsets.UTF_8).replace("+", "%20");'
       );
-    case 'go':
-      return code.replace(
+    }
+
+    // ── Go ─────────────────────────────────────────────────────────────
+    case 'go': {
+      if (!qParam) {
+        return code.replace(
+          /queryString\s*:=\s*fmt\.Sprintf\("timestamp=%d", timestamp\)/,
+          () => 'queryString := fmt.Sprintf("timestamp=%d' + ampQsFull + '", timestamp)'
+        );
+      }
+      const qVal = String(qParam.val).replace(/`/g, '` + "`" + `');
+      let result = code.replace(
         /queryString\s*:=\s*fmt\.Sprintf\("timestamp=%d", timestamp\)/,
-        () => 'queryString := fmt.Sprintf("timestamp=%d' + ampQs + '", timestamp)'
+        () => 'questionnaire := `' + qVal + '`\n\t' +
+              'queryString   := fmt.Sprintf("timestamp=%d' + ampQsOther + '", timestamp) +\n\t\t' +
+              '"&questionnaire=" + url.QueryEscape(questionnaire)'
       );
-    case 'csharp':
+      if (!result.includes('"net/url"')) {
+        result = result.replace('"net/http"\n', '"net/http"\n\t"net/url"\n');
+      }
+      return result;
+    }
+
+    // ── C# ─────────────────────────────────────────────────────────────
+    case 'csharp': {
+      if (!qParam) {
+        return code.replace(
+          'string queryString = "timestamp=" + timestamp;',
+          () => 'string queryString = "timestamp=" + timestamp + "' + ampQsFull + '";'
+        );
+      }
+      const qVal = escDbl(String(qParam.val));
       return code.replace(
         'string queryString = "timestamp=" + timestamp;',
-        () => 'string queryString = "timestamp=" + timestamp + "' + ampQs + '";'
+        () => 'string questionnaire = "' + qVal + '";\n        ' +
+              'string queryString   = "timestamp=" + timestamp' +
+              (ampQsOther ? ' + "' + ampQsOther + '"' : '') +
+              ' + "&questionnaire=" + Uri.EscapeDataString(questionnaire);'
       );
-    case 'php':
+    }
+
+    // ── PHP ────────────────────────────────────────────────────────────
+    case 'php': {
+      if (!qParam) {
+        return code.replace(
+          /\$queryString\s*=\s*"timestamp=\{\$timestamp\}";/,
+          () => '$queryString = "timestamp={$timestamp}' + ampQsFull + '";'
+        );
+      }
+      const qVal = escSingle(String(qParam.val));
       return code.replace(
         /\$queryString\s*=\s*"timestamp=\{\$timestamp\}";/,
-        () => '$queryString = "timestamp={$timestamp}' + ampQs + '";'
+        () => '$questionnaire = \'' + qVal + '\';\n' +
+              '$queryString   = "timestamp={$timestamp}"' +
+              (ampQsOther ? ' . "' + ampQsOther + '"' : '') +
+              ' . "&questionnaire=" . rawurlencode($questionnaire);'
       );
-    case 'ruby':
+    }
+
+    // ── Ruby ───────────────────────────────────────────────────────────
+    case 'ruby': {
+      if (!qParam) {
+        return code.replace(
+          'query_string = "timestamp=#{timestamp}"',
+          () => 'query_string = "timestamp=#{timestamp}' + ampQsFull + '"'
+        );
+      }
+      const qVal = escSingle(String(qParam.val));
       return code.replace(
         'query_string = "timestamp=#{timestamp}"',
-        () => 'query_string = "timestamp=#{timestamp}' + ampQs + '"'
+        () => 'questionnaire = \'' + qVal + '\'\n' +
+              'query_string  = "timestamp=#{timestamp}"' +
+              (ampQsOther ? ' + "' + ampQsOther + '"' : '') +
+              ' + "&questionnaire=" + URI.encode_www_form_component(questionnaire)'
       );
+    }
+
+    // ── Rust (pre-encoded literal — no external crate needed) ──────────
     case 'rust':
       return code.replace(
         /let qs\s+=\s+format!\("timestamp=\{\}", ts\);/,
-        () => 'let qs = format!("timestamp={}' + ampQs + '", ts);'
+        () => 'let qs = format!("timestamp={}' + ampQsFull + '", ts);'
       );
+
+    // ── C++ (pre-encoded literal) ──────────────────────────────────────
     case 'cpp':
       return code.replace(
         /std::string qs\s+=\s+"timestamp=" \+ std::to_string\(ms\);/,
-        () => 'std::string qs = "timestamp=" + std::to_string(ms) + "' + ampQs + '";'
+        () => 'std::string qs = "timestamp=" + std::to_string(ms) + "' + ampQsFull + '";'
       );
-    case 'bash':
+
+    // ── Bash ───────────────────────────────────────────────────────────
+    case 'bash': {
+      if (!qParam) {
+        return code.replace(
+          /QUERY_STRING="timestamp=\$\{TIMESTAMP\}"/,
+          () => 'QUERY_STRING="timestamp=${TIMESTAMP}' + ampQsFull + '"'
+        );
+      }
+      const qVal = String(qParam.val).replace(/'/g, "'\\''");
       return code.replace(
-        /QUERY_STRING="timestamp=\\\$\{TIMESTAMP\}"/,
-        () => 'QUERY_STRING="timestamp=${TIMESTAMP}' + ampQs + '"'
+        /QUERY_STRING="timestamp=\$\{TIMESTAMP\}"/,
+        () => 'QUESTIONNAIRE=\'' + qVal + '\'\n' +
+              'QUESTIONNAIRE_ENC=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$QUESTIONNAIRE")\n' +
+              'QUERY_STRING="timestamp=${TIMESTAMP}' + ampQsOther + '&questionnaire=${QUESTIONNAIRE_ENC}"'
       );
+    }
+
     default:
       return code;
   }
