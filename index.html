@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Binance API Code Generator v202606221338</title>
+  <title>Binance API Code Generator v202606221342</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1160,7 +1160,7 @@
 <header>
   <div class="logo">B</div>
   <div>
-    <h1>Binance API Code Generator <span style="font-size:0.55em;opacity:0.5;font-weight:400">v202606221338</span></h1>
+    <h1>Binance API Code Generator <span style="font-size:0.55em;opacity:0.5;font-weight:400">v202606221342</span></h1>
     <p>Signed REST, WebSocket, and User Data Stream examples — with optional Binance docs import for REST.</p>
   </div>
 </header>
@@ -7716,22 +7716,13 @@ function injectExtraParams(code, lang, params) {
   switch (lang) {
     // ── Python ─────────────────────────────────────────────────────────
     case 'python': {
-      const dictEntries = otherParams.map(p => '"' + p.key + '": "' + escPy(p.val) + '"');
+      const extra = params.map(p => '"' + p.key + '": "' + escPy(p.val) + '"').join(', ');
+      let result = code.replace(
+        'params       = {"timestamp": timestamp}',
+        'params       = {"timestamp": timestamp, ' + extra + '}'
+      );
       if (qParam) {
-        dictEntries.push('"questionnaire": json.dumps(questionnaire, separators=(",", ":"))');
-      }
-      const extra = dictEntries.join(', ');
-      const newParamsLine = qParam
-        ? 'questionnaire = json.loads("' + escPy(qParam.val) + '")\n' +
-          'params       = {"timestamp": timestamp, ' + extra + '}'
-        : 'params       = {"timestamp": timestamp, ' + extra + '}';
-
-      let result = code.replace('params       = {"timestamp": timestamp}', newParamsLine);
-      if (qParam) {
-        if (!result.includes('import json')) {
-          result = result.replace('import requests\n', 'import json\nimport requests\n');
-        }
-        // quote (RFC 3986) instead of default quote_plus
+        // quote (RFC 3986) instead of default quote_plus — required for JSON param values
         result = result.replace(
           'query_string = urllib.parse.urlencode(params)',
           'query_string = urllib.parse.urlencode(params, quote_via=urllib.parse.quote)'
