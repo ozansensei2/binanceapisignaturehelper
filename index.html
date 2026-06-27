@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Binance API Code Generator v202606261812</title>
+  <title>Binance API Code Generator v202606271907</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1227,7 +1227,7 @@
 <header>
   <div class="logo">B</div>
   <div>
-    <h1>Binance API Code Generator <span style="font-size:0.55em;opacity:0.5;font-weight:400">v202606261812</span></h1>
+    <h1>Binance API Code Generator <span style="font-size:0.55em;opacity:0.5;font-weight:400">v202606271907</span></h1>
     <p>Signed REST, WebSocket, and User Data Stream examples — with optional Binance docs import for REST.</p>
   </div>
 </header>
@@ -10004,7 +10004,16 @@ function inferApiTypeFromBinanceDocUrl(urlStr) {
 
   if (/(?:\/|^)websocket-api(?:\/|$)/.test(blob)) return "ws";
   if (/(?:\/|^)rest-api(?:\/|$)/.test(blob)) return "rest";
+  if (/(?:\/|^)travel-rule(?:\/|$)/.test(blob)) return "rest";
   return null;
+}
+
+/** Documentation fetch/import: use inferred REST/WS, otherwise default to REST. */
+function ensureDocFetchApiType() {
+  if (state.apitype === "rest" || state.apitype === "ws") return;
+  state.apitype = "rest";
+  const sel = document.getElementById("sel-apitype");
+  if (sel) sel.value = "rest";
 }
 
 function applyDocUrlInferredApiType(docPageUrl, rawPasteText) {
@@ -10930,10 +10939,7 @@ function addParamRowFilled(key, val, valuePlaceholder) {
 
 function applyDocsImportFromText(rawText, alertEmpty, docPageUrl) {
   applyDocUrlInferredApiType(docPageUrl || "", rawText || "");
-  if (state.apitype !== "rest" && state.apitype !== "ws") {
-    if (alertEmpty) window.alert("Select REST API or WebSocket API to import from documentation.");
-    return false;
-  }
+  ensureDocFetchApiType();
   render();
 
   const frag = extractMergedDocsFragment(docPageUrl || "", rawText || "");
@@ -11071,10 +11077,7 @@ async function fetchDocUrlAndParse(urlOverride) {
   const cleanUrl = url.split("#")[0];
   if (input) input.value = cleanUrl;
   applyDocUrlInferredApiType(cleanUrl, "");
-  if (state.apitype !== "rest" && state.apitype !== "ws") {
-    window.alert("Select REST API or WebSocket API to fetch documentation.");
-    return;
-  }
+  ensureDocFetchApiType();
   render();
   setDocFetchControlsDisabled(true);
   setDocFetchLoading(true);
