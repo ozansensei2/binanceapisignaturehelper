@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Binance API Code Generator v202606292029</title>
+  <title>Binance API Code Generator v202606292225</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1243,7 +1243,7 @@
 <header>
   <div class="logo">B</div>
   <div>
-    <h1>Binance API Code Generator <span style="font-size:0.55em;opacity:0.5;font-weight:400">v202606292029</span></h1>
+    <h1>Binance API Code Generator <span style="font-size:0.55em;opacity:0.5;font-weight:400">v202606292225</span></h1>
     <p>Signed REST, WebSocket, and User Data Stream examples — with optional Binance docs import for REST.</p>
   </div>
 </header>
@@ -1488,7 +1488,6 @@
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
@@ -11717,6 +11716,84 @@ function closePdfPopup() {
   if (popup) popup.classList.remove("pdf-popup--open");
 }
 
+function wrapPdfLine(pdf, text, maxW) {
+  if (!text) return [""];
+  if (pdf.getTextWidth(text) <= maxW) return [text];
+  const out = [];
+  let buf = "";
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    const test = buf + ch;
+    if (pdf.getTextWidth(test) > maxW && buf) {
+      out.push(buf);
+      buf = ch;
+    } else {
+      buf = test;
+    }
+  }
+  if (buf) out.push(buf);
+  return out.length ? out : [""];
+}
+
+function buildTextPdf(code, meta, endpoint) {
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
+  const pageW = pdf.internal.pageSize.getWidth();
+  const pageH = pdf.internal.pageSize.getHeight();
+  const margin = 14;
+  const maxW = pageW - margin * 2;
+  const codeFontSize = 7.5;
+  const lineHeight = 3.8;
+  let y = margin;
+
+  function newPageIfNeeded(extra) {
+    if (y + extra > pageH - margin) {
+      pdf.addPage();
+      y = margin;
+    }
+  }
+
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(11);
+  pdf.text("Binance API — Code Snippet", margin, y);
+  y += 7;
+
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(8.5);
+  if (meta) {
+    newPageIfNeeded(5);
+    pdf.text(meta, margin, y);
+    y += 5;
+  }
+  if (endpoint) {
+    wrapPdfLine(pdf, endpoint, maxW).forEach(line => {
+      newPageIfNeeded(4);
+      pdf.text(line, margin, y);
+      y += 4;
+    });
+    y += 2;
+  }
+
+  newPageIfNeeded(4);
+  pdf.setDrawColor(180, 180, 180);
+  pdf.line(margin, y, pageW - margin, y);
+  y += 5;
+
+  pdf.setFont("courier", "normal");
+  pdf.setFontSize(codeFontSize);
+
+  for (const rawLine of String(code || "").split("\n")) {
+    const wrapped = wrapPdfLine(pdf, rawLine, maxW);
+    for (const line of wrapped) {
+      newPageIfNeeded(lineHeight);
+      pdf.text(line, margin, y);
+      y += lineHeight;
+    }
+  }
+
+  return pdf;
+}
+
 async function downloadPdfWithFilename(filenameBase) {
   const btn = document.getElementById("pdf-download-confirm-btn");
   const safeName = sanitizePdfFilenameBase(filenameBase);
@@ -11726,14 +11803,14 @@ async function downloadPdfWithFilename(filenameBase) {
   }
 
   try {
-    const pre = document.querySelector(".code-container pre");
-    const canvas = await html2canvas(pre, { backgroundColor: "#161b22", scale: 2, logging: false });
-    const img = canvas.toDataURL("image/png");
-    const { jsPDF } = window.jspdf;
-    const pw = canvas.width / 2;
-    const ph = canvas.height / 2;
-    const pdf = new jsPDF({ orientation: pw > ph ? "l" : "p", unit: "px", format: [pw, ph], hotfixes: ["px_scaling"] });
-    pdf.addImage(img, "PNG", 0, 0, pw, ph);
+    const block = document.getElementById("code-block");
+    const code = block ? block.textContent : "";
+    const meta = (document.getElementById("print-meta") || {}).textContent || "";
+    const endpoint =
+      (document.getElementById("print-ep") || {}).textContent ||
+      (document.getElementById("endpoint-display") || {}).textContent ||
+      "";
+    const pdf = buildTextPdf(code, meta.trim(), endpoint.trim());
     pdf.save(safeName + ".pdf");
     closePdfPopup();
   } catch (e) {
