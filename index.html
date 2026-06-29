@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Binance API Code Generator v202606271907</title>
+  <title>Binance API Code Generator v202606292023</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1140,14 +1140,16 @@
       .selectors { grid-template-columns: 1fr; }
     }
 
-    /* ── Binance Square Modal ─────────────────────────────────── */
-    #sq-modal-overlay {
+    /* ── Binance Square / FIX API Modal ───────────────────────── */
+    #sq-modal-overlay,
+    #fix-modal-overlay {
       position: fixed; inset: 0;
       background: rgba(0,0,0,0.80);
       z-index: 9000;
       display: flex; align-items: center; justify-content: center;
     }
-    #sq-modal {
+    #sq-modal,
+    #fix-modal {
       background: #161b22;
       border: 1px solid #30363d;
       border-radius: 12px;
@@ -1227,7 +1229,7 @@
 <header>
   <div class="logo">B</div>
   <div>
-    <h1>Binance API Code Generator <span style="font-size:0.55em;opacity:0.5;font-weight:400">v202606271907</span></h1>
+    <h1>Binance API Code Generator <span style="font-size:0.55em;opacity:0.5;font-weight:400">v202606292023</span></h1>
     <p>Signed REST, WebSocket, and User Data Stream examples — with optional Binance docs import for REST.</p>
   </div>
 </header>
@@ -1315,6 +1317,7 @@
           <button type="button" class="ready-template-btn" id="ready-tpl-travel-deposit-v2" data-doc-url="https://developers.binance.com/docs/wallet/travel-rule/deposit-provide-info-v2" title="Submit Deposit Questionnaire V2 — PUT /sapi/v2/localentity/deposit/provide-info">Deposit Questionnaire V2</button>
           <button type="button" class="ready-template-btn" id="ready-tpl-announcement" title="Announcement WebSocket — wss://api.binance.com/sapi/wss">Announcement WS</button>
           <button type="button" class="ready-template-btn" id="ready-tpl-square" title="Binance Square Post API — publish text, image, article, video posts">Binance Square</button>
+          <button type="button" class="ready-template-btn" id="ready-tpl-fix" title="Binance FIX API — logon, instrument list, market data, limit query">FIX API</button>
         </div>
       </div>
     </div>
@@ -12183,6 +12186,625 @@ function copySquareCode() {
 
 document.getElementById("ready-tpl-square").addEventListener("click", openSquareModal);
 
+// ── FIX API Modal ────────────────────────────────────────────────
+const FIX_TYPES = [
+  {
+    id: "keep-logon",
+    label: "FIX API keep logon",
+    badge: "FIX",
+    desc: "Order Entry · keepalive heartbeat",
+    ep: "fix-oe.binance.com:9000",
+    code: String.raw`from datetime import datetime, timezone
+from Crypto.Signature import eddsa
+from Crypto.PublicKey import ECC
+ 
+import os
+import base64
+import socket
+import ssl
+import random
+import string
+ 
+ 
+def get_time():
+    return datetime.now(timezone.utc).strftime('%Y%m%d-%H:%M:%S.%f')[:-3]
+ 
+def sign(payload):
+    sign = eddsa.new(private_key,'rfc8032')
+    sign_data = sign.sign(payload.encode("ASCII"))                      
+    signature = base64.b64encode(sign_data).decode('ASCII') 
+    return signature
+ 
+def get_final_message(fix_message):
+     
+    temp_str = f"8=FIX.4.4|9={len(fix_message)}|" + fix_message
+    chesum = sum(ord(char) for char in temp_str.replace('|','\x01'))
+    final_msg = temp_str + f"10={chesum%256:03}|"
+ 
+    return final_msg.replace('|','\x01')
+ 
+ 
+ 
+api_key = ""
+ 
+dir = os.path.dirname(_file_)
+f = open(dir+"/private_key.pem", "rb")
+private_key = f.read()                             
+private_key = ECC.import_key(private_key)
+ 
+ 
+ 
+utc_timestamp = get_time()
+sender_comp_id=''.join(random.sample(string.ascii_letters + string.digits,8))
+target_comp_id='SPOT'
+msg_seq_num=1
+payload = chr(1).join(['A',sender_comp_id,target_comp_id,str(msg_seq_num),utc_timestamp])
+signature = sign(payload)
+ 
+fix_message=(f"35=A|"f"49={sender_comp_id}|"f"56={target_comp_id}|"f"34=1|"f"52={utc_timestamp}|"
+f"95={len(signature)}|"f"96={signature}|"f"98=0|"f"108=60|"f"141=Y|"f"553={api_key}|"f"25035=1|")
+ 
+ 
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+ssl_sock = ssl.wrap_socket(sock)
+ssl_sock.connect(('fix-oe.binance.com', 9000))
+ 
+send_msg = get_final_message(fix_message)
+# print(type(send_msg.encode('ASCII')))
+print("send: ",send_msg.replace('\x01','|'))
+# send logon message
+ssl_sock.sendall(send_msg.encode('ASCII'))
+msg_seq_num += 1
+# get response
+ 
+ 
+ 
+ 
+ 
+while True:
+ 
+    response = ssl_sock.recv(4096)
+ 
+    if response:
+         
+        data_str = response.decode('ASCII')
+        print("recv: ",data_str.replace("\x01","|"))
+        data_list = data_str.split('\x01')
+ 
+ 
+ 
+        if data_list[2] == '35=1':  # send Heartbeat to keep connected
+            TestReqID = data_list[-3]
+            #print(TestReqID)
+            fix_message=(f"35=0|"f"49={sender_comp_id}|"f"56={target_comp_id}|"f"34={msg_seq_num}|"f"52={get_time()}|"f"{TestReqID}|")
+            send_msg = get_final_message(fix_message)
+            print("send: ",send_msg.replace('\x01','|'))
+            ssl_sock.sendall(send_msg.encode('ASCII'))
+            msg_seq_num += 1`
+  },
+  {
+    id: "instrument-list",
+    label: "fix instrument list request",
+    badge: "FIX",
+    desc: "Market Data · single symbol",
+    ep: "fix-md.binance.com:9000",
+    code: String.raw`from datetime import datetime, timezone
+from Crypto.Signature import eddsa
+from Crypto.PublicKey import ECC
+ 
+import os
+import base64
+import socket
+import ssl
+import random
+import string
+ 
+ 
+def get_time():
+    return datetime.now(timezone.utc).strftime('%Y%m%d-%H:%M:%S.%f')[:-3]
+ 
+def sign(payload):
+    sign = eddsa.new(private_key,'rfc8032')
+    sign_data = sign.sign(payload.encode("ASCII"))                      
+    signature = base64.b64encode(sign_data).decode('ASCII') 
+    return signature
+ 
+def get_final_message(fix_message):
+     
+    temp_str = f"8=FIX.4.4|9={len(fix_message)}|" + fix_message
+    chesum = sum(ord(char) for char in temp_str.replace('|','\x01'))
+    final_msg = temp_str + f"10={chesum%256:03}|"
+ 
+    return final_msg.replace('|','\x01')
+ 
+ 
+def get_InstrumentListRequest(sender_comp_id, msg_seq_num, utc_timestamp):
+    fix_message=(
+                f"35=x|"
+                f"49={sender_comp_id}|"
+                f"56=SPOT|"
+                f"34={msg_seq_num}|"
+                f"52={utc_timestamp}|"
+                f"320=BTCUSDT_INFO|"
+                f"559=0|"
+                f"55=BTCUSDT|"
+                )
+    return fix_message
+ 
+ 
+api_key = ""
+ 
+dir = os.path.dirname(__file__)
+f = open(dir+"/private_key.pem", "rb")
+private_key = f.read()                              
+private_key = ECC.import_key(private_key)
+ 
+ 
+ 
+utc_timestamp = get_time()
+sender_comp_id=''.join(random.sample(string.ascii_letters + string.digits,8))
+target_comp_id='SPOT'
+msg_seq_num=1
+payload = chr(1).join(['A',sender_comp_id,target_comp_id,str(msg_seq_num),utc_timestamp])
+signature = sign(payload)
+ 
+fix_message=(f"35=A|"f"49={sender_comp_id}|"f"56={target_comp_id}|"f"34={msg_seq_num}|"f"52={utc_timestamp}|"
+f"95={len(signature)}|"f"96={signature}|"f"98=0|"f"108=60|"f"141=Y|"f"553={api_key}|"f"25035=1|")
+ 
+ 
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+ssl_sock = ssl.wrap_socket(sock)
+ssl_sock.connect(('fix-md.binance.com', 9000))
+ 
+send_msg = get_final_message(fix_message)
+# print(type(send_msg.encode('ASCII')))
+print("send: ",send_msg.replace('\x01','|'))
+# send logon message
+ssl_sock.sendall(send_msg.encode('ASCII'))
+msg_seq_num += 1
+# get response
+ 
+ 
+ 
+ 
+ 
+while True:
+ 
+    response = ssl_sock.recv(4096)
+ 
+    if response:
+         
+        data_str = response.decode('ASCII')
+        print("recv: ",data_str.replace("\x01","|"))
+ 
+        fix_message = get_InstrumentListRequest(sender_comp_id,msg_seq_num,get_time())
+        send_msg = get_final_message(fix_message)
+        print("send: ",send_msg)
+        ssl_sock.sendall(send_msg.encode('ASCII'))
+        msg_seq_num += 1
+         
+        response = ssl_sock.recv(4096)
+        data_str = response.decode('ASCII')
+        print("recv: ",data_str.replace("\x01","|"))
+        break`
+  },
+  {
+    id: "instrument-list-all",
+    label: "FIX API instrumentListRequest for ALL_INSTRUMENTS",
+    badge: "FIX",
+    desc: "Market Data · all instruments",
+    ep: "fix-md.binance.com:9000",
+    code: String.raw`from datetime import datetime, timezone
+from Crypto.Signature import eddsa
+from Crypto.PublicKey import ECC
+ 
+import re
+ 
+import os
+import base64
+import socket
+import ssl
+import random
+import string
+ 
+ 
+def get_time():
+    return datetime.now(timezone.utc).strftime('%Y%m%d-%H:%M:%S.%f')[:-3]
+ 
+def sign(payload):
+    sign = eddsa.new(private_key,'rfc8032')
+    sign_data = sign.sign(payload.encode("ASCII"))                       
+    signature = base64.b64encode(sign_data).decode('ASCII') 
+    return signature
+ 
+def get_final_message(fix_message):
+     
+    temp_str = f"8=FIX.4.4|9={len(fix_message)}|" + fix_message
+    chesum = sum(ord(char) for char in temp_str.replace('|','\x01'))
+    final_msg = temp_str + f"10={chesum%256:03}|"
+ 
+    return final_msg.replace('|','\x01')
+ 
+ 
+def get_InstrumentListRequest(sender_comp_id, msg_seq_num, utc_timestamp):
+    fix_message=(
+                f"35=x|"
+                f"49={sender_comp_id}|"
+                f"56=SPOT|"
+                f"34={msg_seq_num}|"
+                f"52={utc_timestamp}|"
+                f"320=BTCUSDT_INFO|"
+                f"559=4|"
+                #f"55=BTCUSDT|"
+                )
+    return fix_message
+ 
+ 
+api_key = ""
+ 
+dir = os.path.dirname(__file__)
+f = open(dir+"/private_key.pem", "rb")
+private_key = f.read()                              
+private_key = ECC.import_key(private_key)
+ 
+ 
+ 
+utc_timestamp = get_time()
+sender_comp_id=''.join(random.sample(string.ascii_letters + string.digits,8))
+target_comp_id='SPOT'
+msg_seq_num=1
+payload = chr(1).join(['A',sender_comp_id,target_comp_id,str(msg_seq_num),utc_timestamp])
+signature = sign(payload)
+ 
+fix_message=(f"35=A|"f"49={sender_comp_id}|"f"56={target_comp_id}|"f"34={msg_seq_num}|"f"52={utc_timestamp}|"
+f"95={len(signature)}|"f"96={signature}|"f"98=0|"f"108=60|"f"141=Y|"f"553={api_key}|"f"25035=1|")
+ 
+ 
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+ssl_sock = ssl.wrap_socket(sock)
+ssl_sock.connect(('fix-md.binance.com', 9000))
+ 
+send_msg = get_final_message(fix_message)
+# print(type(send_msg.encode('ASCII')))
+print("send: ",send_msg.replace('\x01','|'))
+# send logon message
+ssl_sock.sendall(send_msg.encode('ASCII'))
+msg_seq_num += 1
+# get response
+ 
+response = ssl_sock.recv(4096)
+ 
+data_str = response.decode('ASCII')
+print("recv: ",data_str.replace("\x01","|"))
+ 
+fix_message = get_InstrumentListRequest(sender_comp_id,msg_seq_num,get_time())
+send_msg = get_final_message(fix_message)
+print("send: ",send_msg.replace('\x01','|'))
+ssl_sock.sendall(send_msg.encode('ASCII'))
+msg_seq_num += 1
+ 
+# final_result = ''
+ 
+while True:
+ 
+    response = ssl_sock.recv(4096)
+ 
+     
+    if response:
+         
+        data_str = response.decode('ASCII')
+        print("recv: ",data_str.replace("\x01","|"))
+        data_list = data_str.split('\x01')
+        final_result = final_result + data_str.replace("\x01","|")
+ 
+        if data_list[2] == '35=1' or data_list[2] == '35=0':
+            break`
+  },
+  {
+    id: "market-data",
+    label: "fix market data request",
+    badge: "FIX",
+    desc: "Market Data · trade stream",
+    ep: "fix-md.binance.com:9000",
+    code: String.raw`from datetime import datetime, timezone
+from Crypto.Signature import eddsa
+from Crypto.PublicKey import ECC
+ 
+import os
+import base64
+import socket
+import ssl
+import random
+import string
+ 
+ 
+def get_time():
+    return datetime.now(timezone.utc).strftime('%Y%m%d-%H:%M:%S.%f')[:-3]
+ 
+def sign(payload):
+    sign = eddsa.new(private_key,'rfc8032')
+    sign_data = sign.sign(payload.encode("ASCII"))             
+    signature = base64.b64encode(sign_data).decode('ASCII') 
+    return signature
+ 
+def get_final_message(fix_message):
+     
+    temp_str = f"8=FIX.4.4|9={len(fix_message)}|" + fix_message
+    chesum = sum(ord(char) for char in temp_str.replace('|','\x01'))
+    final_msg = temp_str + f"10={chesum%256:03}|"
+ 
+    return final_msg.replace('|','\x01')
+ 
+ 
+def MarketDataRequest(sender_comp_id, msg_seq_num, utc_timestamp):
+     
+    #Trade stream
+    trade_stream_fix_message=(
+        f"35=V|"
+        f"49={sender_comp_id}|"
+        f"56=SPOT|"
+        f"34={msg_seq_num}|"
+        f"52={utc_timestamp}|"
+        f"262=TRADE_STREAM|"
+        f"263=1|"
+        f"266=Y|"
+        f"146=1|"
+        f"55=BTCUSDT|"
+        f"267=1|"
+        f"269=2|"
+        )
+ 
+    #Book Ticker Stream
+    book_ticker_stream_fix_message=(
+        f"35=V|"
+        f"49={sender_comp_id}|"
+        f"56=SPOT|"
+        f"34={msg_seq_num}|"
+        f"52={utc_timestamp}|"
+        f"262=BOOK_TICKER_STREAM|"
+        f"263=1|"
+        f"264=1|"
+        f"266=Y|"
+        f"146=1|"
+        f"55=BTCUSDT|"
+        f"267=2|"
+        f"269=0|"
+        f"269=1|"
+        )
+ 
+    #Diff. Depth Stream
+    diff_depth_stream_fix_message=(
+        f"35=V|"
+        f"49={sender_comp_id}|"
+        f"56=SPOT|"
+        f"34={msg_seq_num}|"
+        f"52={utc_timestamp}|"
+        f"262=DIFF_DEPTH_STREAM|"
+        f"263=1|"
+        f"264=5|"
+        f"266=Y|"
+        f"146=1|"
+        f"55=BTCUSDT|"
+        f"267=2|"
+        f"269=0|"
+        f"269=1|"
+        )
+ 
+    return trade_stream_fix_message
+ 
+ 
+ 
+api_key = ""
+ 
+dir = os.path.dirname(__file__)
+f = open(dir+"/private_key.pem", "rb")
+private_key = f.read()                             
+private_key = ECC.import_key(private_key)
+ 
+ 
+ 
+utc_timestamp = get_time()
+sender_comp_id=''.join(random.sample(string.ascii_letters + string.digits,8))
+target_comp_id='SPOT'
+msg_seq_num=1
+payload = chr(1).join(['A',sender_comp_id,target_comp_id,str(msg_seq_num),utc_timestamp])
+signature = sign(payload)
+ 
+fix_message=(f"35=A|"f"49={sender_comp_id}|"f"56={target_comp_id}|"f"34={msg_seq_num}|"f"52={utc_timestamp}|"
+f"95={len(signature)}|"f"96={signature}|"f"98=0|"f"108=60|"f"141=Y|"f"553={api_key}|"f"25035=1|")
+ 
+ 
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+ssl_sock = ssl.wrap_socket(sock)
+ssl_sock.connect(('fix-md.binance.com', 9000))
+ 
+send_msg = get_final_message(fix_message)
+# print(type(send_msg.encode('ASCII')))
+print("send: ",send_msg.replace('\x01','|'))
+# send logon message
+ssl_sock.sendall(send_msg.encode('ASCII'))
+msg_seq_num += 1
+# get response
+ 
+ 
+response = ssl_sock.recv(4096)
+data_str = response.decode('ASCII')
+print("recv: ",data_str.replace("\x01","|"))
+ 
+fix_message = MarketDataRequest(sender_comp_id,msg_seq_num, get_time())
+send_msg = get_final_message(fix_message)
+ssl_sock.sendall(send_msg.encode('ASCII'))
+print("send: ",send_msg.replace('\x01','|'))
+msg_seq_num += 1
+ 
+while True:
+ 
+    response = ssl_sock.recv(4096)
+ 
+    if response:
+         
+        data_str = response.decode('ASCII')
+        print("recv: ",data_str.replace("\x01","|"))
+         
+        data_list = data_str.split('\x01')
+ 
+        if data_list[2] == '35=1':  # send Heartbeat to keep connected
+            TestReqID = data_list[-3]
+            #print(TestReqID)
+            fix_message=(f"35=0|"f"49={sender_comp_id}|"f"56={target_comp_id}|"f"34={msg_seq_num}|"f"52={get_time()}|"f"{TestReqID}|")
+            send_msg = get_final_message(fix_message)
+            print("send: ",send_msg.replace('\x01','|'))
+            ssl_sock.sendall(send_msg.encode('ASCII'))
+            msg_seq_num += 1`
+  },
+  {
+    id: "limit-query",
+    label: "LimitQuery<XLQ>",
+    badge: "FIX",
+    desc: "Order Entry · limit query",
+    ep: "fix-oe.binance.com:9000",
+    code: String.raw`from datetime import datetime, timezone
+from Crypto.Signature import eddsa
+from Crypto.PublicKey import ECC
+ 
+import os
+import base64
+import socket
+import ssl
+import random
+import string
+import time
+ 
+ 
+def get_time():
+    return datetime.now(timezone.utc).strftime('%Y%m%d-%H:%M:%S.%f')[:-3]
+ 
+def sign(payload):
+    sign = eddsa.new(private_key,'rfc8032')
+    sign_data = sign.sign(payload.encode("ASCII"))                   
+    signature = base64.b64encode(sign_data).decode('ASCII') 
+    return signature
+ 
+def get_final_message(fix_message):
+     
+    temp_str = f"8=FIX.4.4|9={len(fix_message)}|" + fix_message
+    chesum = sum(ord(char) for char in temp_str.replace('|','\x01'))
+    final_msg = temp_str + f"10={chesum%256:03}|"
+ 
+    return final_msg.replace('|','\x01')
+ 
+ 
+ 
+def new_request():
+    fix_message=(f"35=XLQ|"f"49={sender_comp_id}|"f"56={target_comp_id}|"f"34={msg_seq_num}|"f"52={utc_timestamp}|"
+                 f"6136={round(time.time()*1000)}|")
+    send_msg = get_final_message(fix_message)
+    print("send: ",send_msg.replace('\x01','|'))
+    return send_msg
+ 
+ 
+ 
+ 
+api_key = ""
+ 
+dir = os.path.dirname(__file__)
+f = open(dir+"/private_key.pem", "rb")
+private_key = f.read()                          
+private_key = ECC.import_key(private_key)
+ 
+ 
+ 
+utc_timestamp = get_time()
+sender_comp_id=''.join(random.sample(string.ascii_letters + string.digits,8))
+target_comp_id='SPOT'
+msg_seq_num=1
+payload = chr(1).join(['A',sender_comp_id,target_comp_id,str(msg_seq_num),utc_timestamp])
+signature = sign(payload)
+ 
+fix_message=(f"35=A|"f"49={sender_comp_id}|"f"56={target_comp_id}|"f"34=1|"f"52={utc_timestamp}|"
+f"95={len(signature)}|"f"96={signature}|"f"98=0|"f"108=60|"f"141=Y|"f"553={api_key}|"f"25035=1|")
+ 
+ 
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+ssl_sock = ssl.wrap_socket(sock)
+ssl_sock.connect(('fix-oe.binance.com', 9000))
+ 
+ 
+send_msg = get_final_message(fix_message)
+# print(type(send_msg.encode('ASCII')))
+print("send: ",send_msg.replace('\x01','|'))
+# send logon message
+ssl_sock.sendall(send_msg.encode('ASCII'))
+msg_seq_num += 1
+# get response
+response = ssl_sock.recv(4096)
+data_str = response.decode('ASCII')
+print("recv: ",data_str.replace("\x01","|"))
+ 
+ 
+ 
+newrequest = new_request()
+ssl_sock.sendall(newrequest.encode('ASCII'))
+msg_seq_num += 1
+ 
+response = ssl_sock.recv(4096)
+data_str = response.decode('ASCII')
+print("recv: ",data_str.replace("\x01","|"))`
+  },
+];
+
+function openFixModal() {
+  const overlay = document.getElementById("fix-modal-overlay");
+  overlay.style.display = "flex";
+  const grid = document.getElementById("fix-card-grid");
+  if (!grid.children.length) {
+    FIX_TYPES.forEach(t => {
+      const card = document.createElement("div");
+      card.className = "sq-card";
+      card.id = `fix-card-${t.id}`;
+      card.innerHTML =
+        `<div class="sq-card-type-badge">${t.badge}</div>` +
+        `<div class="sq-card-label">${t.label}</div>` +
+        `<div class="sq-card-desc">${t.desc}</div>` +
+        `<div class="sq-card-ep">${t.ep}</div>`;
+      card.addEventListener("click", () => showFixCode(t.id));
+      grid.appendChild(card);
+    });
+  }
+}
+
+function closeFixModal() {
+  document.getElementById("fix-modal-overlay").style.display = "none";
+}
+
+function showFixCode(id) {
+  const t = FIX_TYPES.find(x => x.id === id);
+  if (!t) return;
+  document.querySelectorAll("#fix-card-grid .sq-card").forEach(c => c.classList.remove("sq-active"));
+  const card = document.getElementById(`fix-card-${id}`);
+  if (card) card.classList.add("sq-active");
+  document.getElementById("fix-code-title").textContent = t.label;
+  const block = document.getElementById("fix-code-block");
+  block.textContent = t.code;
+  block.removeAttribute("data-highlighted");
+  if (window.hljs) hljs.highlightElement(block);
+  const wrap = document.getElementById("fix-code-wrap");
+  wrap.style.display = "";
+  setTimeout(() => wrap.scrollIntoView({ behavior: "smooth", block: "nearest" }), 50);
+}
+
+function copyFixCode() {
+  const code = document.getElementById("fix-code-block").textContent;
+  navigator.clipboard.writeText(code).then(() => {
+    const btn = document.getElementById("fix-copy-btn");
+    btn.textContent = "Copied!";
+    btn.classList.add("sq-copied");
+    setTimeout(() => { btn.textContent = "Copy"; btn.classList.remove("sq-copied"); }, 2000);
+  });
+}
+
+document.getElementById("ready-tpl-fix").addEventListener("click", openFixModal);
+
 render();
 </script>
 
@@ -12206,6 +12828,30 @@ render();
         <button class="sq-copy-btn" id="sq-copy-btn" onclick="copySquareCode()">Copy</button>
       </div>
       <pre><code id="sq-code-block" class="language-python"></code></pre>
+    </div>
+  </div>
+</div>
+
+<!-- ── FIX API Modal ─────────────────────────────────────────────── -->
+<div id="fix-modal-overlay" style="display:none;" onclick="if(event.target===this)closeFixModal()">
+  <div id="fix-modal">
+    <div class="sq-modal-header">
+      <div>
+        <h2>FIX API</h2>
+        <p>Select an example to view the Python code</p>
+      </div>
+      <button class="sq-close-btn" onclick="closeFixModal()">&#x2715;</button>
+    </div>
+    <div class="sq-card-grid" id="fix-card-grid"></div>
+    <div id="fix-code-wrap" style="display:none;">
+      <div class="sq-code-header">
+        <div>
+          <span class="sq-code-title" id="fix-code-title"></span>
+          <span class="sq-code-lang">Python &middot; pycryptodome</span>
+        </div>
+        <button class="sq-copy-btn" id="fix-copy-btn" onclick="copyFixCode()">Copy</button>
+      </div>
+      <pre><code id="fix-code-block" class="language-python"></code></pre>
     </div>
   </div>
 </div>
