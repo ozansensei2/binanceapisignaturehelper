@@ -1214,6 +1214,20 @@
     }
     .sq-code-title { font-size: 13px; font-weight: 600; color: #e6edf3; }
     .sq-code-lang  { font-size: 11px; color: #8b949e; margin-left: 8px; }
+    .fix-modal-deps {
+      margin: 8px 0 0;
+      font-size: 12px;
+      color: #8b949e;
+      line-height: 1.5;
+    }
+    .fix-modal-deps code {
+      font-size: 11px;
+      background: #21262d;
+      padding: 1px 5px;
+      border-radius: 4px;
+      border: 1px solid #30363d;
+      color: #e6edf3;
+    }
     .sq-copy-btn {
       background: none; border: 1px solid #30363d; color: #8b949e;
       font-size: 12px; cursor: pointer; border-radius: 5px;
@@ -12839,6 +12853,7 @@ render();
       <div>
         <h2>FIX API</h2>
         <p>Select an example to view the Python code</p>
+        <p class="fix-modal-deps">Requires <code>pycryptodome</code> for Ed25519 signing — install: <code>pip install pycryptodome</code></p>
       </div>
       <button class="sq-close-btn" onclick="closeFixModal()">&#x2715;</button>
     </div>
@@ -12847,7 +12862,7 @@ render();
       <div class="sq-code-header">
         <div>
           <span class="sq-code-title" id="fix-code-title"></span>
-          <span class="sq-code-lang">Python &middot; pycryptodome</span>
+          <span class="sq-code-lang">Python · requires pycryptodome</span>
         </div>
         <button class="sq-copy-btn" id="fix-copy-btn" onclick="copyFixCode()">Copy</button>
       </div>
