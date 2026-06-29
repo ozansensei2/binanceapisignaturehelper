@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Binance API Code Generator v202606292225</title>
+  <title>Binance API Code Generator v202606292230</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1243,7 +1243,7 @@
 <header>
   <div class="logo">B</div>
   <div>
-    <h1>Binance API Code Generator <span style="font-size:0.55em;opacity:0.5;font-weight:400">v202606292225</span></h1>
+    <h1>Binance API Code Generator <span style="font-size:0.55em;opacity:0.5;font-weight:400">v202606292230</span></h1>
     <p>Signed REST, WebSocket, and User Data Stream examples — with optional Binance docs import for REST.</p>
   </div>
 </header>
@@ -11735,7 +11735,7 @@ function wrapPdfLine(pdf, text, maxW) {
   return out.length ? out : [""];
 }
 
-function buildTextPdf(code, meta, endpoint) {
+function buildTextPdf(code) {
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
   const pageW = pdf.internal.pageSize.getWidth();
@@ -11752,32 +11752,6 @@ function buildTextPdf(code, meta, endpoint) {
       y = margin;
     }
   }
-
-  pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(11);
-  pdf.text("Binance API — Code Snippet", margin, y);
-  y += 7;
-
-  pdf.setFont("helvetica", "normal");
-  pdf.setFontSize(8.5);
-  if (meta) {
-    newPageIfNeeded(5);
-    pdf.text(meta, margin, y);
-    y += 5;
-  }
-  if (endpoint) {
-    wrapPdfLine(pdf, endpoint, maxW).forEach(line => {
-      newPageIfNeeded(4);
-      pdf.text(line, margin, y);
-      y += 4;
-    });
-    y += 2;
-  }
-
-  newPageIfNeeded(4);
-  pdf.setDrawColor(180, 180, 180);
-  pdf.line(margin, y, pageW - margin, y);
-  y += 5;
 
   pdf.setFont("courier", "normal");
   pdf.setFontSize(codeFontSize);
@@ -11805,12 +11779,7 @@ async function downloadPdfWithFilename(filenameBase) {
   try {
     const block = document.getElementById("code-block");
     const code = block ? block.textContent : "";
-    const meta = (document.getElementById("print-meta") || {}).textContent || "";
-    const endpoint =
-      (document.getElementById("print-ep") || {}).textContent ||
-      (document.getElementById("endpoint-display") || {}).textContent ||
-      "";
-    const pdf = buildTextPdf(code, meta.trim(), endpoint.trim());
+    const pdf = buildTextPdf(code);
     pdf.save(safeName + ".pdf");
     closePdfPopup();
   } catch (e) {
